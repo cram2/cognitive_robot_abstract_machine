@@ -44,7 +44,7 @@ def test_camera_can_be_added_without_a_robot():
     world = World()
     root = Body(name=PrefixedName(name="world"))
     with world.modify_world():
-        world.add_body(root)
+        world.add_body(body=root)
     model = PinholeCameraModel.from_field_of_view(
         resolution=CameraResolution(width=640, height=480),
         field_of_view=FieldOfView(
@@ -59,9 +59,11 @@ def test_camera_can_be_added_without_a_robot():
     )
 
     with world.modify_world():
-        world.add_semantic_annotation(camera)
+        world.add_semantic_annotation(semantic_annotation=camera)
 
-    assert world.get_semantic_annotations_by_type(Camera) == [camera]
+    assert world.get_semantic_annotations_by_type(semantic_annotation_type=Camera) == [
+        camera
+    ]
     assert not isinstance(camera, AbstractRobotPart)
     assert camera.resolution == model.resolution
     assert camera.field_of_view == model.field_of_view
@@ -116,7 +118,7 @@ def test_camera_predicates_use_projection_model_resolution(
         camera_model=model,
     )
     with table_world.modify_world():
-        table_world.add_semantic_annotation(camera)
+        table_world.add_semantic_annotation(semantic_annotation=camera)
 
     rendered_resolutions: list[CameraResolution] = []
 
@@ -152,9 +154,11 @@ def test_default_pr2_kinect_uses_rgb_optical_frame(
     """
     The default Kinect observes from its RGB sensor rather than the stereo camera.
     """
-    camera = pr2_world_state_reset.get_semantic_annotations_by_type(PR2KinectV1)[0]
+    camera = pr2_world_state_reset.get_semantic_annotations_by_type(
+        semantic_annotation_type=PR2KinectV1
+    )[0]
     rgb_optical_frame = pr2_world_state_reset.get_body_by_name(
-        "head_mount_kinect_rgb_optical_frame"
+        name="head_mount_kinect_rgb_optical_frame"
     )
 
     assert camera.root is rgb_optical_frame
@@ -171,11 +175,13 @@ def test_default_stretch_camera_uses_optical_positive_z(
     Default Stretch camera construction uses positive z in its optical frame.
     """
     monkeypatch.setattr(
-        table_world, "get_body_in_branch_by_name", lambda root, name: table_world.root
+        table_world,
+        "get_body_in_branch_by_name",
+        lambda *, branch_root, name: table_world.root,
     )
 
     camera = camera_type.setup_default_configuration_in_world_below_robot_root(
-        table_world.root
+        robot_root=table_world.root
     )
 
     assert np.array_equal(

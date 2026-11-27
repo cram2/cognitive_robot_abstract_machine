@@ -45,11 +45,11 @@ from semantic_digital_twin.world import World
 box_world = World()
 
 with box_world.modify_world():
-    box = Body(name=PrefixedName("box"), collision=ShapeCollection([Box(scale=Scale(0.5, 0.5, 0.5),
+    box = Body(name=PrefixedName(name="box"), collision=ShapeCollection(shapes=[Box(scale=Scale(x=0.5, y=0.5, z=0.5),
                                                         color=Color.from_rgba(red=1., green=1., blue=1., opacity=1.),
                                                         origin=HomogeneousTransformationMatrix.from_xyz_rpy(0,0,0,0,0,0),)],
                                                         ))
-    box_world.add_kinematic_structure_entity(box)
+    box_world.add_kinematic_structure_entity(kinematic_structure_entity=box)
     
 ```
 
@@ -62,9 +62,9 @@ from random_events.interval import SimpleInterval
 from semantic_digital_twin.world_description.graph_of_convex_sets.boxes import VolumetricGraphOfBoundingBoxes
 from semantic_digital_twin.world_description.geometry import VolumetricBoundingBox
 
-search_space = BoundingBoxCollection([VolumetricBoundingBox(min_x=-1, max_x=1,
+search_space = BoundingBoxCollection(shapes=[VolumetricBoundingBox(min_x=-1, max_x=1,
                            min_y=-1, max_y=1,
-                           min_z=0.1, max_z=0.2, origin=HomogeneousTransformationMatrix(reference_frame=box_world.root))], box_world.root)
+                           min_z=0.1, max_z=0.2, origin=HomogeneousTransformationMatrix(reference_frame=box_world.root))], reference_frame=box_world.root)
                            
 graph_of_bounding_boxes = VolumetricGraphOfBoundingBoxes.free_space_from_world(world=box_world, search_space=search_space)
 ```
@@ -94,7 +94,7 @@ from krrood_spatial_math.spatial_types import Point3
 
 start = Point3(-0.75, 0, 0.15, reference_frame=box_world.root)
 goal = Point3(0.75, 0, 0.15, reference_frame=box_world.root)
-path = graph_of_bounding_boxes.path_from_to(start, goal)
+path = graph_of_bounding_boxes.path_from_to(start=start, goal=goal)
 print("A potential path is", [(point.x, point.y) for point in path])
 ```
 
@@ -106,12 +106,12 @@ from semantic_digital_twin.adapters.urdf import URDFParser
 
 apartment = "package://iai_kitchen/urdf_obj/kitchen_with_walls.urdf"
 
-apartment_parser = URDFParser.from_file(apartment)
+apartment_parser = URDFParser.from_file(file_path=apartment)
 world = apartment_parser.create_world()
 
-search_space = BoundingBoxCollection([VolumetricBoundingBox(min_x=-2, max_x=2,
+search_space = BoundingBoxCollection(shapes=[VolumetricBoundingBox(min_x=-2, max_x=2,
                            min_y=-2, max_y=2,
-                           min_z=0., max_z=2, origin=HomogeneousTransformationMatrix(reference_frame=world.root))], world.root)
+                           min_z=0., max_z=2, origin=HomogeneousTransformationMatrix(reference_frame=world.root))], reference_frame=world.root)
 graph_of_bounding_boxes = VolumetricGraphOfBoundingBoxes.free_space_from_world(world=world, search_space=search_space)
 ```
 
@@ -143,7 +143,7 @@ Finally, let's find a way from here to there:
 ```{code-cell} ipython3
 start = Point3(-0.75, 0, 1.15, reference_frame=world.root)
 goal = Point3(0.75, 0, 1.15, reference_frame=world.root)
-path = graph_of_bounding_boxes.path_from_to(start, goal)
+path = graph_of_bounding_boxes.path_from_to(start=start, goal=goal)
 print("A potential path is", [(point.x, point.y, point.z) for point in path])
 ```
 

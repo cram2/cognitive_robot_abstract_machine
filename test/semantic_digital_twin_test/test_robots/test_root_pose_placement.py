@@ -20,11 +20,11 @@ def _pr2_behind_an_odom(
     The specification path is what puts the odom between the world root and the robot,
     so the placement is exercised against the same chain a specification builds.
     """
-    world = World.create_with_root_body("root")
+    world = World.create_with_root_body(root_body_name="root")
     try:
         robot = RobotSpecification(
             semantic_annotation_type=PR2, localization_pose=world_T_odometry
-        ).spawn(world)
+        ).spawn(world=world)
     except ParsingError as error:
         pytest.skip(f"PR2 URDF not available: {error}")
     return world, robot
@@ -44,7 +44,7 @@ def test_root_reaches_a_world_pose_through_a_displaced_odom():
     world, robot = _pr2_behind_an_odom(_DISPLACED_ODOM)
     target = Pose.from_xyz_rpy(1.3, 2.0, 0.0, yaw=0.25, reference_frame=world.root)
 
-    robot.set_root_pose(target)
+    robot.set_root_pose(pose=target)
 
     np.testing.assert_allclose(
         robot.root.global_pose.to_np(), target.to_np(), atol=1e-9
@@ -55,7 +55,7 @@ def test_root_reaches_a_world_pose_through_an_undisplaced_odom():
     world, robot = _pr2_behind_an_odom(HomogeneousTransformationMatrix())
     target = Pose.from_xyz_rpy(1.3, 2.0, 0.0, yaw=0.25, reference_frame=world.root)
 
-    robot.set_root_pose(target)
+    robot.set_root_pose(pose=target)
 
     np.testing.assert_allclose(
         robot.root.global_pose.to_np(), target.to_np(), atol=1e-9
@@ -72,6 +72,6 @@ def test_pose_in_the_root_connection_parent_frame_is_applied_unchanged():
         1.3, 2.0, 0.0, yaw=0.25, reference_frame=connection.parent
     )
 
-    robot.set_root_pose(target)
+    robot.set_root_pose(pose=target)
 
     np.testing.assert_allclose(connection.origin.to_np(), target.to_np(), atol=1e-9)

@@ -6,7 +6,7 @@ from http import HTTPStatus
 from krrood.exceptions import DataclassException
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PartFindingServerUnknownError(DataclassException):
     """
     Raised when a part finding client is given no server to ask.
@@ -27,7 +27,7 @@ class PartFindingServerUnknownError(DataclassException):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PartFindingServerError(DataclassException):
     """
     Raised when a part finding server does not answer a query with the parts.

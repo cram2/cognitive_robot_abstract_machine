@@ -56,7 +56,7 @@ class RecordingRobotSpecification(RobotSpecification):
     The worlds the robot was put into, in order.
     """
 
-    def spawn(self, world: World) -> None:
+    def spawn(self, *, world: World) -> None:
         self.spawned_into.append(world)
 
 
@@ -139,7 +139,11 @@ class RecordingDemonstration(RobotDemonstration):
         self.populated_scene_roots.append(world.root.id)
 
     def build_context_extensions(self, *, world: World) -> list[ContextExtension]:
-        return robot_extensions(world.get_semantic_annotations_by_type(MinimalRobot)[0])
+        return robot_extensions(
+            world.get_semantic_annotations_by_type(
+                semantic_annotation_type=MinimalRobot
+            )[0]
+        )
 
     def build_statechart(self, *, context: StatechartContext) -> Statechart:
         statechart = Statechart(context=context)
@@ -239,7 +243,9 @@ def test_real_run_merges_the_scene_into_a_world_that_does_not_have_it(
         demonstration.tear_down()
 
     [scene_root_id] = demonstration.populated_scene_roots
-    scene_root = cylinder_bot_world.get_kinematic_structure_entity_by_id(scene_root_id)
+    scene_root = cylinder_bot_world.get_kinematic_structure_entity_by_id(
+        id=scene_root_id
+    )
     assert acquired_world is cylinder_bot_world
     assert cylinder_bot_world.root is controller_root
     assert scene_root.parent_connection.parent is controller_root

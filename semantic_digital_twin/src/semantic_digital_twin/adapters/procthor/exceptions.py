@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from semantic_digital_twin.exceptions import ParsingError
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnpairedProcthorWalls(ParsingError):
     """
     Raised when the walls of a house that hold no door do not come in pairs.
@@ -25,7 +25,7 @@ class UnpairedProcthorWalls(ParsingError):
         return "Describe every wall from both of its sides."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ProcthorDoorWallNotFound(ParsingError):
     """
     Raised when a door refers to a wall that the house does not describe.

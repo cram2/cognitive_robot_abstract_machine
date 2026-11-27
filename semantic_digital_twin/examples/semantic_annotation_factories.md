@@ -50,7 +50,7 @@ world = World.create_with_root_body()
 with world.modify_world():
     drawer = Drawer.create_with_new_body_in_world(
         name="drawer",
-        scale=Scale(0.2, 0.4, 0.2),
+        scale=Scale(x=0.2, y=0.4, z=0.2),
         world=world,
         world_root_T_self=HomogeneousTransformationMatrix(),
     )
@@ -58,7 +58,7 @@ with world.modify_world():
         name="drawer_handle",
         world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=-0.1),
         world=world,
-        scale=Scale(0.05, 0.02, 0.1)
+        scale=Scale(x=0.05, y=0.02, z=0.1)
     )
     drawer.add(part=handle)
 
@@ -66,7 +66,7 @@ assert drawer.handle is handle
 assert drawer in world.semantic_annotations
 assert handle in world.semantic_annotations
 print(*world.semantic_annotations, sep="\n")
-rt = RayTracer(world)
+rt = RayTracer(world=world)
 rt.update_scene()
 rt.scene.show("jupyter")
 ```

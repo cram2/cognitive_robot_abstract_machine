@@ -53,15 +53,15 @@ world = ...
 :tags: [example-solution]
 table_urdf = "package://iai_objects/urdf/table.urdf"
 
-world = URDFParser.from_file(table_urdf).create_world()
+world = URDFParser.from_file(file_path=table_urdf).create_world()
 ```
 
 ```{code-cell} ipython3
 :tags: [verify-solution, remove-input]
 from semantic_digital_twin.world import World
-if world is ...: raise ExerciseVerificationFailed("Create a World by parsing the URDF file.")
-if not isinstance(world, World): raise ExerciseVerificationFailed("`world` must be an instance of World.")
-if len(world.bodies) != 6: raise ExerciseVerificationFailed("The loaded world must contain 6 bodies.")
-if world.get_connection_by_name("left_front_leg_to_top") is None: raise ExerciseVerificationFailed("The world should contain a connection named 'left_front_leg_to_top'.")
-rt = RayTracer(world); rt.update_scene(); rt.scene.show("jupyter")
+if world is ...: raise ExerciseVerificationFailed(requirement="Create a World by parsing the URDF file.")
+if not isinstance(world, World): raise ExerciseVerificationFailed(requirement="`world` must be an instance of World.")
+if len(world.bodies) != 6: raise ExerciseVerificationFailed(requirement="The loaded world must contain 6 bodies.")
+if world.get_connection_by_name(name="left_front_leg_to_top") is None: raise ExerciseVerificationFailed(requirement="The world should contain a connection named 'left_front_leg_to_top'.")
+rt = RayTracer(world=world); rt.update_scene(); rt.scene.show("jupyter")
 ```

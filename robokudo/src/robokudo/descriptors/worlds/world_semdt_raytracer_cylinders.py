@@ -52,7 +52,7 @@ class WorldDescriptor(BaseWorldDescriptor):
         object_specs = [
             ObjectSpec(
                 name="table",
-                box_scale=Scale(1.20, 0.80, table_thickness),
+                box_scale=Scale(x=1.20, y=0.80, z=table_thickness),
                 color=Color.from_rgba(red=0.65, green=0.58, blue=0.48, opacity=1.0),
                 pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=-1.10,
@@ -91,7 +91,7 @@ class WorldDescriptor(BaseWorldDescriptor):
         region_specs = [
             RegionSpec(
                 name="table_surface_region",
-                box_scale=Scale(1.00, 0.60, table_surface_region_thickness),
+                box_scale=Scale(x=1.00, y=0.60, z=table_surface_region_thickness),
                 parent_name="table",
                 color=Color.from_rgba(red=0.10, green=0.70, blue=0.30, opacity=0.20),
                 pose=HomogeneousTransformationMatrix.from_xyz_rpy(

@@ -305,7 +305,9 @@ class GraphOfConvexSetsFreespaceBenchmark:
             )
 
         return cls(
-            world_loader=lambda: URDFParser.from_file(str(urdf_path)).create_world(),
+            world_loader=lambda: URDFParser.from_file(
+                file_path=str(urdf_path)
+            ).create_world(),
             search_space_factory=_search_space_factory,
             environment_name=Path(urdf_path).stem,
         )
@@ -325,7 +327,7 @@ class GraphOfConvexSetsFreespaceBenchmark:
         :param model_id: PartNet-Mobility model identifier (e.g. ``179``).
         """
         return cls(
-            world_loader=lambda: loader.load(model_id),
+            world_loader=lambda: loader.load(model_id=model_id),
             search_space_factory=lambda world: cls._compute_minimal_search_space(
                 cls._collect_obstacles(world), world
             ),
@@ -399,7 +401,9 @@ class GraphOfConvexSetsFreespaceBenchmark:
 
         def _materialise_free_space():
             return BoundingBoxCollection.from_event(
-                VolumetricBoundingBox, reference_frame=world.root, event=free_space
+                box_type=VolumetricBoundingBox,
+                reference_frame=world.root,
+                event=free_space,
             )
 
         free_space_collection, materialise_elapsed = self._measure(
@@ -411,7 +415,7 @@ class GraphOfConvexSetsFreespaceBenchmark:
                 world=world, search_space=search_space
             )
             for bounding_box in free_space_collection:
-                graph_of_convex_sets.add_node(bounding_box)
+                graph_of_convex_sets.add_node(box=bounding_box)
             graph_of_convex_sets.calculate_connectivity(tolerance=0.001)
             return graph_of_convex_sets
 
@@ -459,7 +463,9 @@ class GraphOfConvexSetsFreespaceBenchmark:
         )
 
         def _grow_convex_polygons():
-            return GraphOfConvexPolygons.from_world(world, search_space)
+            return GraphOfConvexPolygons.from_world(
+                world=world, search_space=search_space
+            )
 
         graph_of_convex_polygons, polygon_construction_elapsed = self._measure(
             _grow_convex_polygons, repetitions=3
@@ -555,7 +561,7 @@ class GraphOfConvexSetsFreespaceBenchmark:
         """
         annotation = SemanticEnvironmentAnnotation(root=world.root, _world=world)
         origin = HomogeneousTransformationMatrix(reference_frame=world.root)
-        return list(annotation.as_bounding_box_collection_at_origin(origin))
+        return list(annotation.as_bounding_box_collection_at_origin(origin=origin))
 
     @staticmethod
     def _collect_obstacle_shapes(world: World) -> list[Shape]:
@@ -714,7 +720,7 @@ def main():
     arguments = _parse_arguments()
 
     urdf_files = [
-        Path(PackageUriResolver().resolve(environment))
+        Path(PackageUriResolver().resolve(uri=environment))
         for environment in BenchmarkedUrdfEnvironment
     ]
 

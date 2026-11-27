@@ -63,7 +63,7 @@ ROBOT_START_POSE = Pose.from_xyz_rpy(1.9, 9.1, PELVIS_HEIGHT_ABOVE_FLOOR)
 Where the robot starts, in the aisle south of the two pallet stacks.
 """
 
-PARCEL_SCALE = Scale(0.08, 0.08, 0.14)
+PARCEL_SCALE = Scale(x=0.08, y=0.08, z=0.14)
 """
 The extents of the transported parcel.
 """
@@ -95,7 +95,7 @@ def build_world() -> World:
     :return: The warehouse with the G1 and the parcel in it.
     """
     world = WorldSpecification.from_gazebo(
-        WORLD_URI,
+        file_path=WORLD_URI,
         robots=[
             RobotSpecification(
                 semantic_annotation_type=UnitreeG1,
@@ -104,8 +104,8 @@ def build_world() -> World:
         ],
         objects=[
             BodySpecification.box(
-                "parcel",
-                PARCEL_SCALE,
+                name="parcel",
+                scale=PARCEL_SCALE,
                 color=Color.from_rgba(red=0.85, green=0.45, blue=0.1),
                 parent_T_self=PICK_POSE.homogeneous_matrix,
             )
@@ -114,7 +114,9 @@ def build_world() -> World:
     # The parcel stands in for any graspable object; the plan only needs an annotation
     # to name it by, not a particular kind of object.
     with world.modify_world():
-        world.add_semantic_annotation(Parcel(root=world.get_body_by_name("parcel")))
+        world.add_semantic_annotation(
+            semantic_annotation=Parcel(root=world.get_body_by_name(name="parcel"))
+        )
     return world
 
 
@@ -126,7 +128,7 @@ def straighten_torso(robot: AbstractRobot) -> JointPositionList:
     """
     return JointPositionList(
         goal_state=JointState.from_mapping(
-            {connection: 0.0 for connection in robot.torso.active_connections}
+            mapping={connection: 0.0 for connection in robot.torso.active_connections}
         )
     )
 
@@ -161,7 +163,7 @@ def build_statechart(
     """
     world = context.world
     robot = context.require_extension(extension_type=RobotAccess).robot
-    parcel = world.get_semantic_annotations_by_type(Parcel)[0]
+    parcel = world.get_semantic_annotations_by_type(semantic_annotation_type=Parcel)[0]
     statechart = Statechart(context=context)
     statechart.add_node(
         node=Sequence(
@@ -208,10 +210,10 @@ def lowest_collision_point_of(robot: UnitreeG1, world: World) -> float:
     :return: The height of the robot's lowest collision geometry above the world's floor.
     """
     return min(
-        body.collision.as_bounding_box_collection_in_frame(world.root)
+        body.collision.as_bounding_box_collection_in_frame(reference_frame=world.root)
         .bounding_box()
         .min_z
-        for body in world.get_kinematic_structure_entities_of_branch(robot.root)
+        for body in world.get_kinematic_structure_entities_of_branch(root=robot.root)
         if body.collision
     )
 
@@ -246,7 +248,7 @@ def run(
 
 
 world = build_world()
-robot = world.get_semantic_annotations_by_type(UnitreeG1)[0]
+robot = world.get_semantic_annotations_by_type(semantic_annotation_type=UnitreeG1)[0]
 
 # Keeps PELVIS_HEIGHT_ABOVE_FLOOR honest: the robot has to stand on the floor rather than
 # sink into it or hover above it.
@@ -261,7 +263,7 @@ with RobotDemonstrationRosSession.start(node_name="warehouse_demo") as ros_sessi
         run(PLACE_POSE, PICK_POSE, 1.57, world, robot, ros_session.node, visualizations)
     run(PICK_POSE, PLACE_POSE, -1.57, world, robot, ros_session.node, visualizations)
 
-parcel_position = world.get_body_by_name("parcel").global_pose
+parcel_position = world.get_body_by_name(name="parcel").global_pose
 print(f"parcel delivered to {np.round(parcel_position.position, 3)}")
 print(f"Expected parcel to be delivered to {np.round(PLACE_POSE.position, 3)}")
 assert np.allclose(parcel_position, PLACE_POSE, atol=0.05)

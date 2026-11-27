@@ -31,7 +31,7 @@ except ImportError:
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ArtVipDatasetLoader:
     """
     Loader for professionally modelled, articulated digital-twin objects from the ArtVIP
@@ -77,7 +77,7 @@ class ArtVipDatasetLoader:
     :meth:`load` call.
     """
 
-    def available_objects(self, category: ArtVipCategory) -> tuple[str, ...]:
+    def available_objects(self, *, category: ArtVipCategory) -> tuple[str, ...]:
         """
         :param category: The category to list objects of.
         :return: Every object name in ``category`` - the path (relative to the
@@ -88,10 +88,10 @@ class ArtVipDatasetLoader:
             that segment too.
         """
         prefix = f"Articulated_objects/{category.value}/"
-        return self._object_names(self._list_repository_files(), prefix)
+        return self._object_names(files=self._list_repository_files(), prefix=prefix)
 
     @staticmethod
-    def _object_names(files: tuple[str, ...], prefix: str) -> tuple[str, ...]:
+    def _object_names(*, files: tuple[str, ...], prefix: str) -> tuple[str, ...]:
         """
         :param files: Every file path in the dataset repository.
         :param prefix: The category's path prefix, e.g.
@@ -125,7 +125,7 @@ class ArtVipDatasetLoader:
             )
         return self._repository_files
 
-    def load(self, category: ArtVipCategory, name: str) -> ArtVipObject:
+    def load(self, *, category: ArtVipCategory, name: str) -> ArtVipObject:
         """
         Load one object as a World, with joints for its links.
 
@@ -135,18 +135,22 @@ class ArtVipDatasetLoader:
         :return: The loaded object.
         :raises ArtVipObjectNotFoundError: if no dataset entry matches category and name.
         """
-        main_usd_path = self._download_object_if_not_exists(category, name)
-        world = USDParser.from_file(str(main_usd_path), prefix=name).create_world()
+        main_usd_path = self._download_object_if_not_exists(
+            category=category, name=name
+        )
+        world = USDParser.from_file(
+            file_path=str(main_usd_path), prefix=name
+        ).create_world()
         with world.modify_world():
             world.add_semantic_annotation(
-                NaturalLanguageWithTypeDescription(
+                semantic_annotation=NaturalLanguageWithTypeDescription(
                     root=world.root, description=name, type_description=category.value
                 )
             )
         return ArtVipObject(world=world, category=category, name=name)
 
     def _download_object_if_not_exists(
-        self, category: ArtVipCategory, name: str
+        self, *, category: ArtVipCategory, name: str
     ) -> Path:
         """
         Download every file of one object if not already present, preserving the
@@ -171,7 +175,7 @@ class ArtVipDatasetLoader:
             raise ArtVipObjectNotFoundError(category=category, name=name)
 
         main_relative_path = self._main_stage_file(
-            object_files, prefix, category=category, name=name
+            object_files=object_files, prefix=prefix, category=category, name=name
         )
 
         main_usd_path = None
@@ -195,9 +199,9 @@ class ArtVipDatasetLoader:
 
     @staticmethod
     def _main_stage_file(
+        *,
         object_files: list[str],
         prefix: str,
-        *,
         category: ArtVipCategory,
         name: str,
     ) -> str:

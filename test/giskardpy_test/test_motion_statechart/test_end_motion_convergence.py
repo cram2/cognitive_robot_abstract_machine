@@ -22,7 +22,7 @@ def test_end_motion_abruptness(cylinder_bot_world: World):
     Ends a motion of the cylinder bot and prints how fast the bot still moves when the
     statechart ends.
     """
-    tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+    tip = cylinder_bot_world.get_kinematic_structure_entity_by_name(name="bot")
 
     executor = StatechartExecutor(
         context=StatechartContext(world=cylinder_bot_world),

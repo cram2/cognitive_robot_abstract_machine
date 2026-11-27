@@ -83,7 +83,9 @@ class QPControllerConfig:
 
     dof_weights: dict[PrefixedName, DerivativeMap[float]] = field(
         default_factory=lambda: defaultdict(
-            lambda: DerivativeMap(None, 0.01, None, None)
+            lambda: DerivativeMap(
+                position=None, velocity=0.01, acceleration=None, jerk=None
+            )
         )
     )
     """

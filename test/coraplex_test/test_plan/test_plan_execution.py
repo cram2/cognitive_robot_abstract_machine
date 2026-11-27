@@ -135,7 +135,7 @@ def test_a_plan_that_fails_raises_motion_did_not_finish(pr2_apartment_context) -
 
 def test_preparing_a_plan_does_not_move_the_robot(pr2_apartment_context) -> None:
     world, robot_view, extensions = pr2_apartment_context
-    torso = world.get_degree_of_freedom_by_name(PR2Joint.TORSO_LIFT).id
+    torso = world.get_degree_of_freedom_by_name(name=PR2Joint.TORSO_LIFT).id
     position_before = world.state[torso].position
     executor = simulated_executor(extensions)
 
@@ -212,7 +212,7 @@ def executor_reaching_out_of_range(
         arm cannot close on.
     """
     world, robot_view, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     milk.root.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         2, 1.5, 50, reference_frame=milk.root.parent_connection.parent
     )
@@ -468,15 +468,18 @@ def tiago_world_with_a_stretch(_tiago_world_setup) -> World:
     """
     world = deepcopy(_tiago_world_setup)
     RobotSpecification(
-        Stretch, localization_pose=HomogeneousTransformationMatrix.from_xyz_rpy(x=3)
-    ).spawn(world)
+        semantic_annotation_type=Stretch,
+        localization_pose=HomogeneousTransformationMatrix.from_xyz_rpy(x=3),
+    ).spawn(world=world)
     return world
 
 
 def test_collision_avoidance_is_compiled_for_the_robot_performing_the_plan(
     tiago_world_with_a_stretch,
 ) -> None:
-    [tiago] = tiago_world_with_a_stretch.get_semantic_annotations_by_type(Tiago)
+    [tiago] = tiago_world_with_a_stretch.get_semantic_annotations_by_type(
+        semantic_annotation_type=Tiago
+    )
     plan = MoveTorsoAction(torso_state=TorsoState.HIGH)
     executor = simulated_executor(robot_extensions(tiago), collision_avoidance=True)
 
@@ -496,7 +499,9 @@ def test_collision_avoidance_is_compiled_for_the_robot_performing_the_plan(
 def test_a_plan_avoiding_collisions_succeeds_in_a_world_with_another_robot(
     tiago_world_with_a_stretch,
 ) -> None:
-    [tiago] = tiago_world_with_a_stretch.get_semantic_annotations_by_type(Tiago)
+    [tiago] = tiago_world_with_a_stretch.get_semantic_annotations_by_type(
+        semantic_annotation_type=Tiago
+    )
     plan = MoveTorsoAction(torso_state=TorsoState.HIGH)
     executor = simulated_executor(robot_extensions(tiago), collision_avoidance=True)
 

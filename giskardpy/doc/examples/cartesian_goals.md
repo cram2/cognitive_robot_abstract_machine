@@ -43,27 +43,27 @@ world = urdf_parser.create_world()
 
 # Initialize PR2 semantic annotation
 try:
-    pr2 = PR2.from_world(world)
+    pr2 = PR2.from_world(world=world)
 except Exception as e:
     print(f"Warning: Could not fully initialize PR2 semantic annotation: {e}")
 
 # Replicate the world structure from world_with_urdf_factory:
 # map -> odom_combined -> base_footprint (robot root)
 with world.modify_world():
-    map_body = Body(name=PrefixedName("map"))
-    localization_body = Body(name=PrefixedName("odom_combined"))
+    map_body = Body(name=PrefixedName(name="map"))
+    localization_body = Body(name=PrefixedName(name="odom_combined"))
 
     map_C_localization = Connection6DoF.create_with_dofs(
         world=world, parent=map_body, child=localization_body
     )
-    world.add_connection(map_C_localization)
+    world.add_connection(connection=map_C_localization)
 
     c_root_bf = OmniDrive.create_with_dofs(
         parent=localization_body,
         child=world.root,
         world=world,
     )
-    world.add_connection(c_root_bf)
+    world.add_connection(connection=c_root_bf)
     c_root_bf.has_hardware_interface = True
 
 # 2. Set up the executor with motion control, and create a Motion Statechart in its context
@@ -81,7 +81,7 @@ statechart = Statechart(context=executor.context)
 # 3. Define a Cartesian Pose Goal
 # We want to move the left gripper to a specific pose relative to the world root
 root_link = world.root
-tip_link = world.get_body_by_name("l_gripper_tool_frame")
+tip_link = world.get_body_by_name(name="l_gripper_tool_frame")
 
 goal_pose = Pose(
     position=Vector3(0.5, 0.5, 1.2), 

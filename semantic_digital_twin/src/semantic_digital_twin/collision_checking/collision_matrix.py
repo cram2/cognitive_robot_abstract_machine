@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from ..world import World
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CollisionCheck(SubclassJSONSerializer):
     """
     Represents a collision check between two bodies.
@@ -37,6 +37,7 @@ class CollisionCheck(SubclassJSONSerializer):
     """
     First body in the collision check.
     """
+
     body_b: Body
     """
     Second body in the collision check.
@@ -47,16 +48,16 @@ class CollisionCheck(SubclassJSONSerializer):
     Minimum distance to check for collisions.
     """
 
-    def copy_for_world(self, world: World) -> Self:
+    def copy_for_world(self, *, world: World) -> Self:
         return CollisionCheck(
-            body_a=world.get_world_entity_with_id_by_id(self.body_a.id),
-            body_b=world.get_world_entity_with_id_by_id(self.body_b.id),
+            body_a=world.get_world_entity_with_id_by_id(id=self.body_a.id),
+            body_b=world.get_world_entity_with_id_by_id(id=self.body_b.id),
             distance=self.distance,
         )
 
     @classmethod
     def create_for_bodies_with_collision(
-        cls, body_a: Body, body_b: Body, distance: float | None = None
+        cls, *, body_a: Body, body_b: Body, distance: float | None = None
     ) -> Self:
         """
         Creates a CollisionCheck instance for two bodies that are already known to have
@@ -75,16 +76,16 @@ class CollisionCheck(SubclassJSONSerializer):
         """
         self = cls(body_a=body_a, body_b=body_b, distance=distance)
         if self.distance is not None and self.distance < 0:
-            raise NegativeCollisionCheckingDistanceError(self)
+            raise NegativeCollisionCheckingDistanceError(collision_check=self)
 
         if self.body_a == self.body_b:
-            raise InvalidBodiesInCollisionCheckError(self)
+            raise InvalidBodiesInCollisionCheckError(collision_check=self)
         self.sort_bodies()
         return self
 
     @classmethod
     def create_and_validate(
-        cls, body_a: Body, body_b: Body, distance: float | None = None
+        cls, *, body_a: Body, body_b: Body, distance: float | None = None
     ) -> Self:
         """
         Creates a CollisionCheck instance and validates its properties, including that
@@ -96,12 +97,14 @@ class CollisionCheck(SubclassJSONSerializer):
         :param distance: Minimum distance to check for collisions.
         :return: Validated CollisionCheck instance.
         """
-        self = cls.create_for_bodies_with_collision(body_a, body_b, distance)
+        self = cls.create_for_bodies_with_collision(
+            body_a=body_a, body_b=body_b, distance=distance
+        )
         if not self.body_a.has_collision():
-            raise BodyHasNoGeometryError(self)
+            raise BodyHasNoGeometryError(collision_check=self)
 
         if not self.body_b.has_collision():
-            raise BodyHasNoGeometryError(self)
+            raise BodyHasNoGeometryError(collision_check=self)
         return self
 
     def __repr__(self):
@@ -138,7 +141,7 @@ class CollisionCheck(SubclassJSONSerializer):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CollisionMatrix:
     """
     Describes a matrix in sparse format by storing only unique pairs of bodies with
@@ -163,18 +166,20 @@ class CollisionMatrix:
     def __hash__(self):
         return hash(id(self))
 
-    def apply_buffer(self, buffer: float):
+    def apply_buffer(self, *, buffer: float):
         self.collision_checks = {
             CollisionCheck(
-                check.body_a,
-                check.body_b,
-                check.distance + buffer if check.distance is not None else None,
+                body_a=check.body_a,
+                body_b=check.body_b,
+                distance=check.distance + buffer
+                if check.distance is not None
+                else None,
             )
             for check in self.collision_checks
         }
 
     @classmethod
-    def create_all_checks(cls, distance: float, world: World) -> Self:
+    def create_all_checks(cls, *, distance: float, world: World) -> Self:
         return CollisionMatrix(
             collision_checks={
                 CollisionCheck(body_a=body_a, body_b=body_b, distance=distance)
@@ -182,7 +187,7 @@ class CollisionMatrix:
             }
         )
 
-    def add_collision_checks(self, collision_checks: set[CollisionCheck]):
+    def add_collision_checks(self, *, collision_checks: set[CollisionCheck]):
         """
         Adds collision checks to the matrix.
 
@@ -193,11 +198,11 @@ class CollisionMatrix:
             self.collision_checks - collision_checks
         ) | collision_checks
 
-    def remove_collision_checks(self, collision_checks: set[CollisionCheck]):
+    def remove_collision_checks(self, *, collision_checks: set[CollisionCheck]):
         self.collision_checks -= collision_checks
 
     def is_collision_groups_combination_checked(
-        self, group_a: CollisionGroup, group_b: CollisionGroup
+        self, *, group_a: CollisionGroup, group_b: CollisionGroup
     ) -> bool:
         """
         Checks if any combination of bodies between groups is in the collision matrix.
@@ -208,12 +213,13 @@ class CollisionMatrix:
             collision matrix, False otherwise.
         """
         return any(
-            CollisionCheck.create_and_validate(body_a, body_b) in self.collision_checks
+            CollisionCheck.create_and_validate(body_a=body_a, body_b=body_b)
+            in self.collision_checks
             for body_a, body_b in product(group_a.bodies, group_b.bodies)
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CollisionRule(ABC):
     """
     Base class for collision rules.
@@ -227,31 +233,31 @@ class CollisionRule(ABC):
     """
 
     @abstractmethod
-    def apply_to_collision_matrix(self, collision_matrix: CollisionMatrix):
+    def apply_to_collision_matrix(self, *, collision_matrix: CollisionMatrix):
         """
         Modifies the collision matrix by adding or removing collision checks.
         """
 
-    def is_up_to_date(self, world: World) -> bool:
+    def is_up_to_date(self, *, world: World) -> bool:
         """
         Checks if the collision rule is up to date with the current state of the world.
         """
         return self._last_world_model_version == world._model_manager.version
 
-    def update(self, world: World):
+    def update(self, *, world: World):
         """
         Updates the collision rule based on the current state of the world, if the world
         model has changed.
 
         :param world: The world used for updating
         """
-        if self.is_up_to_date(world):
+        if self.is_up_to_date(world=world):
             return
-        self._update(world)
+        self._update(world=world)
         self._last_world_model_version = world._model_manager.version
 
     @abstractmethod
-    def _update(self, world: World):
+    def _update(self, *, world: World):
         """
         Specific update logic for the collision rule.
 
@@ -259,7 +265,7 @@ class CollisionRule(ABC):
         """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MaxAvoidedCollisionsRule(ABC):
     """
     Base class for collision rules that define the maximum number of collisions that can
@@ -267,25 +273,25 @@ class MaxAvoidedCollisionsRule(ABC):
     """
 
     @abstractmethod
-    def get_max_avoided_collisions(self, body: Body) -> int | None:
+    def get_max_avoided_collisions(self, *, body: Body) -> int | None:
         """
         :param body: The body for which to get the maximum number of collisions that can be avoided.
         :return: The maximum number of collisions that can be avoided for the given body, or None if no rule is defined for it.
         """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DefaultMaxAvoidedCollisions(MaxAvoidedCollisionsRule):
     """
     Default implementation of MaxAvoidedCollisionsRule that sets the maximum number of
     avoided collisions to 1 for all bodies.
     """
 
-    def get_max_avoided_collisions(self, body: Body) -> int | None:
+    def get_max_avoided_collisions(self, *, body: Body) -> int | None:
         return 1
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MaxAvoidedCollisionsOverride(MaxAvoidedCollisionsRule, SubclassJSONSerializer):
     """
     Implementation of MaxAvoidedCollisionsRule that overrides the maximum number of
@@ -302,7 +308,7 @@ class MaxAvoidedCollisionsOverride(MaxAvoidedCollisionsRule, SubclassJSONSeriali
     Bodies for which the maximum number of avoided collisions is overridden.
     """
 
-    def get_max_avoided_collisions(self, body: Body) -> int | None:
+    def get_max_avoided_collisions(self, *, body: Body) -> int | None:
         if body not in self.bodies:
             return None
         return self.value

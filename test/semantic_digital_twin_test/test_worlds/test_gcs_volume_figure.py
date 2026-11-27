@@ -91,9 +91,9 @@ def add_box_body(
     :param z: The z coordinate of the box's center.
     :return: The added body.
     """
-    body = Body(name=PrefixedName(name))
+    body = Body(name=PrefixedName(name=name))
     world.add_connection(
-        FixedConnection.create_with_dofs(
+        connection=FixedConnection.create_with_dofs(
             world=world,
             parent=world.root,
             child=body,
@@ -102,7 +102,7 @@ def add_box_body(
             ),
         )
     )
-    body.collision.append(Box(scale=scale))
+    body.collision.append(shape=Box(scale=scale))
     return body
 
 
@@ -116,12 +116,14 @@ def barrier_world() -> World:
     """
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName("map")))
+        world.add_kinematic_structure_entity(
+            kinematic_structure_entity=Body(name=PrefixedName(name="map"))
+        )
 
         add_box_body(
             world,
             "floor",
-            Scale(FLOOR_SIZE[0], FLOOR_SIZE[1], FLOOR_THICKNESS),
+            Scale(x=FLOOR_SIZE[0], y=FLOOR_SIZE[1], z=FLOOR_THICKNESS),
             0.0,
             0.0,
             -FLOOR_THICKNESS / 2,
@@ -129,7 +131,7 @@ def barrier_world() -> World:
         add_box_body(
             world,
             "barrier",
-            Scale(0.2, FLOOR_SIZE[1], BARRIER_HEIGHT),
+            Scale(x=0.2, y=FLOOR_SIZE[1], z=BARRIER_HEIGHT),
             0.0,
             0.0,
             BARRIER_HEIGHT / 2,
@@ -141,7 +143,7 @@ def barrier_world() -> World:
             add_box_body(
                 world,
                 name,
-                Scale(0.1, FLOOR_SIZE[1], SIDE_WALL_HEIGHT),
+                Scale(x=0.1, y=FLOOR_SIZE[1], z=SIDE_WALL_HEIGHT),
                 x,
                 0.0,
                 SIDE_WALL_HEIGHT / 2,
@@ -156,18 +158,18 @@ def barrier_search_space_of(world: World) -> BoundingBoxCollection:
     """
     origin = HomogeneousTransformationMatrix(reference_frame=world.root)
     return BoundingBoxCollection(
-        [
+        shapes=[
             VolumetricBoundingBox(
-                -FLOOR_SIZE[0] / 2,
-                -FLOOR_SIZE[1] / 2,
-                0.0,
-                FLOOR_SIZE[0] / 2,
-                FLOOR_SIZE[1] / 2,
-                SIDE_WALL_HEIGHT,
-                origin,
+                min_x=-FLOOR_SIZE[0] / 2,
+                min_y=-FLOOR_SIZE[1] / 2,
+                min_z=0.0,
+                max_x=FLOOR_SIZE[0] / 2,
+                max_y=FLOOR_SIZE[1] / 2,
+                max_z=SIDE_WALL_HEIGHT,
+                origin=origin,
             )
         ],
-        world.root,
+        reference_frame=world.root,
     )
 
 
@@ -182,14 +184,14 @@ def navigation_scene_of(
     """
     origin = HomogeneousTransformationMatrix(reference_frame=world.root)
     query = hardest_path_query(graph)
-    waypoints = graph.path_from_to(query.start, query.goal)
+    waypoints = graph.path_from_to(start=query.start, goal=query.goal)
     obstacles = SemanticEnvironmentAnnotation(
         root=world.root, _world=world
-    ).as_bounding_box_collection_at_origin(origin)
+    ).as_bounding_box_collection_at_origin(origin=origin)
     return NavigationScene(
         graph_of_convex_sets=graph,
         environment_name="barrier",
-        path=NavigationPath(waypoints),
+        path=NavigationPath(waypoints=waypoints),
         obstacles=obstacles,
     )
 
@@ -252,18 +254,18 @@ def test_the_third_dimension_connects_what_a_shallow_search_space_leaves_apart(
     """
     origin = HomogeneousTransformationMatrix(reference_frame=barrier_world.root)
     shallow_search_space = BoundingBoxCollection(
-        [
+        shapes=[
             VolumetricBoundingBox(
-                -FLOOR_SIZE[0] / 2,
-                -FLOOR_SIZE[1] / 2,
-                0.0,
-                FLOOR_SIZE[0] / 2,
-                FLOOR_SIZE[1] / 2,
-                BARRIER_HEIGHT - 0.1,
-                origin,
+                min_x=-FLOOR_SIZE[0] / 2,
+                min_y=-FLOOR_SIZE[1] / 2,
+                min_z=0.0,
+                max_x=FLOOR_SIZE[0] / 2,
+                max_y=FLOOR_SIZE[1] / 2,
+                max_z=BARRIER_HEIGHT - 0.1,
+                origin=origin,
             )
         ],
-        barrier_world.root,
+        reference_frame=barrier_world.root,
     )
     shallow_graph = VolumetricGraphOfBoundingBoxes.free_space_from_world(
         world=barrier_world,
@@ -295,7 +297,7 @@ def test_the_path_panel_reports_how_much_of_the_path_is_vertical(
     The subtitle names the height the path changes, which is the quantity a floor plan
     has no way to report.
     """
-    assert OptimalPathVolumePanel().subtitle(barrier_scene) == (
+    assert OptimalPathVolumePanel().subtitle(scene=barrier_scene) == (
         f"{barrier_scene.path.length:.2f} m over "
         f"{len(barrier_scene.path.waypoints)} waypoints, "
         f"{barrier_scene.path.vertical_travel:.2f} m of it vertical"
@@ -306,7 +308,7 @@ def test_the_convex_sets_panel_counts_what_it_draws(barrier_scene: NavigationSce
     """
     The subtitle reports the size of the decomposition the panel shows.
     """
-    subtitle = ConvexSetsVolumePanel().subtitle(barrier_scene)
+    subtitle = ConvexSetsVolumePanel().subtitle(scene=barrier_scene)
 
     assert subtitle == (
         f"{len(barrier_scene.convex_sets)} convex sets, "
@@ -320,7 +322,7 @@ def test_the_environment_panel_reports_the_volume_it_frames(
     """
     The subtitle reports all three extents, since a volume is what this figure is about.
     """
-    subtitle = EnvironmentVolumePanel().subtitle(barrier_scene)
+    subtitle = EnvironmentVolumePanel().subtitle(scene=barrier_scene)
 
     assert subtitle == (
         f"{len(barrier_scene.obstacles)} obstacle boxes in "
@@ -336,7 +338,7 @@ def test_every_panel_is_framed_to_the_same_volume(barrier_scene: NavigationScene
     Panels are pinned to the search space rather than auto-scaled to their own traces,
     so a metre is the same length in all three and they can be read against each other.
     """
-    figure = GraphOfConvexSetsVolumeFigure(barrier_scene).render()
+    figure = GraphOfConvexSetsVolumeFigure(scene=barrier_scene).render()
     bounds = barrier_scene.search_space.bounding_box().to_array_bounds()
 
     ranges = [
@@ -355,7 +357,7 @@ def test_every_panel_is_looked_at_from_the_same_place(barrier_scene: NavigationS
     """
     A shared camera is the other half of making the panels comparable.
     """
-    figure = GraphOfConvexSetsVolumeFigure(barrier_scene).render()
+    figure = GraphOfConvexSetsVolumeFigure(scene=barrier_scene).render()
 
     cameras = [figure.layout[f"scene{index}"].camera for index in range(1, 4)]
 
@@ -369,7 +371,7 @@ def test_each_legend_entry_is_shown_once_across_the_whole_figure(
     """
     Obstacles appear in two panels and the legend names them once.
     """
-    figure = GraphOfConvexSetsVolumeFigure(barrier_scene).render()
+    figure = GraphOfConvexSetsVolumeFigure(scene=barrier_scene).render()
 
     shown = [trace.legendgroup for trace in figure.data if trace.showlegend]
 
@@ -398,7 +400,7 @@ def test_a_panel_title_is_generated_for_every_panel_not_just_the_first_three(
         OptimalPathVolumePanel(),
         EnvironmentVolumePanel(),
     )
-    figure = GraphOfConvexSetsVolumeFigure(barrier_scene, panels=panels).render()
+    figure = GraphOfConvexSetsVolumeFigure(scene=barrier_scene, panels=panels).render()
 
     labels = [
         annotation.text.split("<br>")[0] for annotation in figure.layout.annotations
@@ -415,8 +417,8 @@ def test_the_figure_is_saved_as_an_interactive_page(barrier_scene, tmp_path):
     that can be turned is always written.
     """
     written = GraphOfConvexSetsVolumeFigure(
-        barrier_scene, theme=Theme.DARK, image_formats=()
-    ).save(tmp_path / "figures")
+        scene=barrier_scene, theme=Theme.DARK, image_formats=()
+    ).save(output_directory=tmp_path / "figures")
 
     assert [path.name for path in written] == [
         "graph_of_convex_sets_volume_barrier_dark.html"

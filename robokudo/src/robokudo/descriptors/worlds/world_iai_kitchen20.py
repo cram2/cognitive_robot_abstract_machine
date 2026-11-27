@@ -27,13 +27,13 @@ class WorldDescriptor(BaseWorldDescriptor):
         root = self.world.root
 
         milk_path = Path(
-            PackageUriResolver().resolve("package://iai_objects/objects/milk.stl")
+            PackageUriResolver().resolve(uri="package://iai_objects/objects/milk.stl")
         )
 
         object_specs = [
             ObjectSpec(
                 name="cereal",
-                box_scale=Scale(0.10, 0.20, 0.30),
+                box_scale=Scale(x=0.10, y=0.20, z=0.30),
                 pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=-1.3,
                     y=0.75,
@@ -54,7 +54,7 @@ class WorldDescriptor(BaseWorldDescriptor):
         region_specs = [
             RegionSpec(
                 name="kitchen_island",
-                box_scale=Scale(1.0, 2.5, 0.85),
+                box_scale=Scale(x=1.0, y=2.5, z=0.85),
                 pose=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=-1.10, y=1.7, z=1.20, reference_frame=root
                 ),

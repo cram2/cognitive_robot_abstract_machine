@@ -100,10 +100,10 @@ scene_xml_str = """
 </worldbody>
 </mujoco>
 """
-world = MJCFParser.from_xml_string(scene_xml_str).create_world()
+world = MJCFParser.from_xml_string(xml_string=scene_xml_str).create_world()
 
 
-rt = RayTracer(world)
+rt = RayTracer(world=world)
 rt.update_scene()
 rt.scene.show("jupyter")
 ```
@@ -213,13 +213,13 @@ def spawn_free_box(
     spawn_world: World,
     name: str = "box",
     position: tuple = (0.0, 0.0, 1.5),
-    scale: Scale = Scale(0.1, 0.1, 0.1),
+    scale: Scale = Scale(x=0.1, y=0.1, z=0.1),
     color: Color = Color.from_rgba(red=1.0, green=1.0, blue=0.0, opacity=1.0),
 ) -> Body:
     """
     Spawn a free-floating box attached to the world root via a 6-DoF connection.
     """
-    spawn_body = Body(name=PrefixedName(name))
+    spawn_body = Body(name=PrefixedName(name=name))
 
     box = Box(
         origin=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -228,7 +228,7 @@ def spawn_free_box(
         scale=scale,
         color=color,
     )
-    spawn_body.collision = ShapeCollection([box], reference_frame=spawn_body)
+    spawn_body.collision = ShapeCollection(shapes=[box], reference_frame=spawn_body)
 
     with spawn_world.modify_world():
         connection = Connection6DoF.create_with_dofs(
@@ -236,7 +236,7 @@ def spawn_free_box(
             child=spawn_body,
             world=spawn_world,
         )
-        spawn_world.add_connection(connection)
+        spawn_world.add_connection(connection=connection)
 
         # Set the initial world pose of the box via the 6-DoF DoF state.
         connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -253,7 +253,7 @@ def spawn_robot_body(spawn_world: World) -> Body:
     """
     Spawn the static robot base as a tall box rigidly fixed to the world root.
     """
-    spawn_body = Body(name=PrefixedName("robot"))
+    spawn_body = Body(name=PrefixedName(name="robot"))
 
     # Shape origin is expressed relative to the body frame.
     box_origin = HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -262,14 +262,14 @@ def spawn_robot_body(spawn_world: World) -> Body:
     )
     box = Box(
         origin=box_origin,
-        scale=Scale(0.4, 0.4, 1.0),
+        scale=Scale(x=0.4, y=0.4, z=1.0),
         color=Color.from_rgba(red=0.9, green=0.9, blue=0.9, opacity=1.0),
     )
-    spawn_body.collision = ShapeCollection([box], reference_frame=spawn_body)
+    spawn_body.collision = ShapeCollection(shapes=[box], reference_frame=spawn_body)
 
     with spawn_world.modify_world():
         spawn_world.add_connection(
-            FixedConnection(parent=spawn_world.root, child=spawn_body)
+            connection=FixedConnection(parent=spawn_world.root, child=spawn_body)
         )
 
     return spawn_body
@@ -279,7 +279,7 @@ def spawn_arm(spawn_world: World, root_body: Body) -> ScrewAxisConnection:
     """
     Spawn a single-link arm attached to ``root_body`` via a revolute joint about Z.
     """
-    spawn_arm_body = Body(name=PrefixedName("arm"))
+    spawn_arm_body = Body(name=PrefixedName(name="arm"))
 
     # Offset the box shape so the link extends along +Y from the joint origin.
     box_origin = HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -288,14 +288,14 @@ def spawn_arm(spawn_world: World, root_body: Body) -> ScrewAxisConnection:
     )
     box = Box(
         origin=box_origin,
-        scale=Scale(0.1, 0.5, 0.1),
+        scale=Scale(x=0.1, y=0.5, z=0.1),
         color=Color.from_rgba(red=0.9, green=0.1, blue=0.1, opacity=1.0),
     )
     spawn_arm_body.collision = ShapeCollection(
-        [box], reference_frame=spawn_arm_body
+        shapes=[box], reference_frame=spawn_arm_body
     )
 
-    dof = DegreeOfFreedom(name=PrefixedName("arm_joint"))
+    dof = DegreeOfFreedom(name=PrefixedName(name="arm_joint"))
 
     # Mount the joint on top of the robot base and rotate into a horizontal pose.
     connection_origin = HomogeneousTransformationMatrix.from_xyz_quaternion(
@@ -309,7 +309,7 @@ def spawn_arm(spawn_world: World, root_body: Body) -> ScrewAxisConnection:
     )
 
     with spawn_world.modify_world():
-        spawn_world.add_degree_of_freedom(dof)
+        spawn_world.add_degree_of_freedom(dof=dof)
         arm_connection = ScrewAxisConnection(
             screw_axis=ScrewAxis(rotation_per_unit_position=Vector3.Z()),
             name=dof.name,
@@ -318,7 +318,7 @@ def spawn_arm(spawn_world: World, root_body: Body) -> ScrewAxisConnection:
             dof_id=dof.id,
             parent_T_connection_expression=connection_origin,
         )
-        spawn_world.add_connection(arm_connection)
+        spawn_world.add_connection(connection=arm_connection)
 
     return arm_connection
 

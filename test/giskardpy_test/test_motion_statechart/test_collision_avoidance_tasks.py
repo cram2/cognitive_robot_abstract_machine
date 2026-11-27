@@ -141,10 +141,14 @@ def test_external_collision_avoidance(
     A goal behind an obstacle leaves the cylinder bot outside the buffer zone of the one
     contact, and the motion leaves no collision consumer behind.
     """
-    robot = cylinder_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
-    tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
-    env1 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment")
-    env2 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment2")
+    robot = cylinder_bot_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=AbstractRobot
+    )[0]
+    tip = cylinder_bot_world.get_kinematic_structure_entity_by_name(name="bot")
+    env1 = cylinder_bot_world.get_kinematic_structure_entity_by_name(name="environment")
+    env2 = cylinder_bot_world.get_kinematic_structure_entity_by_name(
+        name="environment2"
+    )
 
     executor = StatechartExecutor(
         context=StatechartContext(world=cylinder_bot_world),
@@ -202,9 +206,9 @@ def test_external_collision_avoidance_battle():
     strong_robot_world = World()
     with strong_robot_world.modify_world():
         strong = Body(
-            name=PrefixedName("strong"),
+            name=PrefixedName(name="strong"),
             collision=ShapeCollection(
-                [
+                shapes=[
                     Cylinder(
                         width=0.1,
                         height=0.1,
@@ -213,15 +217,15 @@ def test_external_collision_avoidance_battle():
                 ]
             ),
         )
-        strong_robot_world.add_body(strong)
-        strong_robot_sa = MinimalRobot.from_world(strong_robot_world)
+        strong_robot_world.add_body(body=strong)
+        strong_robot_sa = MinimalRobot.from_world(world=strong_robot_world)
 
     weak_robot_world = World()
     with weak_robot_world.modify_world():
         weak = Body(
-            name=PrefixedName("weak"),
+            name=PrefixedName(name="weak"),
             collision=ShapeCollection(
-                [
+                shapes=[
                     Cylinder(
                         width=0.1,
                         height=0.1,
@@ -230,19 +234,19 @@ def test_external_collision_avoidance_battle():
                 ]
             ),
         )
-        weak_robot_world.add_body(weak)
-        weak_robot_sa = MinimalRobot.from_world(weak_robot_world)
+        weak_robot_world.add_body(body=weak)
+        weak_robot_sa = MinimalRobot.from_world(world=weak_robot_world)
 
     world = World()
 
     with world.modify_world():
         wall = Body(
-            name=PrefixedName("wall"),
-            collision=ShapeCollection([Box(scale=Scale(x=0.1, y=10, z=0.1))]),
+            name=PrefixedName(name="wall"),
+            collision=ShapeCollection(shapes=[Box(scale=Scale(x=0.1, y=10, z=0.1))]),
         )
-        map = Body(name=PrefixedName("map"))
+        map = Body(name=PrefixedName(name="map"))
         world.add_connection(
-            FixedConnection(
+            connection=FixedConnection(
                 parent=map,
                 child=wall,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -250,9 +254,9 @@ def test_external_collision_avoidance_battle():
                 ),
             )
         )
-        strong_odom = Body(name=PrefixedName("strong_odom"))
+        strong_odom = Body(name=PrefixedName(name="strong_odom"))
         world.add_connection(
-            FixedConnection(
+            connection=FixedConnection(
                 parent=map,
                 child=strong_odom,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -260,9 +264,9 @@ def test_external_collision_avoidance_battle():
                 ),
             )
         )
-        weak_odom = Body(name=PrefixedName("weak_odom"))
+        weak_odom = Body(name=PrefixedName(name="weak_odom"))
         world.add_connection(
-            FixedConnection(
+            connection=FixedConnection(
                 parent=map,
                 child=weak_odom,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -273,28 +277,32 @@ def test_external_collision_avoidance_battle():
 
         # %% attach robots
         world.merge_world(
-            strong_robot_world,
-            omni1 := OmniDrive.create_with_dofs(
-                world=world,
-                parent=strong_odom,
-                child=strong_robot_world.root,
+            other=strong_robot_world,
+            root_connection=(
+                omni1 := OmniDrive.create_with_dofs(
+                    world=world,
+                    parent=strong_odom,
+                    child=strong_robot_world.root,
+                )
             ),
         )
-        strong = world.get_kinematic_structure_entity_by_id(strong.id)
-        strong_robot_sa = world.get_semantic_annotation_by_id(strong_robot_sa.id)
+        strong = world.get_kinematic_structure_entity_by_id(id=strong.id)
+        strong_robot_sa = world.get_semantic_annotation_by_id(id=strong_robot_sa.id)
         world.merge_world(
-            weak_robot_world,
-            omni2 := OmniDrive.create_with_dofs(
-                world=world,
-                parent=weak_odom,
-                child=weak_robot_world.root,
+            other=weak_robot_world,
+            root_connection=(
+                omni2 := OmniDrive.create_with_dofs(
+                    world=world,
+                    parent=weak_odom,
+                    child=weak_robot_world.root,
+                )
             ),
         )
-        weak = world.get_kinematic_structure_entity_by_id(weak.id)
-        weak_robot_sa = world.get_semantic_annotation_by_id(weak_robot_sa.id)
+        weak = world.get_kinematic_structure_entity_by_id(id=weak.id)
+        weak_robot_sa = world.get_semantic_annotation_by_id(id=weak_robot_sa.id)
 
         world.set_dofs_has_hardware_interface(
-            omni1.active_dofs + omni2.active_dofs, True
+            dofs=omni1.active_dofs + omni2.active_dofs, value=True
         )
 
     executor = StatechartExecutor(
@@ -370,10 +378,14 @@ def test_external_collision_avoidance_with_weight_above_ca(
     A goal weighted above collision avoidance pushes the bot into the buffer zone of the
     obstacle, but not into it.
     """
-    robot = cylinder_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
-    tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
-    env1 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment")
-    env2 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment2")
+    robot = cylinder_bot_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=AbstractRobot
+    )[0]
+    tip = cylinder_bot_world.get_kinematic_structure_entity_by_name(name="bot")
+    env1 = cylinder_bot_world.get_kinematic_structure_entity_by_name(name="environment")
+    env2 = cylinder_bot_world.get_kinematic_structure_entity_by_name(
+        name="environment2"
+    )
 
     executor = StatechartExecutor(
         context=StatechartContext(world=cylinder_bot_world),
@@ -430,10 +442,14 @@ def test_update_collision_matrix_later(cylinder_bot_world: World):
     collision matrix is rebuilt from new rules, and none of its collision consumers stay
     registered.
     """
-    robot = cylinder_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
-    tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
-    env1 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment")
-    env2 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment2")
+    robot = cylinder_bot_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=AbstractRobot
+    )[0]
+    tip = cylinder_bot_world.get_kinematic_structure_entity_by_name(name="bot")
+    env1 = cylinder_bot_world.get_kinematic_structure_entity_by_name(name="environment")
+    env2 = cylinder_bot_world.get_kinematic_structure_entity_by_name(
+        name="environment2"
+    )
 
     executor = StatechartExecutor(
         context=StatechartContext(world=cylinder_bot_world),
@@ -487,7 +503,7 @@ def test_update_collision_matrix_later(cylinder_bot_world: World):
     executor.tick_until_end(timeout=500)
     statechart.draw(file_name=Path("muh.pdf"))
     cylinder_bot_world.collision_manager.clear_temporary_rules()
-    cylinder_bot_world.collision_manager.add_temporary_rule(AvoidAllCollisions())
+    cylinder_bot_world.collision_manager.add_temporary_rule(rule=AvoidAllCollisions())
     cylinder_bot_world.collision_manager.update_collision_matrix()
     collisions = executor.context.world.collision_manager.compute_collisions()
     assert len(collisions.contacts) == 1
@@ -499,10 +515,14 @@ def test_consumer_cleanup_after_cancel(cylinder_bot_world: World):
     """
     A motion cancelled at its local minimum still leaves no collision consumer behind.
     """
-    robot = cylinder_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
-    tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
-    env1 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment")
-    env2 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment2")
+    robot = cylinder_bot_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=AbstractRobot
+    )[0]
+    tip = cylinder_bot_world.get_kinematic_structure_entity_by_name(name="bot")
+    env1 = cylinder_bot_world.get_kinematic_structure_entity_by_name(name="environment")
+    env2 = cylinder_bot_world.get_kinematic_structure_entity_by_name(
+        name="environment2"
+    )
 
     executor = StatechartExecutor(
         context=StatechartContext(world=cylinder_bot_world),
@@ -552,9 +572,11 @@ def test_multiple_external_collision_avoidance_motions(cylinder_bot_world: World
     """
     Two motions run one after another each leave no collision consumer behind.
     """
-    robot = cylinder_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
-    tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
-    env1 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment")
+    robot = cylinder_bot_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=AbstractRobot
+    )[0]
+    tip = cylinder_bot_world.get_kinematic_structure_entity_by_name(name="bot")
+    env1 = cylinder_bot_world.get_kinematic_structure_entity_by_name(name="environment")
 
     def run_motion(goal_x):
         """
@@ -622,7 +644,9 @@ def test_cancel_node_without_tasks_never_starts():
 def test_self_collision_avoidance_without_checked_body_combinations(
     cylinder_bot_world: World,
 ):
-    robot = cylinder_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
+    robot = cylinder_bot_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=AbstractRobot
+    )[0]
 
     executor = StatechartExecutor(
         context=StatechartContext(world=cylinder_bot_world),
@@ -649,11 +673,21 @@ def test_self_collision_avoidance(
     self_collision_bot_world: World, statechart_origin: StatechartOrigin
 ) -> None:
 
-    robot = self_collision_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
-    l_tip = self_collision_bot_world.get_kinematic_structure_entity_by_name("l_tip")
-    r_tip = self_collision_bot_world.get_kinematic_structure_entity_by_name("r_tip")
-    l_thumb = self_collision_bot_world.get_kinematic_structure_entity_by_name("l_thumb")
-    r_thumb = self_collision_bot_world.get_kinematic_structure_entity_by_name("r_thumb")
+    robot = self_collision_bot_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=AbstractRobot
+    )[0]
+    l_tip = self_collision_bot_world.get_kinematic_structure_entity_by_name(
+        name="l_tip"
+    )
+    r_tip = self_collision_bot_world.get_kinematic_structure_entity_by_name(
+        name="r_tip"
+    )
+    l_thumb = self_collision_bot_world.get_kinematic_structure_entity_by_name(
+        name="l_thumb"
+    )
+    r_thumb = self_collision_bot_world.get_kinematic_structure_entity_by_name(
+        name="r_thumb"
+    )
 
     executor = StatechartExecutor(
         context=StatechartContext(world=self_collision_bot_world),
@@ -701,8 +735,12 @@ def test_avoid_collision_go_around_corner(pr2_with_box):
     The PR2's right gripper reaches around the corner of a box without coming closer to
     it than the violated distance, which would cancel the motion.
     """
-    r_tip = pr2_with_box.get_kinematic_structure_entity_by_name("r_gripper_tool_frame")
-    robot = pr2_with_box.get_semantic_annotations_by_type(AbstractRobot)[0]
+    r_tip = pr2_with_box.get_kinematic_structure_entity_by_name(
+        name="r_gripper_tool_frame"
+    )
+    robot = pr2_with_box.get_semantic_annotations_by_type(
+        semantic_annotation_type=AbstractRobot
+    )[0]
 
     executor = StatechartExecutor(
         context=StatechartContext(world=pr2_with_box), extensions=[MotionControl()]
@@ -722,7 +760,7 @@ def test_avoid_collision_go_around_corner(pr2_with_box):
             nodes=[
                 SetSeedConfiguration(
                     seed_configuration=JointState.from_str_dict(
-                        {
+                        mapping={
                             PR2Joint.RIGHT_ELBOW_FLEX: -1.29610152504,
                             PR2Joint.RIGHT_FOREARM_ROLL: -0.0301682323805,
                             PR2Joint.RIGHT_SHOULDER_LIFT: 1.20324921318,
@@ -772,7 +810,7 @@ def test_avoid_collision_go_around_corner(pr2_with_box):
         node=(
             distance_violated := ExternalCollisionDistanceMonitor(
                 body=pr2_with_box.get_kinematic_structure_entity_by_name(
-                    "r_gripper_palm_link"
+                    name="r_gripper_palm_link"
                 ),
                 distance_threshold=0.0,
             )
@@ -795,17 +833,21 @@ def test_avoid_self_collision_with_l_arm(pr2_with_box, rclpy_node):
     VizMarkerPublisher(
         _world=pr2_with_box, node=rclpy_node
     ).with_collision_visualization()
-    r_tip = pr2_with_box.get_kinematic_structure_entity_by_name("r_gripper_tool_frame")
+    r_tip = pr2_with_box.get_kinematic_structure_entity_by_name(
+        name="r_gripper_tool_frame"
+    )
     l_forearm_link = pr2_with_box.get_kinematic_structure_entity_by_name(
-        "l_forearm_link"
+        name="l_forearm_link"
     )
     r_palm_link = pr2_with_box.get_kinematic_structure_entity_by_name(
-        "r_gripper_palm_link"
+        name="r_gripper_palm_link"
     )
     base_footprint = pr2_with_box.get_kinematic_structure_entity_by_name(
-        "base_footprint"
+        name="base_footprint"
     )
-    robot = pr2_with_box.get_semantic_annotations_by_type(AbstractRobot)[0]
+    robot = pr2_with_box.get_semantic_annotations_by_type(
+        semantic_annotation_type=AbstractRobot
+    )[0]
 
     executor = StatechartExecutor(
         context=StatechartContext(world=pr2_with_box),
@@ -824,7 +866,7 @@ def test_avoid_self_collision_with_l_arm(pr2_with_box, rclpy_node):
             nodes=[
                 SetSeedConfiguration(
                     seed_configuration=JointState.from_str_dict(
-                        {
+                        mapping={
                             PR2Joint.RIGHT_ELBOW_FLEX: -1.43286344265,
                             PR2Joint.RIGHT_FOREARM_ROLL: -1.26465060073,
                             PR2Joint.RIGHT_SHOULDER_LIFT: 0.47990329056,
@@ -914,7 +956,9 @@ def _weights(task: Task) -> list[float]:
 def test_self_collision_avoidance_avoids_every_checked_combination_in_one_task(
     self_collision_bot_world: World,
 ) -> None:
-    robot = self_collision_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
+    robot = self_collision_bot_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=AbstractRobot
+    )[0]
     goal = SelfCollisionAvoidance(robot=robot)
 
     executor = _compile_collision_avoidance(self_collision_bot_world, goal)
@@ -929,7 +973,7 @@ def test_self_collision_avoidance_avoids_every_checked_combination_in_one_task(
     assert task.avoided_contacts == [
         contact
         for combination in manager.registered_group_combinations
-        for contact in manager.avoided_contacts_of(combination)
+        for contact in manager.avoided_contacts_of(combination=combination)
     ]
     assert len(task.constraint_collection.inequality_constraints) == len(
         task.avoided_contacts
@@ -946,17 +990,19 @@ def test_self_collision_avoidance_avoids_the_closest_contacts_of_a_combination(
     within one control cycle.
     """
     world = self_collision_bot_world
-    robot = world.get_semantic_annotations_by_type(AbstractRobot)[0]
+    robot = world.get_semantic_annotations_by_type(
+        semantic_annotation_type=AbstractRobot
+    )[0]
     left_hand = {
-        world.get_kinematic_structure_entity_by_name("l_tip"),
-        world.get_kinematic_structure_entity_by_name("l_thumb"),
+        world.get_kinematic_structure_entity_by_name(name="l_tip"),
+        world.get_kinematic_structure_entity_by_name(name="l_thumb"),
     }
     right_hand = {
-        world.get_kinematic_structure_entity_by_name("r_tip"),
-        world.get_kinematic_structure_entity_by_name("r_thumb"),
+        world.get_kinematic_structure_entity_by_name(name="r_tip"),
+        world.get_kinematic_structure_entity_by_name(name="r_thumb"),
     }
     world.collision_manager.max_avoided_bodies_rules.append(
-        MaxAvoidedCollisionsOverride(2, left_hand | right_hand)
+        MaxAvoidedCollisionsOverride(value=2, bodies=left_hand | right_hand)
     )
     goal = SelfCollisionAvoidance(robot=robot)
     executor = _compile_collision_avoidance(
@@ -989,8 +1035,8 @@ def test_self_collision_avoidance_avoids_the_closest_contacts_of_a_combination(
     contacts = manager.last_closest_contacts[hands]
     assert len(contacts) == 4
     avoided_distances = [
-        manager.get_contact_distance_symbol(contact).evaluate()[0]
-        for contact in manager.avoided_contacts_of(hands)
+        manager.get_contact_distance_symbol(contact=contact).evaluate()[0]
+        for contact in manager.avoided_contacts_of(combination=hands)
     ]
     assert avoided_distances == pytest.approx(
         sorted(contact.distance for contact in contacts)[:2]
@@ -1000,7 +1046,9 @@ def test_self_collision_avoidance_avoids_the_closest_contacts_of_a_combination(
 def test_external_collision_avoidance_avoids_every_closest_object_in_one_task(
     cylinder_bot_world: World,
 ) -> None:
-    robot = cylinder_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
+    robot = cylinder_bot_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=AbstractRobot
+    )[0]
     goal = ExternalCollisionAvoidance(robot=robot)
 
     executor = _compile_collision_avoidance(cylinder_bot_world, goal)
@@ -1014,7 +1062,7 @@ def test_external_collision_avoidance_avoids_every_closest_object_in_one_task(
     assert task.avoided_contacts == [
         contact
         for group in manager.registered_groups
-        for contact in manager.avoided_contacts_of(group)
+        for contact in manager.avoided_contacts_of(group=group)
     ]
     assert len(task.constraint_collection.inequality_constraints) == len(
         task.avoided_contacts
@@ -1024,9 +1072,15 @@ def test_external_collision_avoidance_avoids_every_closest_object_in_one_task(
 def test_only_self_collision_combinations_with_collision_data_weigh_anything(
     self_collision_bot_world: World,
 ) -> None:
-    robot = self_collision_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
-    l_thumb = self_collision_bot_world.get_kinematic_structure_entity_by_name("l_thumb")
-    r_thumb = self_collision_bot_world.get_kinematic_structure_entity_by_name("r_thumb")
+    robot = self_collision_bot_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=AbstractRobot
+    )[0]
+    l_thumb = self_collision_bot_world.get_kinematic_structure_entity_by_name(
+        name="l_thumb"
+    )
+    r_thumb = self_collision_bot_world.get_kinematic_structure_entity_by_name(
+        name="r_thumb"
+    )
     goal = SelfCollisionAvoidance(robot=robot)
     executor = _compile_collision_avoidance(
         self_collision_bot_world,
@@ -1063,10 +1117,12 @@ def test_only_self_collision_combinations_with_collision_data_weigh_anything(
 def test_only_closest_objects_with_collision_data_weigh_anything(
     cylinder_bot_world: World,
 ) -> None:
-    robot = cylinder_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
-    tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+    robot = cylinder_bot_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=AbstractRobot
+    )[0]
+    tip = cylinder_bot_world.get_kinematic_structure_entity_by_name(name="bot")
     environment = cylinder_bot_world.get_kinematic_structure_entity_by_name(
-        "environment"
+        name="environment"
     )
     goal = ExternalCollisionAvoidance(robot=robot)
     executor = _compile_collision_avoidance(
@@ -1210,9 +1266,11 @@ def _contacts_with_data(
     return [
         ContactWithData(
             lower_error=float(constraint.lower_bound.evaluate()[0]),
-            distance=float(manager.get_contact_distance_symbol(contact).evaluate()[0]),
+            distance=float(
+                manager.get_contact_distance_symbol(contact=contact).evaluate()[0]
+            ),
             root_P_point_on_robot=Point3.from_iterable(
-                manager.closest_points_of(contact).root_P_point_on_body_a[:3],
+                manager.closest_points_of(contact=contact).root_P_point_on_body_a[:3],
                 reference_frame=executor.context.world.root,
             ),
         )
@@ -1242,9 +1300,9 @@ def _avoid_bot_and_environments(
             AvoidCollisionBetweenGroups(
                 buffer_zone_distance=buffer_zone_distance,
                 violated_distance=violated_distance,
-                body_group_a=[world.get_kinematic_structure_entity_by_name("bot")],
+                body_group_a=[world.get_kinematic_structure_entity_by_name(name="bot")],
                 body_group_b=[
-                    world.get_kinematic_structure_entity_by_name(name)
+                    world.get_kinematic_structure_entity_by_name(name=name)
                     for name in environment_names
                 ],
             )
@@ -1262,7 +1320,9 @@ def test_each_external_contact_is_scaled_by_its_own_distance_to_the_goal(
     Every scaled buffer zone stays below the gap of its contact, so the bot stands still
     and the collision data stays where the constraints read it.
     """
-    robot = cylinder_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
+    robot = cylinder_bot_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=AbstractRobot
+    )[0]
     scaling = _linear_scaling_at_goal(
         cylinder_bot_world, y=0.3, full_scale_goal_distance=2.0
     )
@@ -1307,7 +1367,9 @@ def test_scaled_buffer_zone_never_drops_below_the_violated_distance(
     A contact whose scaled buffer zone would be smaller than its violated distance is
     kept outside its violated distance instead.
     """
-    robot = cylinder_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
+    robot = cylinder_bot_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=AbstractRobot
+    )[0]
     scaling = _linear_scaling_at_goal(
         cylinder_bot_world, full_scale_goal_distance=100.0
     )
@@ -1340,8 +1402,10 @@ def test_scaled_buffer_zone_lets_the_bot_come_closer_to_an_obstacle_at_its_goal(
     obstacle equals the buffer zone scaled at its contact point, well inside the
     configured buffer zone.
     """
-    robot = cylinder_bot_world.get_semantic_annotations_by_type(AbstractRobot)[0]
-    tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+    robot = cylinder_bot_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=AbstractRobot
+    )[0]
+    tip = cylinder_bot_world.get_kinematic_structure_entity_by_name(name="bot")
     scaling = _linear_scaling_at_goal(
         cylinder_bot_world, x=1.0, full_scale_goal_distance=1.0
     )
@@ -1412,7 +1476,7 @@ class CollisionCheckCountingObserver(CollisionConsumer):
         self.collision_check_count += 1
 
     @called_positionally
-    def on_world_model_update(self, world: World):
+    def on_world_model_update(self, *, world: World):
         pass
 
     def on_collision_matrix_update(self):
@@ -1448,8 +1512,8 @@ def _build_arms_crossing_statechart(
         goal.
     """
     world = executor.context.world
-    r_tip = world.get_kinematic_structure_entity_by_name("r_gripper_tool_frame")
-    base_footprint = world.get_kinematic_structure_entity_by_name("base_footprint")
+    r_tip = world.get_kinematic_structure_entity_by_name(name="r_gripper_tool_frame")
+    base_footprint = world.get_kinematic_structure_entity_by_name(name="base_footprint")
 
     statechart = Statechart(context=executor.context)
     statechart.add_node(
@@ -1458,7 +1522,7 @@ def _build_arms_crossing_statechart(
                 nodes=[
                     SetSeedConfiguration(
                         seed_configuration=JointState.from_str_dict(
-                            {
+                            mapping={
                                 PR2Joint.RIGHT_ELBOW_FLEX: -1.43286344265,
                                 PR2Joint.RIGHT_FOREARM_ROLL: -1.26465060073,
                                 PR2Joint.RIGHT_SHOULDER_LIFT: 0.47990329056,
@@ -1488,7 +1552,9 @@ def _build_arms_crossing_statechart(
     )
     statechart.add_node(node=EndMotion.when_true(node=goal))
     if collision_avoidance:
-        robot = world.get_semantic_annotations_by_type(AbstractRobot)[0]
+        robot = world.get_semantic_annotations_by_type(
+            semantic_annotation_type=AbstractRobot
+        )[0]
         statechart.add_node(node=SelfCollisionAvoidance(robot=robot))
     return statechart
 
@@ -1501,10 +1567,10 @@ def _run_and_count_collision_checks(
     """
     world = executor.context.world
     observer = CollisionCheckCountingObserver()
-    world.collision_manager.add_collision_consumer(observer)
+    world.collision_manager.add_collision_consumer(consumer=observer)
     executor.compile(statechart=statechart)
     executor.tick_until_end(timeout=500)
-    world.collision_manager.remove_collision_consumer(observer)
+    world.collision_manager.remove_collision_consumer(consumer=observer)
     return observer
 
 
@@ -1537,7 +1603,7 @@ def test_collisions_are_computed_for_a_distance_monitor_alone(pr2_with_box):
     statechart.add_node(
         node=ExternalCollisionDistanceMonitor(
             body=pr2_with_box.get_kinematic_structure_entity_by_name(
-                "r_gripper_palm_link"
+                name="r_gripper_palm_link"
             ),
             distance_threshold=0.0,
         )
@@ -1558,7 +1624,7 @@ def executor_driving_into_obstacles(
     root = cylinder_bot_world.root
     with cylinder_bot_world.modify_world():
         env2 = Body(
-            name=PrefixedName("environment2"),
+            name=PrefixedName(name="environment2"),
             collision=ShapeCollection(shapes=[Cylinder(width=0.5, height=0.1)]),
         )
         env_connection = FixedConnection(
@@ -1568,10 +1634,10 @@ def executor_driving_into_obstacles(
                 0.75
             ),
         )
-        cylinder_bot_world.add_connection(env_connection)
+        cylinder_bot_world.add_connection(connection=env_connection)
 
         env3 = Body(
-            name=PrefixedName("environment3"),
+            name=PrefixedName(name="environment3"),
             collision=ShapeCollection(shapes=[Cylinder(width=0.5, height=0.1)]),
         )
         env_connection = FixedConnection(
@@ -1581,9 +1647,9 @@ def executor_driving_into_obstacles(
                 1.25
             ),
         )
-        cylinder_bot_world.add_connection(env_connection)
+        cylinder_bot_world.add_connection(connection=env_connection)
         env4 = Body(
-            name=PrefixedName("environment4"),
+            name=PrefixedName(name="environment4"),
             collision=ShapeCollection(shapes=[Cylinder(width=0.5, height=0.1)]),
         )
         env_connection = FixedConnection(
@@ -1593,9 +1659,9 @@ def executor_driving_into_obstacles(
                 x=1, y=-0.25
             ),
         )
-        cylinder_bot_world.add_connection(env_connection)
+        cylinder_bot_world.add_connection(connection=env_connection)
         env5 = Body(
-            name=PrefixedName("environment5"),
+            name=PrefixedName(name="environment5"),
             collision=ShapeCollection(shapes=[Cylinder(width=0.5, height=0.1)]),
         )
         env_connection = FixedConnection(
@@ -1605,9 +1671,9 @@ def executor_driving_into_obstacles(
                 x=1, y=0.25
             ),
         )
-        cylinder_bot_world.add_connection(env_connection)
+        cylinder_bot_world.add_connection(connection=env_connection)
 
-    tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+    tip = cylinder_bot_world.get_kinematic_structure_entity_by_name(name="bot")
 
     executor = StatechartExecutor(
         context=StatechartContext(world=cylinder_bot_world),
@@ -1719,20 +1785,22 @@ def test_collision_for_robot_with_static_base(
     penetrating it.
     """
     world = request.getfixturevalue(fix_name)
-    robot = world.get_semantic_annotations_by_type(robot_type)[0]
+    robot = world.get_semantic_annotations_by_type(semantic_annotation_type=robot_type)[
+        0
+    ]
 
-    tool_frame = world.get_body_by_name(tool_frame_id)
+    tool_frame = world.get_body_by_name(name=tool_frame_id)
     with world.modify_world():
         obstacle = Body(
-            name=PrefixedName("obstacle"),
-            collision=ShapeCollection([Box(scale=Scale(0.4, 0.4, 0.4))]),
+            name=PrefixedName(name="obstacle"),
+            collision=ShapeCollection(shapes=[Box(scale=Scale(x=0.4, y=0.4, z=0.4))]),
         )
         world.add_connection(
-            Connection6DoF.create_with_dofs(
+            connection=Connection6DoF.create_with_dofs(
                 world=world,
                 parent=world.root,
                 child=obstacle,
-                name=PrefixedName("obstacle_conn"),
+                name=PrefixedName(name="obstacle_conn"),
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     0.5, 0.5, 1, reference_frame=world.root
                 ),
@@ -1789,15 +1857,19 @@ def test_repeated_collision_pr2_apartment_does_not_increase_execution_time(
     """
     world = deepcopy(pr2_apartment_world)
 
-    tool_frame = world.get_body_by_name("r_gripper_tool_frame")
-    robot = world.get_semantic_annotations_by_type(PR2)[0]
+    tool_frame = world.get_body_by_name(name="r_gripper_tool_frame")
+    robot = world.get_semantic_annotations_by_type(semantic_annotation_type=PR2)[0]
 
-    left_arm_park = robot.left_arm.get_joint_state_by_type(StaticJointState.PARK)
-    right_arm_park = robot.right_arm.get_joint_state_by_type(StaticJointState.PARK)
-    left_arm_park.apply_to(world)
-    right_arm_park.apply_to(world)
+    left_arm_park = robot.left_arm.get_joint_state_by_type(
+        state_type=StaticJointState.PARK
+    )
+    right_arm_park = robot.right_arm.get_joint_state_by_type(
+        state_type=StaticJointState.PARK
+    )
+    left_arm_park.apply_to(world=world)
+    right_arm_park.apply_to(world=world)
 
-    body = world.get_body_by_name("handle_cab11_t")
+    body = world.get_body_by_name(name="handle_cab11_t")
 
     execution_times = []
     for i in range(10):
@@ -1862,7 +1934,9 @@ def test_end_effector_rules_free_only_that_end_effector(pr2_world_copy) -> None:
     The rules built for an end effector allow collisions for that end effector and
     nothing else.
     """
-    robot = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
+    robot = pr2_world_copy.get_semantic_annotations_by_type(
+        semantic_annotation_type=PR2
+    )[0]
     end_effector = robot.left_arm.end_effector
 
     node = UpdateTemporaryCollisionRules.for_end_effector(end_effector=end_effector)
@@ -1881,7 +1955,7 @@ def test_building_a_rules_node_keeps_the_temporary_rules_in_force(
 ) -> None:
     collision_manager = cylinder_bot_world.collision_manager
     rule_in_force = AllowAllCollisions()
-    collision_manager.add_temporary_rule(rule_in_force)
+    collision_manager.add_temporary_rule(rule=rule_in_force)
     executor = StatechartExecutor(
         context=StatechartContext(world=cylinder_bot_world),
         extensions=[MotionControl()],
@@ -1911,7 +1985,9 @@ def _executor_of(world: World) -> StatechartExecutor:
 def test_rules_nodes_running_at_once_keep_the_rules_of_each_other_in_force(
     pr2_world_copy: World,
 ) -> None:
-    robot = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
+    robot = pr2_world_copy.get_semantic_annotations_by_type(
+        semantic_annotation_type=PR2
+    )[0]
     left = UpdateTemporaryCollisionRules(
         temporary_rules=[
             AllowCollisionForEndEffector(end_effector=robot.left_arm.end_effector)
@@ -1940,7 +2016,7 @@ def test_the_rules_of_a_rules_node_are_out_of_force_once_it_ended(
 ) -> None:
     collision_manager = cylinder_bot_world.collision_manager
     rule_in_force = AllowAllCollisions()
-    collision_manager.add_temporary_rule(rule_in_force)
+    collision_manager.add_temporary_rule(rule=rule_in_force)
     executor = _executor_of(cylinder_bot_world)
     statechart = Statechart(context=executor.context)
     rules_node = UpdateTemporaryCollisionRules(temporary_rules=[AllowAllCollisions()])
@@ -1987,13 +2063,14 @@ def attach_box(
     :return: The added box.
     """
     parent_T_box = world.transform(spatial_object=pose, target_frame=parent)
+    x, y, z = size
     with world.modify_world():
         box = Body(
-            name=PrefixedName(name),
-            collision=ShapeCollection([Box(scale=Scale(*size))]),
+            name=PrefixedName(name=name),
+            collision=ShapeCollection(shapes=[Box(scale=Scale(x=x, y=y, z=z))]),
         )
         world.add_connection(
-            FixedConnection(
+            connection=FixedConnection(
                 parent=parent, child=box, parent_T_connection_expression=parent_T_box
             )
         )
@@ -2045,11 +2122,16 @@ def test_cable_guide_collision(
     """
     Turning the head into the cable guide is stopped by self collision avoidance.
     """
-    JointState.from_str_dict(default_pr2_pose, pr2_world_copy).apply_to(pr2_world_copy)
-    robot = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
+    JointState.from_str_dict(mapping=default_pr2_pose, world=pr2_world_copy).apply_to(
+        world=pr2_world_copy
+    )
+    robot = pr2_world_copy.get_semantic_annotations_by_type(
+        semantic_annotation_type=PR2
+    )[0]
     joint_goal = JointPositionList(
         goal_state=JointState.from_str_dict(
-            {PR2Joint.HEAD_PAN: 2.84, PR2Joint.HEAD_TILT: 1.0}, world=pr2_world_copy
+            mapping={PR2Joint.HEAD_PAN: 2.84, PR2Joint.HEAD_TILT: 1.0},
+            world=pr2_world_copy,
         )
     )
     local_min = LocalMinimumReached()
@@ -2069,9 +2151,11 @@ def test_attached_self_collision_avoid_stick(
     """
     A stick held in the left gripper keeps its distance to the robot, too.
     """
-    JointState.from_str_dict(default_pr2_pose, pr2_world_copy).apply_to(pr2_world_copy)
+    JointState.from_str_dict(mapping=default_pr2_pose, world=pr2_world_copy).apply_to(
+        world=pr2_world_copy
+    )
     JointState.from_str_dict(
-        {
+        mapping={
             PR2Joint.LEFT_ELBOW_FLEX: -1.1343683863086362,
             PR2Joint.LEFT_FOREARM_ROLL: 7.517553513504836,
             PR2Joint.LEFT_SHOULDER_LIFT: 0.5726770101613905,
@@ -2080,11 +2164,13 @@ def test_attached_self_collision_avoid_stick(
             PR2Joint.LEFT_WRIST_FLEX: -1.215660155912625,
             PR2Joint.LEFT_WRIST_ROLL: 4.249300323527076,
         },
-        pr2_world_copy,
-    ).apply_to(pr2_world_copy)
-    robot = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
+        world=pr2_world_copy,
+    ).apply_to(world=pr2_world_copy)
+    robot = pr2_world_copy.get_semantic_annotations_by_type(
+        semantic_annotation_type=PR2
+    )[0]
     left_tip = pr2_world_copy.get_kinematic_structure_entity_by_name(
-        "l_gripper_tool_frame"
+        name="l_gripper_tool_frame"
     )
     stick = attach_box(
         pr2_world_copy,
@@ -2122,10 +2208,14 @@ def test_box_overlapping_with_gripper(
     A held box that overlaps the gripper holding it does not keep the gripper from
     moving.
     """
-    JointState.from_str_dict(better_pr2_pose, pr2_world_copy).apply_to(pr2_world_copy)
-    robot = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
+    JointState.from_str_dict(mapping=better_pr2_pose, world=pr2_world_copy).apply_to(
+        world=pr2_world_copy
+    )
+    robot = pr2_world_copy.get_semantic_annotations_by_type(
+        semantic_annotation_type=PR2
+    )[0]
     right_tip = pr2_world_copy.get_kinematic_structure_entity_by_name(
-        "r_gripper_tool_frame"
+        name="r_gripper_tool_frame"
     )
     box = attach_box(
         pr2_world_copy,
@@ -2158,9 +2248,11 @@ def test_avoid_self_collision_specific_link(
     """
     A temporary rule makes the right gripper keep its distance to the left forearm.
     """
-    JointState.from_str_dict(default_pr2_pose, pr2_world_copy).apply_to(pr2_world_copy)
+    JointState.from_str_dict(mapping=default_pr2_pose, world=pr2_world_copy).apply_to(
+        world=pr2_world_copy
+    )
     JointState.from_str_dict(
-        {
+        mapping={
             PR2Joint.RIGHT_SHOULDER_PAN: -0.0672581793019,
             PR2Joint.RIGHT_SHOULDER_LIFT: 0.429650469244,
             PR2Joint.RIGHT_UPPER_ARM_ROLL: -0.580889703636,
@@ -2169,17 +2261,19 @@ def test_avoid_self_collision_specific_link(
             PR2Joint.RIGHT_WRIST_FLEX: -0.986144640142,
             PR2Joint.RIGHT_WRIST_ROLL: 0.7397216172451033,
         },
-        pr2_world_copy,
-    ).apply_to(pr2_world_copy)
-    robot = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
+        world=pr2_world_copy,
+    ).apply_to(world=pr2_world_copy)
+    robot = pr2_world_copy.get_semantic_annotations_by_type(
+        semantic_annotation_type=PR2
+    )[0]
     right_tip = pr2_world_copy.get_kinematic_structure_entity_by_name(
-        "r_gripper_tool_frame"
+        name="r_gripper_tool_frame"
     )
     right_gripper = robot.right_arm.end_effector.bodies_with_collision
     cart_goal = CartesianPose(
         kinematic_chain=KinematicChain(
             root=pr2_world_copy.get_kinematic_structure_entity_by_name(
-                "base_footprint"
+                name="base_footprint"
             ),
             tip=right_tip,
         ),
@@ -2197,7 +2291,7 @@ def test_avoid_self_collision_specific_link(
                         body_group_a=right_gripper,
                         body_group_b=[
                             pr2_world_copy.get_kinematic_structure_entity_by_name(
-                                "l_forearm_link"
+                                name="l_forearm_link"
                             )
                         ],
                     )
@@ -2217,9 +2311,11 @@ def test_get_out_of_self_collision(
     """
     Self collision avoidance gives up on a robot that already is in self collision.
     """
-    JointState.from_str_dict(default_pr2_pose, pr2_world_copy).apply_to(pr2_world_copy)
+    JointState.from_str_dict(mapping=default_pr2_pose, world=pr2_world_copy).apply_to(
+        world=pr2_world_copy
+    )
     JointState.from_str_dict(
-        {
+        mapping={
             PR2Joint.LEFT_ELBOW_FLEX: -1.43286344265,
             PR2Joint.LEFT_FOREARM_ROLL: 1.26465060073,
             PR2Joint.LEFT_SHOULDER_LIFT: 0.47990329056,
@@ -2228,16 +2324,18 @@ def test_get_out_of_self_collision(
             PR2Joint.LEFT_WRIST_FLEX: -1.18811419869,
             PR2Joint.LEFT_WRIST_ROLL: 2.26884630124,
         },
-        pr2_world_copy,
-    ).apply_to(pr2_world_copy)
-    robot = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
+        world=pr2_world_copy,
+    ).apply_to(world=pr2_world_copy)
+    robot = pr2_world_copy.get_semantic_annotations_by_type(
+        semantic_annotation_type=PR2
+    )[0]
     left_tip = pr2_world_copy.get_kinematic_structure_entity_by_name(
-        "l_gripper_tool_frame"
+        name="l_gripper_tool_frame"
     )
     into_collision = CartesianPose(
         kinematic_chain=KinematicChain(
             root=pr2_world_copy.get_kinematic_structure_entity_by_name(
-                "base_footprint"
+                name="base_footprint"
             ),
             tip=left_tip,
         ),
@@ -2262,9 +2360,11 @@ def test_attached_two_items(
     """
     Boxes held in both grippers keep their distance to each other.
     """
-    JointState.from_str_dict(default_pr2_pose, pr2_world_copy).apply_to(pr2_world_copy)
+    JointState.from_str_dict(mapping=default_pr2_pose, world=pr2_world_copy).apply_to(
+        world=pr2_world_copy
+    )
     JointState.from_str_dict(
-        {
+        mapping={
             PR2Joint.RIGHT_ELBOW_FLEX: -1.58118094489,
             PR2Joint.RIGHT_FOREARM_ROLL: -0.904933033043,
             PR2Joint.RIGHT_SHOULDER_LIFT: 0.822412440711,
@@ -2273,19 +2373,21 @@ def test_attached_two_items(
             PR2Joint.RIGHT_WRIST_FLEX: -1.20182042644,
             PR2Joint.RIGHT_WRIST_ROLL: 0.190433188769,
         },
-        pr2_world_copy,
-    ).apply_to(pr2_world_copy)
-    robot = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
+        world=pr2_world_copy,
+    ).apply_to(world=pr2_world_copy)
+    robot = pr2_world_copy.get_semantic_annotations_by_type(
+        semantic_annotation_type=PR2
+    )[0]
     right_tip = pr2_world_copy.get_kinematic_structure_entity_by_name(
-        "r_gripper_tool_frame"
+        name="r_gripper_tool_frame"
     )
     left_tip = pr2_world_copy.get_kinematic_structure_entity_by_name(
-        "l_gripper_tool_frame"
+        name="l_gripper_tool_frame"
     )
     grippers_facing = CartesianPose(
         kinematic_chain=KinematicChain(
             root=pr2_world_copy.get_kinematic_structure_entity_by_name(
-                "torso_lift_link"
+                name="torso_lift_link"
             ),
             tip=left_tip,
         ),
@@ -2333,10 +2435,14 @@ def test_avoid_collision_box_between_3_boxes(
     Aligning a held box with the world moves it between three boxes without touching
     them.
     """
-    JointState.from_str_dict(pocky_pr2_pose, pr2_world_copy).apply_to(pr2_world_copy)
-    robot = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
+    JointState.from_str_dict(mapping=pocky_pr2_pose, world=pr2_world_copy).apply_to(
+        world=pr2_world_copy
+    )
+    robot = pr2_world_copy.get_semantic_annotations_by_type(
+        semantic_annotation_type=PR2
+    )[0]
     right_tip = pr2_world_copy.get_kinematic_structure_entity_by_name(
-        "r_gripper_tool_frame"
+        name="r_gripper_tool_frame"
     )
     box = attach_box(
         pr2_world_copy,
@@ -2396,9 +2502,11 @@ def test_hsr_self_collision_avoidance(
     """
     The HSR reaches a goal for its gripper from a configuration close to self collision.
     """
-    JointState.from_str_dict(default_hsr_pose, hsr_world_copy).apply_to(hsr_world_copy)
+    JointState.from_str_dict(mapping=default_hsr_pose, world=hsr_world_copy).apply_to(
+        world=hsr_world_copy
+    )
     JointState.from_str_dict(
-        {
+        mapping={
             HSRBJoint.ARM_FLEX: 0.0,
             HSRBJoint.ARM_LIFT: 0.0,
             HSRBJoint.ARM_ROLL: -1.52,
@@ -2407,20 +2515,22 @@ def test_hsr_self_collision_avoidance(
             HSRBJoint.WRIST_FLEX: -1.55,
             HSRBJoint.WRIST_ROLL: 0.11,
         },
-        hsr_world_copy,
-    ).apply_to(hsr_world_copy)
-    robot = hsr_world_copy.get_semantic_annotations_by_type(HSRB)[0]
+        world=hsr_world_copy,
+    ).apply_to(world=hsr_world_copy)
+    robot = hsr_world_copy.get_semantic_annotations_by_type(
+        semantic_annotation_type=HSRB
+    )[0]
     cart_goal = CartesianPose(
         kinematic_chain=KinematicChain(
             root=hsr_world_copy.root,
             tip=hsr_world_copy.get_kinematic_structure_entity_by_name(
-                "hand_gripper_tool_frame"
+                name="hand_gripper_tool_frame"
             ),
         ),
         goal_pose=Pose.from_xyz_axis_angle(
             x=0.5,
             reference_frame=hsr_world_copy.get_kinematic_structure_entity_by_name(
-                "hand_palm_link"
+                name="hand_palm_link"
             ),
         ),
     )

@@ -129,7 +129,7 @@ def _slab_footprints(
     """
     Every spawned slab's x/y extents, rounded so float noise does not split them.
     """
-    shelf.spawn(World.create_with_root_body())
+    shelf.spawn(world=World.create_with_root_body())
     return {
         (
             round(float(layer.annotation.root.collision.shapes[0].scale.x), 6),
@@ -146,7 +146,7 @@ def _slab_heights(shelf: RelationalCircuitExperimentShelf) -> list[float]:
     Slabs are reparented onto the corpus so the shelf moves as one unit, which puts
     their origins in the corpus frame, centred half a shelf up.
     """
-    shelf.spawn(World.create_with_root_body())
+    shelf.spawn(world=World.create_with_root_body())
     return sorted(
         float(layer.annotation.root.parent_connection.origin.position.to_np()[2].item())
         + shelf.scale.z / 2
@@ -173,9 +173,9 @@ def test_shelf_mounts_at_the_origin_of_the_parent_it_is_given(
     world = World()
     parent = Body(name=PrefixedName(name="room_parent"))
     with world.modify_world():
-        world.add_body(parent)
+        world.add_body(body=parent)
 
-    shelf.spawn(world, parent=parent)
+    shelf.spawn(world=world, parent=parent)
 
     [corpus_body] = [body for body in world.bodies if body.name.name == "shelf_corpus"]
     assert corpus_body.parent_connection.parent is parent
@@ -262,7 +262,7 @@ def test_every_slab_spawns_at_the_given_thickness() -> None:
     shelf = _make_shelf(relative_heights=(0.2, 0.5, 0.8))
     slab_thickness = 0.05
 
-    shelf.spawn(World.create_with_root_body(), slab_thickness=slab_thickness)
+    shelf.spawn(world=World.create_with_root_body(), slab_thickness=slab_thickness)
 
     assert [
         float(layer.annotation.root.collision.shapes[0].scale.z)
@@ -313,7 +313,7 @@ def test_each_slab_is_placed_at_its_own_layers_height_rank() -> None:
     for, not at the grid slot sorting by ``relative_height`` happens to give it.
     """
     shelf = _make_shelf(relative_heights=(0.9, 0.1, 0.5))
-    shelf.spawn(World.create_with_root_body())
+    shelf.spawn(world=World.create_with_root_body())
 
     spawned_heights = [
         float(layer.annotation.root.parent_connection.origin.position.to_np()[2].item())
@@ -403,7 +403,7 @@ def test_an_object_on_the_shelfs_top_is_not_rejected_for_lack_of_headroom(
         )
     ]
 
-    shelf.spawn(World.create_with_root_body())
+    shelf.spawn(world=World.create_with_root_body())
 
     assert sum(len(_object_bodies(layer)) for layer in shelf.layers) == 1
 
@@ -422,7 +422,7 @@ def test_object_mesh_is_matched_to_its_sampled_size_not_just_its_type(
     shelf = _make_shelf(relative_heights=(1.0,), scale=Scale(x=0.4, y=0.8, z=1.0))
     shelf.source_ids = [oversized, close_match]
 
-    shelf.spawn(World.create_with_root_body())
+    shelf.spawn(world=World.create_with_root_body())
 
     assert sum(len(_object_bodies(layer)) for layer in shelf.layers) == 1
     assert shelf.layers[0].objects[0].source_id == "close_match"

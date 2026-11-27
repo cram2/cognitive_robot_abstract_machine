@@ -10,6 +10,7 @@ from contextlib import ExitStack
 from dataclasses import dataclass, field
 from time import time, sleep
 
+from krrood.patterns.called_positionally import called_positionally
 from rclpy.node import Node
 from typing_extensions import Any
 from rclpy.service import Service
@@ -24,7 +25,7 @@ from semantic_digital_twin.adapters.ros.ros2_node import HasROS2Node
 from semantic_digital_twin.adapters.ros.world_synchronizer import WorldSynchronizer
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FetchWorldServer(HasROS2Node):
     """
     A ros service that allows other processes to fetch the entire world modification
@@ -56,6 +57,7 @@ class FetchWorldServer(HasROS2Node):
             Trigger, self.service_name, self.service_callback
         )
 
+    @called_positionally
     def service_callback(self, request: Trigger.Request, response: Trigger.Response):
         """
         Handle service requests to fetch the world modification list.
@@ -98,7 +100,7 @@ class FetchWorldServer(HasROS2Node):
                 stream_positions=[
                     position
                     for synchronizer in WorldSynchronizer.all_callbacks_of_this_type_from_world(
-                        self.world
+                        world=self.world
                     )
                     for position in synchronizer.contained_positions
                 ],
@@ -115,7 +117,7 @@ class FetchWorldServer(HasROS2Node):
             self.service = None
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NoServiceFoundError(Exception):
     service_suffix: str
 
@@ -166,7 +168,7 @@ def fetch_world_snapshot_json(
     deadline = time() + timeout_seconds
     chosen_service = find_world_fetcher_service(node, service_suffix, timeout_seconds)
     if chosen_service is None:
-        raise NoServiceFoundError(service_suffix)
+        raise NoServiceFoundError(service_suffix=service_suffix)
     remaining = deadline - time()
 
     client = node.create_client(Trigger, chosen_service)
@@ -204,9 +206,9 @@ def fetch_world_from_service(
     """
     world = World()
     WorldModelSnapshot.apply_to_json_snapshot_to_world(
-        world,
-        fetch_world_snapshot_json(node, service_suffix, timeout_seconds),
-        **WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs(),
+        world=world,
+        json_data=fetch_world_snapshot_json(node, service_suffix, timeout_seconds),
+        **WorldEntityWithIDKwargsTracker.from_world(world=world).create_kwargs(),
     )
     return world
 
@@ -237,9 +239,9 @@ def join_shared_world(
         snapshot_json = fetch_world_snapshot_json(node, service_suffix, timeout_seconds)
         synchronizer.pause()
         WorldModelSnapshot.apply_to_json_snapshot_to_world(
-            world,
-            snapshot_json,
-            **WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs(),
+            world=world,
+            json_data=snapshot_json,
+            **WorldEntityWithIDKwargsTracker.from_world(world=world).create_kwargs(),
         )
         synchronizer.update_previous_world_state()
         synchronizer.resume()

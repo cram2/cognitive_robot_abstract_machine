@@ -19,7 +19,7 @@ from semantic_digital_twin.world_description.connection_properties import (
 from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class UR10eArm(
     Arm[TGenericEndEffector], ServoedRobotPart, Generic[TGenericEndEffector], ABC
 ):
@@ -67,7 +67,7 @@ class UR10eArm(
         }
 
     @staticmethod
-    def _menagerie_drive(torque_limit: float, joint_damping: float) -> JointDrive:
+    def _menagerie_drive(*, torque_limit: float, joint_damping: float) -> JointDrive:
         """
         Stiffness, servo damping and armature are the same for every joint of the arm in
         MuJoCo Menagerie; only the torque limit and the joint's own passive damping

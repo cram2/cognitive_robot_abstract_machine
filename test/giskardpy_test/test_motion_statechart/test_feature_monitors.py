@@ -53,10 +53,10 @@ def test_height_monitor(pr2_world_state_reset: World):
     the reference point.
     """
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "r_gripper_tool_frame"
+        name="r_gripper_tool_frame"
     )
     root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "base_footprint"
+        name="base_footprint"
     )
     tip_point = Point3(0, 0, 0, reference_frame=tip)
     reference_point = Point3(0, 0, 0, reference_frame=root)
@@ -92,10 +92,10 @@ def test_distance_monitor(pr2_world_state_reset: World):
     from the reference point.
     """
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "r_gripper_tool_frame"
+        name="r_gripper_tool_frame"
     )
     root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "base_footprint"
+        name="base_footprint"
     )
     tip_point = Point3(0, 0, 0, reference_frame=tip)
     reference_point = Point3(0, 0, 0, reference_frame=root)
@@ -131,9 +131,11 @@ def test_angle_monitor(pr2_world_state_reset: World):
     reference vector is between its limits.
     """
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "r_gripper_tool_frame"
+        name="r_gripper_tool_frame"
     )
-    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name("odom_combined")
+    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        name="odom_combined"
+    )
     tip_vector = Vector3.Y(reference_frame=tip)
     reference_vector = Vector3.X(reference_frame=root)
     lower_angle, upper_angle = radians(30), radians(32)
@@ -168,9 +170,11 @@ def test_perpendicular_monitor(pr2_world_state_reset: World):
     angle to the reference normal.
     """
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "r_gripper_tool_frame"
+        name="r_gripper_tool_frame"
     )
-    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name("odom_combined")
+    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        name="odom_combined"
+    )
     tip_normal = Vector3.X(reference_frame=tip)
     reference_normal = Vector3.X(reference_frame=root)
 

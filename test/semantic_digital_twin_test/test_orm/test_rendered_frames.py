@@ -62,12 +62,12 @@ def test_rendered_frame_retains_body_color_assignments(
         BodyColorAssignment(
             color=Color(hue=0.75, saturation=0.0, value=0.5, opacity=0.25),
             bodies=[
-                Body(name=PrefixedName("first")),
-                Body(name=PrefixedName("second")),
+                Body(name=PrefixedName(name="first")),
+                Body(name=PrefixedName(name="second")),
             ],
         ),
         BodyColorAssignment(
-            color=Color.BLUE(), bodies=[Body(name=PrefixedName("third"))]
+            color=Color.BLUE(), bodies=[Body(name=PrefixedName(name="third"))]
         ),
     ]
     color_image = np.zeros((2, 2, 3), dtype=np.uint8)

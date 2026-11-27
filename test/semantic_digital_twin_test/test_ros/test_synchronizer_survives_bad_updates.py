@@ -139,15 +139,17 @@ def test_receiver_does_not_report_caught_up_with_a_publisher_it_diverged_from(
     receiver = WorldSynchronizer(
         node=rclpy_node, _world=receiving_world, topic_name=topic
     )
-    unknown_to_receiver = Body(name=PrefixedName("unknown"))
+    unknown_to_receiver = Body(name=PrefixedName(name="unknown"))
     with publishing_world.modify_world(publish_changes=False):
         publishing_world.add_connection(
-            FixedConnection(parent=publishing_world.root, child=unknown_to_receiver)
+            connection=FixedConnection(
+                parent=publishing_world.root, child=unknown_to_receiver
+            )
         )
     with publishing_world.modify_world():
         publishing_world.add_connection(
-            FixedConnection(
-                parent=unknown_to_receiver, child=Body(name=PrefixedName("child"))
+            connection=FixedConnection(
+                parent=unknown_to_receiver, child=Body(name=PrefixedName(name="child"))
             )
         )
     publishing_world.state._data[0, 0] = 4.2
@@ -284,7 +286,7 @@ def test_combined_update_with_unknown_state_leaves_the_model_untouched(
             modifications=WorldModelModificationBlock(
                 modifications=[
                     AddKinematicStructureEntityModification(
-                        Body(name=PrefixedName("extra"))
+                        kinematic_structure_entity=Body(name=PrefixedName(name="extra"))
                     )
                 ]
             ),
@@ -336,15 +338,17 @@ def test_reload_clears_the_divergence_from_the_reloaded_world(
         session=in_memory_session_maker(),
         topic_name=reload_topic,
     )
-    unknown_to_receiver = Body(name=PrefixedName("unknown"))
+    unknown_to_receiver = Body(name=PrefixedName(name="unknown"))
     with publishing_world.modify_world(publish_changes=False):
         publishing_world.add_connection(
-            FixedConnection(parent=publishing_world.root, child=unknown_to_receiver)
+            connection=FixedConnection(
+                parent=publishing_world.root, child=unknown_to_receiver
+            )
         )
     with publishing_world.modify_world():
         publishing_world.add_connection(
-            FixedConnection(
-                parent=unknown_to_receiver, child=Body(name=PrefixedName("child"))
+            connection=FixedConnection(
+                parent=unknown_to_receiver, child=Body(name=PrefixedName(name="child"))
             )
         )
     assert wait_for_condition(
@@ -428,15 +432,15 @@ def test_own_echo_is_ignored_without_reading_it(rclpy_node):
         node=rclpy_node, _world=world, topic_name=unique_topic("own_echo")
     )
     gone = FixedConnection(
-        parent=Body(name=PrefixedName("gone_parent")),
-        child=Body(name=PrefixedName("gone_child")),
+        parent=Body(name=PrefixedName(name="gone_parent")),
+        child=Body(name=PrefixedName(name="gone_child")),
     )
     echo = WorldUpdate(
         position=StreamPosition(origin=synchronizer.origin, sequence_number=1),
         modification_block=ModificationBlock(
             position=StreamPosition(origin=synchronizer.origin),
             modifications=WorldModelModificationBlock(
-                modifications=[AddConnectionModification(gone)]
+                modifications=[AddConnectionModification(connection=gone)]
             ),
         ),
     )
@@ -456,10 +460,14 @@ def test_deferred_updates_building_on_each_other_are_applied(rclpy_node):
     publishing_world = World()
     receiving_world = World()
     with publishing_world.modify_world():
-        publishing_world.add_kinematic_structure_entity(Body(name=PrefixedName("root")))
+        publishing_world.add_kinematic_structure_entity(
+            kinematic_structure_entity=Body(name=PrefixedName(name="root"))
+        )
     with receiving_world.modify_world():
         receiving_world.add_kinematic_structure_entity(
-            Body(name=PrefixedName("root"), id=publishing_world.root.id)
+            kinematic_structure_entity=Body(
+                name=PrefixedName(name="root"), id=publishing_world.root.id
+            )
         )
     publisher = WorldSynchronizer(
         node=rclpy_node, _world=publishing_world, topic_name=topic
@@ -470,14 +478,16 @@ def test_deferred_updates_building_on_each_other_are_applied(rclpy_node):
         topic_name=topic,
         defer_incoming_updates=True,
     )
-    tray = Body(name=PrefixedName("tray"))
+    tray = Body(name=PrefixedName(name="tray"))
     with publishing_world.modify_world():
         publishing_world.add_connection(
-            FixedConnection(parent=publishing_world.root, child=tray)
+            connection=FixedConnection(parent=publishing_world.root, child=tray)
         )
     with publishing_world.modify_world():
         publishing_world.add_connection(
-            FixedConnection(parent=tray, child=Body(name=PrefixedName("cup")))
+            connection=FixedConnection(
+                parent=tray, child=Body(name=PrefixedName(name="cup"))
+            )
         )
     wait_for_condition(lambda: receiver.has_buffered_model_modification)
     wait_for_condition(lambda: len(receiver.missed_messages) >= 4)

@@ -11,7 +11,7 @@ from semantic_digital_twin.semantic_annotations.mixins import (
 from semantic_digital_twin.world_description.world_entity import SemanticAnnotation
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ProcthorResolver:
     """
     Central resolver that deterministically maps a ProcTHOR name to exactly one class.
@@ -19,7 +19,7 @@ class ProcthorResolver:
 
     classes: list[type[HasRootBody]] = field(default_factory=list)
 
-    def resolve(self, name: str) -> type[SemanticAnnotation] | None:
+    def resolve(self, *, name: str) -> type[SemanticAnnotation] | None:
         """
         Resolve a given name to a class based on the number of matching tokens with the
         class name tokens or synonyms. The method preprocesses the name by removing

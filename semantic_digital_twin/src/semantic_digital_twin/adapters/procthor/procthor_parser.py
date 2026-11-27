@@ -57,7 +57,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_source import WorldSource
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ProcthorDoor:
     """
     Processes a door dictionary from Procthor, extracting the door's hole polygon and computing its scale and
@@ -136,7 +136,7 @@ class ProcthorDoor:
         """
         width = self.x_max - self.x_min
         height = self.y_max - self.y_min
-        return Scale(self.thickness, width, height)
+        return Scale(x=self.thickness, y=width, z=height)
 
     @cached_property
     def wall_T_door(self) -> HomogeneousTransformationMatrix:
@@ -157,11 +157,11 @@ class ProcthorDoor:
             Point3(0, -width_origin_center, height_origin_center)
         )
 
-    def _add_double_door_to_world(self, world: World) -> DoubleDoor:
+    def _add_double_door_to_world(self, *, world: World) -> DoubleDoor:
         """
         Parses the parameters according to the double door assumptions, and returns a double door factory.
         """
-        one_door_scale = Scale(self.thickness, self.scale.y * 0.5, self.scale.z)
+        one_door_scale = Scale(x=self.thickness, y=self.scale.y * 0.5, z=self.scale.z)
         x_direction: float = one_door_scale.x / 2
         y_direction: float = one_door_scale.y / 2
         handle_directions = [Vector3.Y(), Vector3.NEGATIVE_Y()]
@@ -205,16 +205,17 @@ class ProcthorDoor:
             doors.append(door)
 
         double_door = DoubleDoor(
-            name=PrefixedName(self.name),
+            name=PrefixedName(name=self.name),
             door_0=doors[0],
             door_1=doors[1],
         )
         with world.modify_world():
-            world.add_semantic_annotation(double_door)
+            world.add_semantic_annotation(semantic_annotation=double_door)
         return double_door
 
     def _add_single_door_to_world(
         self,
+        *,
         semantic_handle_position: SemanticPositionDescription,
         world: World,
         name: str | None = None,
@@ -228,7 +229,7 @@ class ProcthorDoor:
         scale = self.scale if scale is None else scale
 
         sampled_2d_point = semantic_handle_position.sample_point_from_event(
-            scale.to_simple_event()
+            event=scale.to_simple_event()
             .as_composite_set()
             .marginal(variables=SpatialVariables.yz)
         )
@@ -256,7 +257,7 @@ class ProcthorDoor:
             door.add(part=handle)
 
         door.mount_on_movable_joint(
-            ScrewAxisConnectionSpecification(
+            connection_specification=ScrewAxisConnectionSpecification(
                 screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
                     axis=Vector3.Z()
                 ),
@@ -271,7 +272,7 @@ class ProcthorDoor:
         """
 
         if "double" in self.name.lower():
-            return self._add_double_door_to_world(world)
+            return self._add_double_door_to_world(world=world)
         else:
             semantic_position = SemanticPositionDescription(
                 horizontal_direction_chain=[
@@ -285,7 +286,7 @@ class ProcthorDoor:
             )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ProcthorWall:
     """
     Processes a wall dictionary from Procthor, extracting the wall's polygon and computing its scale and
@@ -445,7 +446,7 @@ class ProcthorWall:
         return wall
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ProcthorRoom:
     """
     Processes a room dictionary from Procthor, extracting the room's floor polygon and computing its center.
@@ -513,7 +514,7 @@ class ProcthorRoom:
                 floor_polytope=self.centered_polytope,
                 world_root_T_self=self.world_T_room,
             )
-        room_name = PrefixedName(self.name)
+        room_name = PrefixedName(name=self.name)
         if "Bedroom" in self.name:
             room = Bedroom(name=room_name, floor=floor)
         elif "LivingRoom" in self.name:
@@ -526,10 +527,10 @@ class ProcthorRoom:
             assert_never(self.name)
 
         with world.modify_world():
-            world.add_semantic_annotation(room)
+            world.add_semantic_annotation(semantic_annotation=room)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ProcthorObject:
     """
     Processes an object dictionary from Procthor, extracting the object's position and rotation,
@@ -584,7 +585,7 @@ class ProcthorObject:
 
         with body_world.modify_world():
             for child in self.object_dict.get("children", {}):
-                child_object = ProcthorObject(child, self.session)
+                child_object = ProcthorObject(object_dict=child, session=self.session)
                 world_T_child = child_object.world_T_obj
                 child_world = child_object.get_world()
                 if child_world is None:
@@ -595,7 +596,9 @@ class ProcthorObject:
                     child=child_world.root,
                     parent_T_connection_expression=obj_T_child,
                 )
-                body_world.merge_world(child_world, child_connection)
+                body_world.merge_world(
+                    other=child_world, root_connection=child_connection
+                )
 
             return body_world
 
@@ -635,7 +638,7 @@ def unity_to_semantic_digital_twin_transform(
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ProcTHORParser(WorldSource):
     """
     Parses a Procthor JSON file into a semantic digital twin World.
@@ -656,7 +659,7 @@ class ProcTHORParser(WorldSource):
     """
 
     @classmethod
-    def from_file(cls, file_path: str, session: Session | None = None) -> Self:
+    def from_file(cls, *, file_path: str, session: Session | None = None) -> Self:
         return cls(
             name=Path(file_path).stem, house=json.load(open(file_path)), session=session
         )
@@ -670,22 +673,24 @@ class ProcTHORParser(WorldSource):
         house_name = self.name
         world = World(name=house_name)
         with world.modify_world():
-            world_root = Body(name=PrefixedName(house_name))
-            world.add_kinematic_structure_entity(world_root)
+            world_root = Body(name=PrefixedName(name=house_name))
+            world.add_kinematic_structure_entity(kinematic_structure_entity=world_root)
 
-        self.import_rooms(world, self.house["rooms"])
+        self.import_rooms(world=world, rooms=self.house["rooms"])
 
         if self.session is not None:
-            self.import_objects(world, self.house["objects"])
+            self.import_objects(world=world, objects=self.house["objects"])
         else:
             logging.warning("No database session provided, skipping object import.")
 
-        self.import_walls_and_doors(world, self.house["walls"], self.house["doors"])
+        self.import_walls_and_doors(
+            world=world, walls=self.house["walls"], doors=self.house["doors"]
+        )
 
         return world
 
     @staticmethod
-    def import_rooms(world: World, rooms: list[dict]):
+    def import_rooms(*, world: World, rooms: list[dict]):
         """
         Imports rooms from the Procthor JSON file into ProcthorRoom instances.
 
@@ -696,7 +701,7 @@ class ProcTHORParser(WorldSource):
             procthor_room = ProcthorRoom(room_dict=room)
             procthor_room.add_to_world(world=world)
 
-    def import_objects(self, world: World, objects: list[dict]):
+    def import_objects(self, *, world: World, objects: list[dict]):
         """
         Imports objects from the Procthor JSON file into ProcthorObject instances.
 
@@ -713,10 +718,10 @@ class ProcTHORParser(WorldSource):
                 child=obj_world.root,
                 parent_T_connection_expression=procthor_object.world_T_obj,
             )
-            world.merge_world(obj_world, obj_connection)
+            world.merge_world(other=obj_world, root_connection=obj_connection)
 
     def import_walls_and_doors(
-        self, world: World, walls: list[dict], doors: list[dict]
+        self, *, world: World, walls: list[dict], doors: list[dict]
     ):
         """
         Imports walls from the Procthor JSON file into ProcthorWall instances.
@@ -725,13 +730,14 @@ class ProcTHORParser(WorldSource):
         :param walls: List of wall dictionaries from the Procthor JSON file.
         :param doors: List of door dictionaries from the Procthor JSON file.
         """
-        procthor_walls = self._build_procthor_walls(walls, doors)
+        procthor_walls = self._build_procthor_walls(walls=walls, doors=doors)
 
         for procthor_wall in procthor_walls:
             procthor_wall.add_to_world(world=world)
 
     @staticmethod
     def _build_procthor_wall_from_polygon(
+        *,
         walls: list[dict],
     ) -> list[ProcthorWall]:
         """
@@ -762,7 +768,7 @@ class ProcTHORParser(WorldSource):
 
     @staticmethod
     def _build_procthor_wall_from_door(
-        walls: list[dict], doors: list[dict]
+        *, walls: list[dict], doors: list[dict]
     ) -> tuple[list[ProcthorWall], set[str]]:
         """
         Builds ProcthorWall instances from the provided walls and doors, associating each door with its corresponding walls.
@@ -793,7 +799,7 @@ class ProcTHORParser(WorldSource):
         return procthor_walls, used_wall_ids
 
     def _build_procthor_walls(
-        self, walls: list[dict], doors: list[dict]
+        self, *, walls: list[dict], doors: list[dict]
     ) -> list[ProcthorWall]:
         """
         Builds ProcthorWall instances from the provided walls and doors.
@@ -805,10 +811,10 @@ class ProcTHORParser(WorldSource):
         """
 
         procthor_walls, used_wall_ids = self._build_procthor_wall_from_door(
-            walls, doors
+            walls=walls, doors=doors
         )
         remaining_walls = [wall for wall in walls if wall["id"] not in used_wall_ids]
-        paired_walls = self._build_procthor_wall_from_polygon(remaining_walls)
+        paired_walls = self._build_procthor_wall_from_polygon(walls=remaining_walls)
 
         procthor_walls.extend(paired_walls)
 

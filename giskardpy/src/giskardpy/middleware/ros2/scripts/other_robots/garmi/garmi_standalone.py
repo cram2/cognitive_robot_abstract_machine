@@ -29,7 +29,9 @@ def main() -> None:
 
     giskard = Giskard.standalone(
         world_source=WorldSpecification(
-            robots=[RobotSpecification.specify_real_robot(Garmi)]
+            robots=[
+                RobotSpecification.specify_real_robot(semantic_annotation_type=Garmi)
+            ]
         ),
         qp_controller_config=QPControllerConfig(target_frequency=20),
     )

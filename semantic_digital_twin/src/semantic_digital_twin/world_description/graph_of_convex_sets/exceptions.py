@@ -12,7 +12,7 @@ from krrood_spatial_math.spatial_types import Point
 from semantic_digital_twin.world_description.geometry import AxisAlignedBox
 
 
-@dataclass
+@dataclass(kw_only=True)
 class EmptyFreeSpaceError(UsageError):
     """
     Raised when an environment leaves no free space to plan in, so there is no graph of
@@ -37,7 +37,7 @@ class EmptyFreeSpaceError(UsageError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnreachableGoalError(UsageError):
     """
     Raised when the graph of convex sets contains no path between the queried start and
@@ -61,7 +61,7 @@ class UnreachableGoalError(UsageError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AmbiguousSelectedVariableError(UsageError):
     """
     Raised when constraining an eql variable to a graph of convex sets' free space, but
@@ -89,7 +89,7 @@ class AmbiguousSelectedVariableError(UsageError):
         return "pass the specific variable to constrain instead of its query."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnconnectedGraphError(UsageError):
     """
     Raised when no two convex sets of a graph are connected, so there is no pair to pose
@@ -111,7 +111,7 @@ class UnconnectedGraphError(UsageError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnboundedSearchSpaceError(UsageError):
     """
     Raised when a
@@ -134,7 +134,7 @@ class UnboundedSearchSpaceError(UsageError):
         return "pass an explicit, finite search_space with a single bounding box."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PointOutsideSearchSpaceError(UsageError):
     """
     Raised when a queried point lies beyond the region a graph of convex sets was built

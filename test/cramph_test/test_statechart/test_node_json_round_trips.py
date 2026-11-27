@@ -141,8 +141,12 @@ def _cases() -> list[NodeRoundTripCase]:
             MoveBranch,
             lambda world: [
                 MoveBranch(
-                    branch_root=world.get_kinematic_structure_entity_by_name("tip"),
-                    new_parent=world.get_kinematic_structure_entity_by_name("root"),
+                    branch_root=world.get_kinematic_structure_entity_by_name(
+                        name="tip"
+                    ),
+                    new_parent=world.get_kinematic_structure_entity_by_name(
+                        name="root"
+                    ),
                 )
             ],
         ),

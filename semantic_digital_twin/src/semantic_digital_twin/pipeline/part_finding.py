@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from semantic_digital_twin.world import World
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FindParts(Step):
     """
     Gives every annotation of a type the parts its part-whole relationships call for and
@@ -39,13 +39,15 @@ class FindParts(Step):
     Finds the parts of each annotation.
     """
 
-    def _apply(self, world: World) -> World:
-        for whole in world.get_semantic_annotations_by_type(self.whole_type):
+    def _apply(self, *, world: World) -> World:
+        for whole in world.get_semantic_annotations_by_type(
+            semantic_annotation_type=self.whole_type
+        ):
             self.finder.find_parts(whole=whole)
         return world
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SplitPartFromShape(Step):
     """
     Gives every annotation of a type that has no such part yet the part its shape has,
@@ -62,7 +64,9 @@ class SplitPartFromShape(Step):
     Splits the part off each annotation's shape.
     """
 
-    def _apply(self, world: World) -> World:
-        for whole in world.get_semantic_annotations_by_type(self.whole_type):
+    def _apply(self, *, world: World) -> World:
+        for whole in world.get_semantic_annotations_by_type(
+            semantic_annotation_type=self.whole_type
+        ):
             self.splitter.ensure_part(whole=whole)
         return world

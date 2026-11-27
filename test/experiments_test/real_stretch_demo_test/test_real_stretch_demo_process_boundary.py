@@ -60,15 +60,15 @@ def test_demonstration_runs_against_a_controller_in_another_process(
         timeout_seconds=RESULT_FETCH_TIMEOUT_SECONDS
     )
 
-    cereal = controller_world.get_body_by_name(CEREAL_NAME)
-    shelf_layer = controller_world.get_body_by_name(CEREAL_SHELF_LAYER_NAME)
+    cereal = controller_world.get_body_by_name(name=CEREAL_NAME)
+    shelf_layer = controller_world.get_body_by_name(name=CEREAL_SHELF_LAYER_NAME)
     assert cereal.parent_connection.parent is controller_world.root
 
     root_T_shelf_layer = controller_world.compute_forward_kinematics(
-        controller_world.root, shelf_layer
+        root=controller_world.root, tip=shelf_layer
     ).to_np()
     root_T_cereal = controller_world.compute_forward_kinematics(
-        controller_world.root, cereal
+        root=controller_world.root, tip=cereal
     ).to_np()
     np.testing.assert_allclose(
         root_T_cereal[:2, 3],

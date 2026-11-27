@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 # %% unique names
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UniqueEntityNames(ABC):
     """
     Names entities for a format that identifies everything by a name no two things
@@ -36,7 +36,7 @@ class UniqueEntityNames(ABC):
     no later entity can take over a name something may still refer to.
     """
 
-    def assign(self, entity: WorldEntityWithID) -> str:
+    def assign(self, *, entity: WorldEntityWithID) -> str:
         """
         :param entity: The entity to name.
         :return: the name of the entity, giving it one if it has none yet.
@@ -44,23 +44,23 @@ class UniqueEntityNames(ABC):
         if entity.id in self._name_per_entity:
             return self._name_per_entity[entity.id]
 
-        name = self._unused_name_for(entity)
+        name = self._unused_name_for(entity=entity)
         self._name_per_entity[entity.id] = name
         self._assigned_names.add(name)
         return name
 
-    def _unused_name_for(self, entity: WorldEntityWithID) -> str:
+    def _unused_name_for(self, *, entity: WorldEntityWithID) -> str:
         """
         :param entity: An entity that has not been named yet.
         :return: the name the entity should get.
         """
-        name = self.preferred_name(entity)
+        name = self.preferred_name(entity=entity)
         if name not in self._assigned_names:
             return name
         return f"{name}_{entity.id.hex}"
 
     @abstractmethod
-    def preferred_name(self, entity: WorldEntityWithID) -> str:
+    def preferred_name(self, *, entity: WorldEntityWithID) -> str:
         """
         :param entity: The entity to name.
         :return: the name the entity gets unless another entity already has it.

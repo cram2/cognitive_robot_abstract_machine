@@ -102,10 +102,10 @@ def test_body_detection_transforms_offset_bounding_box_into_camera_frame(
         ),
         scale=Scale(x=0.4, y=0.8, z=1.2),
     )
-    body.collision = ShapeCollection([shape], reference_frame=body)
+    body.collision = ShapeCollection(shapes=[shape], reference_frame=body)
     with world.modify_world():
         world.add_connection(
-            FixedConnection(
+            connection=FixedConnection(
                 parent=root,
                 child=body,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -115,8 +115,8 @@ def test_body_detection_transforms_offset_bounding_box_into_camera_frame(
         )
     camera_model = detector.camera_model.scaled(scale_x=2.0, scale_y=2.0)
     camera = Camera(
-        name=PrefixedName("camera"),
-        root=Body(name=PrefixedName("optical_frame")),
+        name=PrefixedName(name="camera"),
+        root=Body(name=PrefixedName(name="optical_frame")),
         camera_model=camera_model,
     )
     world_T_camera = HomogeneousTransformationMatrix.from_xyz_rpy(

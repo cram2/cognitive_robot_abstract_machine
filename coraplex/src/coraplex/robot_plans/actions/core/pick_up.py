@@ -102,7 +102,7 @@ class ReachAction(
             children.append(
                 self.gripper_goal_type.create_gripper_goal(
                     configuration=self.arm.end_effector.default_configuration(
-                        GripperState.OPEN
+                        state_type=GripperState.OPEN
                     )
                 )
             )
@@ -146,8 +146,8 @@ class PickUpAction(
             z-axis.
         """
         grasp = GraspCandidate(
-            graspable,
-            Pose(
+            graspable=graspable,
+            grasp_pose=Pose(
                 orientation=RotationMatrix.from_rpy(pitch=np.pi / 2).quaternion,
                 reference_frame=graspable.root,
             ),
@@ -254,7 +254,7 @@ class GraspingAction(
             self.closing_step(
                 closing_goal=self.gripper_goal_type.create_gripper_goal(
                     configuration=self.arm.end_effector.default_configuration(
-                        GripperState.CLOSE,
+                        state_type=GripperState.CLOSE,
                         finger_velocity=self.max_grasp_closing_velocity,
                     ),
                     finger_stall_minimum_time=self.finger_stall_minimum_time,

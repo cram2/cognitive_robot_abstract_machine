@@ -125,7 +125,7 @@ class StretchApartmentDemonstration(RobotDemonstration):
         )
 
     def is_scene_populated(self, *, world: World) -> bool:
-        return world.is_kinematic_structure_entity_in_world_by_name(CEREAL_NAME)
+        return world.is_kinematic_structure_entity_in_world_by_name(name=CEREAL_NAME)
 
     def populate_scene(self, *, world: World) -> None:
         """
@@ -135,14 +135,16 @@ class StretchApartmentDemonstration(RobotDemonstration):
         # a connection that has the degrees of freedom to carry it, so it hangs off a
         # 6DoF connection rather than the default fixed one.
         CheezeIt.get_annotation_specification(
-            CEREAL_NAME,
-            BodySpecification.mesh(
-                CEREAL_NAME,
-                ApartmentEnvironment.mesh_path(CEREAL_NAME),
+            name=CEREAL_NAME,
+            root_specification=BodySpecification.mesh(
+                name=CEREAL_NAME,
+                filename=ApartmentEnvironment.mesh_path(mesh_file_name=CEREAL_NAME),
                 parent_T_self=CEREAL_SHELF_LAYER_T_CEREAL,
             ),
             parent_connection_specification=Connection6DoFSpecification(),
-        ).spawn(world, parent=world.get_body_by_name(CEREAL_SHELF_LAYER_NAME))
+        ).spawn(
+            world=world, parent=world.get_body_by_name(name=CEREAL_SHELF_LAYER_NAME)
+        )
 
     def build_context_extensions(self, *, world: World) -> list[ContextExtension]:
         """
@@ -150,7 +152,9 @@ class StretchApartmentDemonstration(RobotDemonstration):
         """
         return [
             RobotAccess(
-                robot=world.get_semantic_annotations_by_type(self.used_robot)[0]
+                robot=world.get_semantic_annotations_by_type(
+                    semantic_annotation_type=self.used_robot
+                )[0]
             ),
             PlanRewriting(transformations=[DetectBeforeGrasp()]),
         ]
@@ -162,10 +166,12 @@ class StretchApartmentDemonstration(RobotDemonstration):
         world = context.world
         robot = context.require_extension(extension_type=RobotAccess).robot
 
-        cereal = world.get_semantic_annotations_by_type(CheezeIt)[0]
+        cereal = world.get_semantic_annotations_by_type(
+            semantic_annotation_type=CheezeIt
+        )[0]
         arm = robot.all_arms[0]
-        shelf_layer_body = world.get_body_by_name(CEREAL_SHELF_LAYER_NAME)
-        bedside_table_body = world.get_body_by_name("bedside_table.dae")
+        shelf_layer_body = world.get_body_by_name(name=CEREAL_SHELF_LAYER_NAME)
+        bedside_table_body = world.get_body_by_name(name="bedside_table.dae")
         CEREAL_SHELF_LAYER_T_CEREAL.reference_frame = shelf_layer_body
 
         plan = Sequence(
@@ -173,7 +179,7 @@ class StretchApartmentDemonstration(RobotDemonstration):
                 ParkArmsAction(arms=robot.all_arms),
                 SetGripperAction(
                     gripper_configuration=arm.end_effector.default_configuration(
-                        GripperState.CLOSE
+                        state_type=GripperState.CLOSE
                     )
                 ),
                 NavigateAction(
@@ -223,7 +229,7 @@ class StretchApartmentDemonstration(RobotDemonstration):
                 ParkArmsAction(arms=robot.all_arms),
                 SetGripperAction(
                     gripper_configuration=arm.end_effector.default_configuration(
-                        GripperState.CLOSE
+                        state_type=GripperState.CLOSE
                     )
                 ),
                 NavigateAction(
@@ -272,7 +278,7 @@ class StretchApartmentDemonstration(RobotDemonstration):
                 ParkArmsAction(arms=robot.all_arms),
                 SetGripperAction(
                     gripper_configuration=arm.end_effector.default_configuration(
-                        GripperState.CLOSE
+                        state_type=GripperState.CLOSE
                     )
                 ),
             ]

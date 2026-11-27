@@ -61,10 +61,10 @@ class Sage10kOpenDoor(SequentialAction):
 
         # Find a node in free space that is near the pre-grasp pose. gcs is planar, so
         # the query point is its floor-plane projection, not the full 3D position.
-        target_node = gcs.node_of_point(Point2.from_pose(pre_grasp_pose))
+        target_node = gcs.node_of_point(point=Point2.from_pose(pre_grasp_pose))
 
         gcs = gcs.create_subgraph(
-            list(
+            nodes=list(
                 rustworkx.node_connected_component(
                     gcs.graph, gcs.box_to_index_map[target_node]
                 )
@@ -89,7 +89,7 @@ class Sage10kOpenDoor(SequentialAction):
         # -- appended directly rather than via Match.where(), since that would re-add
         # it to the Entity a second time.
         free_space_condition = gcs.constrain_to_free_space(
-            reach_query.target_pose_offset_robot.position
+            variable=reach_query.target_pose_offset_robot.position
         )
         reach_query._where_conditions_.append(free_space_condition)
         reach_action = StatementNode(statement=reach_query)

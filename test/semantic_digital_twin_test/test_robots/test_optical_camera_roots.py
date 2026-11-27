@@ -32,7 +32,7 @@ def test_camera_root_defines_optical_forward_direction(table_world: World) -> No
     A camera needs no separate viewing axis or optical offset.
     """
     camera = Camera(
-        name=PrefixedName("camera"),
+        name=PrefixedName(name="camera"),
         root=table_world.root,
         camera_model=PinholeCameraModel.from_field_of_view(
             resolution=CameraResolution(), field_of_view=FieldOfView()
@@ -58,7 +58,9 @@ def test_optical_root_preserves_mounting_pose(table_world: World) -> None:
         yaw=0.6,
         reference_frame=table_world.root,
     )
-    optical_root = RobotCamera.create_optical_body(table_world.root, parent_T_optical)
+    optical_root = RobotCamera.create_optical_body(
+        mounting_body=table_world.root, parent_T_optical=parent_T_optical
+    )
     np.testing.assert_allclose(
         optical_root.global_transform.to_np(),
         table_world.root.global_transform.to_np() @ parent_T_optical.to_np(),
@@ -82,10 +84,12 @@ def test_approximate_camera_keeps_its_modeled_mount(
     Cameras without sensor frames retain the existing mount with fixed optical axes.
     """
     monkeypatch.setattr(
-        table_world, "get_body_in_branch_by_name", lambda root, name: table_world.root
+        table_world,
+        "get_body_in_branch_by_name",
+        lambda *, branch_root, name: table_world.root,
     )
     camera = camera_type.setup_default_configuration_in_world_below_robot_root(
-        table_world.root
+        robot_root=table_world.root
     )
     assert camera.root.parent_connection.parent is table_world.root
     expected = np.eye(4)
@@ -111,7 +115,9 @@ def test_optical_mount_follows_parent_motion(
     parent_T_optical = HomogeneousTransformationMatrix.from_xyz_rpy(
         x=0.2, roll=0.3, yaw=0.4
     )
-    optical_root = RobotCamera.create_optical_body(parent, parent_T_optical)
+    optical_root = RobotCamera.create_optical_body(
+        mounting_body=parent, parent_T_optical=parent_T_optical
+    )
     with world.modify_world():
         parent.parent_connection.origin = HomogeneousTransformationMatrix(
             data=HomogeneousTransformationMatrix.from_xyz_rpy(

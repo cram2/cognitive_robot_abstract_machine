@@ -336,7 +336,9 @@ def convert_to_decomposed_obj_and_save_in_tmp(
         )
         if not trimesh_obj.is_convex and mesh_decomposer is not None:
             with suppress_stdout_stderr():
-                mesh_decomposer.apply_to_mesh_and_save(mesh, unfinished_file_name)
+                mesh_decomposer.apply_to_mesh_and_save(
+                    mesh=mesh, output_path=unfinished_file_name
+                )
 
     return save_in_cache(
         obj_file_name=str(cache_dir / f"{trimesh_quantized_hash(trimesh_obj)}.obj"),
@@ -415,7 +417,7 @@ def create_object(
     return out
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class BulletCollisionDetector(CollisionDetector):
     """
     Collision detector based on the giskard wrapper for bullet.
@@ -459,7 +461,7 @@ class BulletCollisionDetector(CollisionDetector):
         if self._world.is_empty():
             return
         for body in self._world.bodies_with_collision:
-            self.add_body(body)
+            self.add_body(body=body)
         self._ordered_bullet_objects = list(self.body_to_bullet_object.values())
 
     def clear(self):
@@ -473,7 +475,7 @@ class BulletCollisionDetector(CollisionDetector):
                 self.get_all_collision_fks(),
             )
 
-    def add_body(self, body: Body):
+    def add_body(self, *, body: Body):
         o = create_shape_from_body(body=body, mesh_decomposer=self.mesh_decomposer)
         self.kineverse_world.add_collision_object(o)
         self.body_to_bullet_object[body] = o
@@ -486,7 +488,7 @@ class BulletCollisionDetector(CollisionDetector):
 
     @memoize
     def collision_matrix_to_bullet_query(
-        self, collision_matrix: CollisionMatrix
+        self, *, collision_matrix: CollisionMatrix
     ) -> dict[tuple[bullet.CollisionObject, bullet.CollisionObject], float] | None:
         return {
             (
@@ -497,21 +499,21 @@ class BulletCollisionDetector(CollisionDetector):
         }
 
     def check_collisions(
-        self, collision_matrix: CollisionMatrix
+        self, *, collision_matrix: CollisionMatrix
     ) -> CollisionCheckingResult:
 
-        query = self.collision_matrix_to_bullet_query(collision_matrix)
+        query = self.collision_matrix_to_bullet_query(collision_matrix=collision_matrix)
         result: list[bullet.Collision] = (
             self.kineverse_world.get_closest_filtered_map_batch(query)
         )
         return CollisionCheckingResult(
-            [
+            contacts=[
                 ClosestPoints(
                     body_a=self._world.get_kinematic_structure_entity_by_id(
-                        collision.obj_a.name
+                        id=collision.obj_a.name
                     ),
                     body_b=self._world.get_kinematic_structure_entity_by_id(
-                        collision.obj_b.name
+                        id=collision.obj_b.name
                     ),
                     distance=collision.contact_distance,
                     root_P_point_on_body_a=collision.map_P_pa,

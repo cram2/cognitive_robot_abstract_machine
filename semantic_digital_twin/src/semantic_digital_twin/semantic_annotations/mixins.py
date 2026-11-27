@@ -110,7 +110,7 @@ if TYPE_CHECKING:
     )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class IsPerceivable:
     """
     A mixin class for semantic annotations that can be perceived.
@@ -127,7 +127,7 @@ TKinematicStructureEntity = TypeVar(
 )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasRootKinematicStructureEntity(
     SemanticAnnotation, Generic[TKinematicStructureEntity], SubClassSafeGeneric, Mixin
 ):
@@ -168,7 +168,7 @@ class HasRootKinematicStructureEntity(
         """
         return concatenate(
             [
-                shape.mesh_in_frame(self.root)
+                shape.mesh_in_frame(target_frame=self.root)
                 for body in self.bodies_with_collision
                 for shape in body.collision
             ]
@@ -176,9 +176,8 @@ class HasRootKinematicStructureEntity(
 
     @property
     def scale(self) -> Scale:
-        return Scale(
-            *(self.root.combined_mesh.bounds[1] - self.root.combined_mesh.bounds[0])
-        )
+        x, y, z = self.root.combined_mesh.bounds[1] - self.root.combined_mesh.bounds[0]
+        return Scale(x=x, y=y, z=z)
 
     @property
     def min_max_points(self) -> tuple[Point3, Point3]:
@@ -193,6 +192,7 @@ class HasRootKinematicStructureEntity(
     @abstractmethod
     def get_default_root_kinematic_structure_entity_specification(
         cls,
+        *,
         name: str | None = None,
         scale: Scale | None = None,
         connection_specification: ConnectionSpecification | None = None,
@@ -222,9 +222,9 @@ class HasRootKinematicStructureEntity(
     @classmethod
     def get_annotation_specification(
         cls,
+        *,
         name: str,
         root_specification: KinematicStructureEntitySpecification,
-        *,
         parent_connection_specification: ConnectionSpecification | None = None,
         annotation_kwargs: dict | None = None,
         part_specifications: dict | None = None,
@@ -259,11 +259,14 @@ class HasRootKinematicStructureEntity(
             annotation_kwargs=(
                 annotation_kwargs if annotation_kwargs is not None else {}
             ),
-            part_bindings=cls._to_part_bindings(part_specifications),
+            part_bindings=cls._to_part_bindings(
+                part_specifications=part_specifications
+            ),
         )
 
     @staticmethod
     def _to_part_bindings(
+        *,
         part_specifications: dict | None,
     ) -> list[PartSpecificationBinding]:
         """
@@ -286,6 +289,7 @@ class HasRootKinematicStructureEntity(
 
     def _mount_strategy(
         self,
+        *,
         main_has_root_body_annotation: HasRootBody,
         relationship: IsPartWholeRelationship,
     ) -> None:
@@ -302,7 +306,9 @@ class HasRootKinematicStructureEntity(
             mounted into, describing how the mount affects the whole.
         """
         main_has_root_body_annotation._world.move_branch(
-            self.root, main_has_root_body_annotation.root, True
+            branch_root=self.root,
+            new_parent=main_has_root_body_annotation.root,
+            enable_unsafe_inside_world_block=True,
         )
 
     @property
@@ -311,18 +317,18 @@ class HasRootKinematicStructureEntity(
 
     @property
     def connections(self) -> list[Connection]:
-        return self._world.get_connections_of_branch(self.root)
+        return self._world.get_connections_of_branch(root=self.root)
 
     def _kinematic_structure_entities(
-        self, visited: set[int]
+        self, *, visited: set[int]
     ) -> list[KinematicStructureEntity]:
         if id(self) in visited:
             return []
         visited.add(id(self))
-        return self._world.get_kinematic_structure_entities_of_branch(self.root)
+        return self._world.get_kinematic_structure_entities_of_branch(root=self.root)
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasRootBody(HasRootKinematicStructureEntity[Body], HasMaterialElasticity, Mixin):
     """
     Abstract base class for all objects which have a unambiguous root reference frame.
@@ -335,6 +341,7 @@ class HasRootBody(HasRootKinematicStructureEntity[Body], HasMaterialElasticity, 
     @classmethod
     def create_with_new_body_in_world(
         cls,
+        *,
         name: str,
         world: World,
         world_root_T_self: HomogeneousTransformationMatrix | None = None,
@@ -354,14 +361,17 @@ class HasRootBody(HasRootKinematicStructureEntity[Body], HasMaterialElasticity, 
         :return: The created semantic annotation instance.
         """
         return cls.get_annotation_specification(
-            name,
-            cls.get_default_root_kinematic_structure_entity_specification(scale=scale),
+            name=name,
+            root_specification=cls.get_default_root_kinematic_structure_entity_specification(
+                scale=scale
+            ),
             parent_connection_specification=parent_connection_specification,
-        ).spawn(world, parent_T_self=world_root_T_self)
+        ).spawn(world=world, parent_T_self=world_root_T_self)
 
     @classmethod
     def get_default_root_kinematic_structure_entity_specification(
         cls,
+        *,
         name: str | None = None,
         scale: Scale | None = None,
         connection_specification: ConnectionSpecification | None = None,
@@ -390,13 +400,13 @@ class HasRootBody(HasRootKinematicStructureEntity[Body], HasMaterialElasticity, 
                 name=name, connection_specification=connection_specification
             )
         return BodySpecification.from_event(
-            name,
-            scale.to_simple_event().as_composite_set(),
+            name=name,
+            event=scale.to_simple_event().as_composite_set(),
             connection_specification=connection_specification,
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class IsGraspable(HasRootBody, Mixin):
     """
     A mixin class for semantic annotations that state where they may be grasped, by
@@ -417,6 +427,7 @@ class IsGraspable(HasRootBody, Mixin):
 
     def grasp_candidates(
         self,
+        *,
         model_registry: ModelRegistry | None = None,
         result_pattern: Callable[[], Match[GraspResult]] | None = None,
     ) -> list[GraspCandidate]:
@@ -434,10 +445,14 @@ class IsGraspable(HasRootBody, Mixin):
         """
         part = self.grasped_part()
         if part is not self:
-            return part.grasp_candidates(model_registry, result_pattern)
+            return part.grasp_candidates(
+                model_registry=model_registry, result_pattern=result_pattern
+            )
         if model_registry is None:
             return self.default_grasp_candidates()
-        return self.drawn_grasp_candidates(model_registry, result_pattern)
+        return self.drawn_grasp_candidates(
+            model_registry=model_registry, result_pattern=result_pattern
+        )
 
     def default_grasp_candidates(self) -> list[GraspCandidate]:
         """
@@ -447,8 +462,8 @@ class IsGraspable(HasRootBody, Mixin):
         """
         return [
             GraspCandidate(
-                self,
-                Pose(
+                graspable=self,
+                grasp_pose=Pose(
                     orientation=RotationMatrix.from_rpy(yaw=yaw).quaternion,
                     reference_frame=self.root,
                 ),
@@ -460,6 +475,7 @@ class IsGraspable(HasRootBody, Mixin):
 
     def drawn_grasp_candidates(
         self,
+        *,
         model_registry: ModelRegistry | None = None,
         result_pattern: Callable[[], Match[GraspResult]] | None = None,
     ) -> list[GraspCandidate]:
@@ -472,7 +488,9 @@ class IsGraspable(HasRootBody, Mixin):
             surface of the object, at most :attr:`grasp_candidate_count` of them.
         """
         grasps = draw_grasps(
-            self.grasp_strategy.statement(self, result_pattern),
+            self.grasp_strategy.statement(
+                graspable=self, result_pattern=result_pattern
+            ),
             self.grasp_candidate_count,
             model_registry,
         )
@@ -497,11 +515,11 @@ class IsGraspable(HasRootBody, Mixin):
             surface = shapes.combined_mesh
             if body is not self.root:
                 surface.apply_transform(
-                    self._world.compute_forward_kinematics_np(self.root, body)
+                    self._world.compute_forward_kinematics_np(root=self.root, tip=body)
                 )
             surfaces.append(surface)
         if not surfaces:
-            raise NoGraspGeometry(self)
+            raise NoGraspGeometry(graspable=self)
         return trimesh.util.concatenate(surfaces)
 
     def grasp_axis(self) -> LineSegment3:
@@ -528,7 +546,7 @@ class IsGraspable(HasRootBody, Mixin):
         return self
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasDrawnGraspsByDefault(IsGraspable, Mixin):
     """
     A mixin class for semantic annotations whose shape is known well enough that, while
@@ -543,7 +561,7 @@ class HasDrawnGraspsByDefault(IsGraspable, Mixin):
         return self.drawn_grasp_candidates()
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasRootRegion(HasRootKinematicStructureEntity[Region], Mixin):
     """
     A mixin class for semantic annotations that have a region.
@@ -552,6 +570,7 @@ class HasRootRegion(HasRootKinematicStructureEntity[Region], Mixin):
     @classmethod
     def create_with_new_region_in_world(
         cls,
+        *,
         name: str,
         world: World,
         world_root_T_self: HomogeneousTransformationMatrix | None = None,
@@ -571,14 +590,17 @@ class HasRootRegion(HasRootKinematicStructureEntity[Region], Mixin):
         :return: The created semantic annotation instance.
         """
         return cls.get_annotation_specification(
-            name,
-            cls.get_default_root_kinematic_structure_entity_specification(scale=scale),
+            name=name,
+            root_specification=cls.get_default_root_kinematic_structure_entity_specification(
+                scale=scale
+            ),
             parent_connection_specification=parent_connection_specification,
-        ).spawn(world, parent_T_self=world_root_T_self)
+        ).spawn(world=world, parent_T_self=world_root_T_self)
 
     @classmethod
     def get_default_root_kinematic_structure_entity_specification(
         cls,
+        *,
         name: str | None = None,
         scale: Scale | None = None,
         connection_specification: ConnectionSpecification | None = None,
@@ -604,13 +626,13 @@ class HasRootRegion(HasRootKinematicStructureEntity[Region], Mixin):
                 name=name, connection_specification=connection_specification
             )
         return RegionSpecification.from_event(
-            name,
-            scale.to_simple_event().as_composite_set(),
+            name=name,
+            event=scale.to_simple_event().as_composite_set(),
             connection_specification=connection_specification,
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasMovableJoint(HasRootBody, Mixin, ABC):
     """
     A mixin class for semantic annotations whose root moves relative to its parent, such
@@ -640,7 +662,7 @@ class HasMovableJoint(HasRootBody, Mixin, ABC):
         lower limit, where a door or drawer stands closed, and ``1`` at its upper limit.
         """
         if self.movable_joint is None:
-            raise MissingMovableJointError(self)
+            raise MissingMovableJointError(semantic_annotation=self)
         limits = self.movable_joint.dof.limits
         return (self.movable_joint.position - limits.lower.position) / (
             limits.upper.position - limits.lower.position
@@ -648,7 +670,7 @@ class HasMovableJoint(HasRootBody, Mixin, ABC):
 
     @abstractmethod
     def calculate_self_T_movable_joint(
-        self, axis: Vector3
+        self, *, axis: Vector3
     ) -> HomogeneousTransformationMatrix:
         """
         Calculate where the joint that moves this annotation sits, relative to its root.
@@ -658,7 +680,7 @@ class HasMovableJoint(HasRootBody, Mixin, ABC):
         """
 
     def mount_on_movable_joint(
-        self, connection_specification: ScrewAxisConnectionSpecification
+        self, *, connection_specification: ScrewAxisConnectionSpecification
     ) -> ScrewAxisConnection:
         """
         Replace the connection the root hangs from with one built from
@@ -673,10 +695,10 @@ class HasMovableJoint(HasRootBody, Mixin, ABC):
         placed_specification = dataclasses.replace(
             connection_specification,
             connection_T_child=self.calculate_self_T_movable_joint(
-                connection_specification.screw_axis.unit_direction
+                axis=connection_specification.screw_axis.unit_direction
             ).inverse(),
         )
-        return placed_specification.reconnect(self._world, self.root)
+        return placed_specification.reconnect(world=self._world, child=self.root)
 
 
 THasRootBody = TypeVar("THasRootBody", bound=HasRootBody)
@@ -685,7 +707,7 @@ A type variable for HasRootBody.
 """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class IsStorageSpace(HasRootBody, Generic[THasRootBody], SubClassSafeGeneric):
     """
     A mixin class for semantic annotations that represent storage spaces.
@@ -700,14 +722,16 @@ class IsStorageSpace(HasRootBody, Generic[THasRootBody], SubClassSafeGeneric):
     """
 
     @synchronized_attribute_modification
-    def add_object(self, object: HasRootBody):
+    def add_object(self, *, object: HasRootBody):
         self._world.move_branch(
-            object.root, self.root, enable_unsafe_inside_world_block=True
+            branch_root=object.root,
+            new_parent=self.root,
+            enable_unsafe_inside_world_block=True,
         )
         self.objects.append(object)
 
     def get_objects_of_type(
-        self, object_type: type[SemanticAnnotation]
+        self, *, object_type: type[SemanticAnnotation]
     ) -> list[HasRootBody]:
         """
         Returns all objects of a given type in the semantic annotation.
@@ -723,7 +747,7 @@ class IsStorageSpace(HasRootBody, Generic[THasRootBody], SubClassSafeGeneric):
         return [obj for obj in self.objects if isinstance(obj, object_type)]
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasSupportingSurface(IsStorageSpace, Mixin):
     """
     A semantic annotation that represents a supporting surface.
@@ -736,6 +760,7 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
 
     def calculate_supporting_surface(
         self,
+        *,
         upward_threshold: float = 0.95,
         clearance_threshold: float = 0.5,
         min_surface_area: float = 0.0225,  # 15cm x 15cm
@@ -816,8 +841,8 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
         ]
         supporting_surface = Region.from_3d_points(
             name=PrefixedName(
-                f"{self.root.name.name}_supporting_surface_region",
-                self.root.name.prefix,
+                name=f"{self.root.name.name}_supporting_surface_region",
+                prefix=self.root.name.prefix,
             ),
             points_3d=points_3d,
         )
@@ -830,9 +855,9 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
                 x=x, y=y, z=z, reference_frame=self.root
             ),
         )
-        self._world.add_region(supporting_surface)
-        self._world.add_connection(self_C_supporting_surface)
-        self.add_supporting_surface(supporting_surface)
+        self._world.add_region(region=supporting_surface)
+        self._world.add_connection(connection=self_C_supporting_surface)
+        self.add_supporting_surface(region=supporting_surface)
         return supporting_surface
 
     def infer_objects_on_surface(self):
@@ -860,17 +885,20 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
         for obj in objects:
             if obj in self.objects:
                 continue
-            self.add_object(obj)
+            self.add_object(object=obj)
 
     @synchronized_attribute_modification
-    def add_supporting_surface(self, region: Region):
+    def add_supporting_surface(self, *, region: Region):
         self._world.move_branch(
-            region, self.root, enable_unsafe_inside_world_block=True
+            branch_root=region,
+            new_parent=self.root,
+            enable_unsafe_inside_world_block=True,
         )
         self.supporting_surface = region
 
     def sample_points_from_surface(
         self,
+        *,
         body_to_sample_for: HasRootBody | None = None,
         category_of_interest: type[SemanticAnnotation] | None = None,
         amount: int = 100,
@@ -932,6 +960,7 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
 
     def _build_surface_sampler(
         self,
+        *,
         category_of_interest: type[SemanticAnnotation] | None = None,
         object_bloat: float = 0.1,
     ):
@@ -944,11 +973,11 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
         :param object_bloat: The amount of bloat to apply to the object event.
         """
         truncated_event_2d = self._2d_surface_sample_space_excluding_objects(
-            object_bloat
+            object_bloat=object_bloat
         )
 
         objects_of_interest = (
-            self.get_objects_of_type(category_of_interest)
+            self.get_objects_of_type(object_type=category_of_interest)
             if category_of_interest
             else []
         )
@@ -962,23 +991,27 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
         else:
             return uniform_measure_of_event(truncated_event_2d)
 
-    def _2d_surface_sample_space_excluding_objects(self, object_bloat: float) -> Event:
+    def _2d_surface_sample_space_excluding_objects(
+        self, *, object_bloat: float
+    ) -> Event:
         """
         Compute a 2D event representing the supporting surface, truncated by the objects
         on the surface.
 
         :param object_bloat: The amount of bloat to apply to the object events.
         """
-        area_of_self = BoundingBoxCollection.from_shapes(self.supporting_surface.area)
+        area_of_self = BoundingBoxCollection.from_shapes(
+            shapes=self.supporting_surface.area
+        )
         area_of_self.transform_all_shapes_to_own_frame()
         event = area_of_self.event
 
         event_2d = event.marginal(variables=SpatialVariables.xy)
         for obj in self.objects:
             bounding_box = obj.root.collision.as_bounding_box_collection_in_frame(
-                self.supporting_surface
+                reference_frame=self.supporting_surface
             ).bounding_box()
-            bounding_box.enlarge_all(object_bloat)
+            bounding_box.enlarge_all(amount=object_bloat)
             object_event = bounding_box.simple_event.as_composite_set()
             object_event_2d = object_event.marginal(variables=SpatialVariables.xy)
             event_2d = event_2d - object_event_2d
@@ -986,6 +1019,7 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
 
     def _2d_gaussian_sampler_from_2d_sample_space(
         self,
+        *,
         objects_of_interest: list[HasRootBody],
         variance: float,
         sample_space: Event,
@@ -1012,6 +1046,7 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
 
     def _untruncated_2d_gaussian_sampler(
         self,
+        *,
         objects_of_interest: list[HasRootBody],
         variance: float,
     ) -> ProbabilisticCircuit:
@@ -1032,7 +1067,8 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
 
         for object_of_interest in objects_of_interest:
             surface_P_obj = self._world.transform(
-                object_of_interest.root.global_transform, self.supporting_surface
+                spatial_object=object_of_interest.root.global_transform,
+                target_frame=self.supporting_surface,
             )
 
             p_object_root = ProductUnit(probabilistic_circuit=surface_circuit)
@@ -1061,6 +1097,7 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
 
     def spawn_bounding_boxes_as_region(
         self,
+        *,
         boxes: BoundingBoxCollection[VolumetricBoundingBox, Point3],
         name: PrefixedName | None = None,
         color: Color | None = None,
@@ -1076,21 +1113,24 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
         :return: The region.
         """
         if name is None:
-            name = PrefixedName("region")
+            name = PrefixedName(name="region")
         if color is None:
             color = Color.from_rgba(red=0.5, green=1.0, blue=0.5, opacity=0.5)
 
         shapes = boxes.as_shapes()
-        shapes.dye_shapes(color)
-        region = Region.from_shape_collection(name, shapes)
+        shapes.dye_shapes(color=color)
+        region = Region.from_shape_collection(name=name, shape_collection=shapes)
 
         with self._world.modify_world():
-            self._world.add_region(region)
-            self._world.add_connection(FixedConnection(parent=self.root, child=region))
+            self._world.add_region(region=region)
+            self._world.add_connection(
+                connection=FixedConnection(parent=self.root, child=region)
+            )
         return region
 
     def planar_free_space(
         self,
+        *,
         max_height: float = 2.0,
         tolerance: float = 0.001,
         bloat_obstacles: float = 0.0,
@@ -1137,7 +1177,7 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
         if self.supporting_surface is None:
             with world.modify_world():
                 if self.calculate_supporting_surface() is None:
-                    raise NoSupportingSurfaceError(self)
+                    raise NoSupportingSurfaceError(annotation=self)
 
         # The surface's own frame lies on its top, so the free space and the paths
         # through it are expressed relative to what stands on it.
@@ -1145,23 +1185,23 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
             reference_frame=self.supporting_surface
         )
         surface_box = self.supporting_surface.area.as_bounding_box_collection_at_origin(
-            origin
+            origin=origin
         ).bounding_box()
 
         surface_top = surface_box.max_z + 2 * obstacle_height_clearance
         search_space = BoundingBoxCollection(
-            [
+            shapes=[
                 VolumetricBoundingBox(
-                    surface_box.min_x,
-                    surface_box.min_y,
-                    surface_top,
-                    surface_box.max_x,
-                    surface_box.max_y,
-                    surface_top + max_height,
-                    origin,
+                    min_x=surface_box.min_x,
+                    min_y=surface_box.min_y,
+                    min_z=surface_top,
+                    max_x=surface_box.max_x,
+                    max_y=surface_box.max_y,
+                    max_z=surface_top + max_height,
+                    origin=origin,
                 )
             ],
-            self.supporting_surface,
+            reference_frame=self.supporting_surface,
         )
 
         semantic_obstacle_annotation = SemanticEnvironmentAnnotation(
@@ -1179,7 +1219,7 @@ class HasSupportingSurface(IsStorageSpace, Mixin):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasCaseAsRootBody(HasSupportingSurface, Mixin):
     """
     A mixin class for semantic annotations that have a case as root body.
@@ -1211,7 +1251,7 @@ class HasCaseAsRootBody(HasSupportingSurface, Mixin):
         )
 
     @classmethod
-    def _create_container_event(cls, scale: Scale, wall_thickness: float) -> Event:
+    def _create_container_event(cls, *, scale: Scale, wall_thickness: float) -> Event:
         """
         Return an event representing a container with walls of a specified thickness.
 
@@ -1221,10 +1261,12 @@ class HasCaseAsRootBody(HasSupportingSurface, Mixin):
         """
         outer_box = scale.to_simple_event()
         inner_box = Scale(
-            scale.x - wall_thickness,
-            scale.y - wall_thickness,
-            scale.z - wall_thickness,
-        ).to_simple_event(cls._hole_direction_axis, wall_thickness)
+            x=scale.x - wall_thickness,
+            y=scale.y - wall_thickness,
+            z=scale.z - wall_thickness,
+        ).to_simple_event(
+            extend_result_in_direction=cls._hole_direction_axis, amount=wall_thickness
+        )
 
         container_event = outer_box.as_composite_set() - inner_box.as_composite_set()
 
@@ -1233,10 +1275,10 @@ class HasCaseAsRootBody(HasSupportingSurface, Mixin):
     @classmethod
     def get_default_root_kinematic_structure_entity_specification(
         cls,
+        *,
         name: str | None = None,
         scale: Scale | None = None,
         connection_specification: ConnectionSpecification | None = None,
-        *,
         wall_thickness: float = 0.01,
     ) -> BodySpecification:
         """
@@ -1253,7 +1295,9 @@ class HasCaseAsRootBody(HasSupportingSurface, Mixin):
         """
         scale = scale if scale is not None else Scale()
         return BodySpecification.from_event(
-            name,
-            cls._create_container_event(scale, wall_thickness),
+            name=name,
+            event=cls._create_container_event(
+                scale=scale, wall_thickness=wall_thickness
+            ),
             connection_specification=connection_specification,
         )

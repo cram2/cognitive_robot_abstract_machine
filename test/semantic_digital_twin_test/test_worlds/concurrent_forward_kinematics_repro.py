@@ -43,9 +43,9 @@ def hammer_forward_kinematics_composition(
         random_generator = random.Random(thread_index)
         while time.monotonic() < stop_time:
             body_a, body_b = random_generator.sample(bodies, 2)
-            world.compose_forward_kinematics_expression(body_a, body_b)
-            world.compose_forward_kinematics_expression(root, body_a)
-            world.compose_forward_kinematics_expression(root, body_b)
+            world.compose_forward_kinematics_expression(root=body_a, tip=body_b)
+            world.compose_forward_kinematics_expression(root=root, tip=body_a)
+            world.compose_forward_kinematics_expression(root=root, tip=body_b)
 
     threads = [threading.Thread(target=worker, args=(i,)) for i in range(thread_count)]
     for thread in threads:

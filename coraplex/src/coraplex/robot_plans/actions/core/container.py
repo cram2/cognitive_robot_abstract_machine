@@ -103,7 +103,7 @@ class MovesContainerByItsHandle(
         The connection the container moves along while its handle is held.
         """
         return self.grasp_candidate.graspable.root.get_first_parent_connection_of_type(
-            ActiveConnection1DOF
+            connection_type=ActiveConnection1DOF
         )
 
     def back_off_pose(self, *, grasp_pose: Pose, end_effector: EndEffector) -> Pose:
@@ -143,7 +143,9 @@ class MovesContainerByItsHandle(
             ),
             self._create_mechanism_goal(),
             self.gripper_goal_type.create_gripper_goal(
-                configuration=end_effector.default_configuration(GripperState.OPEN)
+                configuration=end_effector.default_configuration(
+                    state_type=GripperState.OPEN
+                )
             ),
             self.tool_center_point_goal(
                 target=self.back_off_pose(

@@ -81,7 +81,11 @@ def test_loader(sage10k_scene):
     world = scene.create_world()
     verify_scene(world, scene)
     assert (
-        len(world.get_semantic_annotations_by_type(NaturalLanguageWithTypeDescription))
+        len(
+            world.get_semantic_annotations_by_type(
+                semantic_annotation_type=NaturalLanguageWithTypeDescription
+            )
+        )
         > 0
     )
 
@@ -100,8 +104,8 @@ def test_different_decomposition_methods(rclpy_node, sage10k_scene):
 
     world = scene.create_world()
     decomposer = BoxDecomposer()
-    pipeline = Pipeline([decomposer])
-    pipeline.apply(world)
+    pipeline = Pipeline(steps=[decomposer])
+    pipeline.apply(world=world)
 
     viz_marker = pytest.importorskip(
         "semantic_digital_twin.adapters.ros.visualization.viz_marker"
@@ -119,11 +123,14 @@ def test_curated_sage10k_scenes_are_named_after_the_scene():
     its URL.
     """
     assert (
-        Sage10kDatasetLoader.environment_name(str(Sage10kActionableScenes.GYM)) == "gym"
+        Sage10kDatasetLoader.environment_name(
+            scene_url=str(Sage10kActionableScenes.GYM)
+        )
+        == "gym"
     )
     assert (
         Sage10kDatasetLoader.environment_name(
-            "https://huggingface.co/datasets/nvidia/SAGE-10k/resolve/main/scenes/"
+            scene_url="https://huggingface.co/datasets/nvidia/SAGE-10k/resolve/main/scenes/"
             "20251213_020526_layout_84b703fb.zip"
         )
         == "20251213_020526_layout_84b703fb"

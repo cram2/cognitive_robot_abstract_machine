@@ -147,7 +147,7 @@ class TestFullAEExecution(object):
             )
 
             [perceivable_object] = seq.world.get_semantic_annotations_by_type(
-                IsPerceivable
+                semantic_annotation_type=IsPerceivable
             )
             body_ids_after_each_successful_cas.append(perceivable_object.root.id)
 
@@ -222,7 +222,9 @@ class TestFullAEExecution(object):
             assert len(pose_annotations) == 1
             assert len(bbox_annotations) == 1
 
-        [perceived_object] = seq.world.get_semantic_annotations_by_type(IsPerceivable)
+        [perceived_object] = seq.world.get_semantic_annotations_by_type(
+            semantic_annotation_type=IsPerceivable
+        )
         assert perceived_object.root.parent_connection is not None, (
             "The body of the perceived object should be attached to the SemDT world frame."
         )
@@ -283,9 +285,9 @@ class TestFullAEExecution(object):
             camera_observation.effective_camera_model
             is camera_observation.camera.camera_model
         )
-        assert seq.world.get_semantic_annotations_by_type(Camera) == [
-            camera_observation.camera
-        ]
+        assert seq.world.get_semantic_annotations_by_type(
+            semantic_annotation_type=Camera
+        ) == [camera_observation.camera]
 
         types_of_annotations = list(map(type, seq.cas.annotations))
         assert types_of_annotations.count(robokudo.types.annotation.Plane) == 1

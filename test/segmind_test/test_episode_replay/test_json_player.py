@@ -16,7 +16,7 @@ def test_json_player_context():
     world = World()
     root = Body(name=PrefixedName(name="root", prefix="world"))
     with world.modify_world():
-        world.add_kinematic_structure_entity(root)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=root)
 
     json_file = f"{Path(segmind.__file__).parent.parent.parent}/resources/fame_episodes/alessandro_with_ycp_objects_in_max_room_2/refined_poses.json"
     obj_id_to_name = {

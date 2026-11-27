@@ -11,7 +11,7 @@ from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world_description.geometry import Mesh, Box, Scale
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class FrozenBox:
     """
     A frozen non-oriented box optimized for the BoxDecomposer.
@@ -44,7 +44,7 @@ class FrozenBox:
     """
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class FrozenIndexBox:
     """
     A box defined by voxel indices.
@@ -128,7 +128,7 @@ class FrozenIndexBox:
         dx, dy, dz = sorted(self.dims())
         return int(dy * dz)
 
-    def to_frozen_box(self, pitch: float, origin: np.ndarray) -> FrozenBox:
+    def to_frozen_box(self, *, pitch: float, origin: np.ndarray) -> FrozenBox:
         """
         Convert the index-based box to a metric frozen box.
 
@@ -147,7 +147,7 @@ class FrozenIndexBox:
             scale=Scale(x=float(size[0]), y=float(size[1]), z=float(size[2])),
         )
 
-    def intersection_volume_vox(self, other: FrozenIndexBox) -> int:
+    def intersection_volume_vox(self, *, other: FrozenIndexBox) -> int:
         """
         Calculate the intersection volume of this index-based box with another index
         based box in voxels.
@@ -163,6 +163,7 @@ class FrozenIndexBox:
     @classmethod
     def create_from_axis_info(
         cls,
+        *,
         axis: int,
         start: int,
         stop: int,
@@ -184,11 +185,17 @@ class FrozenIndexBox:
         :return: The created box.
         """
         if axis == 0:
-            return FrozenIndexBox(start, stop, dim1_min, dim1_max, dim2_min, dim2_max)
+            return FrozenIndexBox(
+                x0=start, x1=stop, y0=dim1_min, y1=dim1_max, z0=dim2_min, z1=dim2_max
+            )
         elif axis == 1:
-            return FrozenIndexBox(dim1_min, dim1_max, start, stop, dim2_min, dim2_max)
+            return FrozenIndexBox(
+                x0=dim1_min, x1=dim1_max, y0=start, y1=stop, z0=dim2_min, z1=dim2_max
+            )
         else:
-            return FrozenIndexBox(dim1_min, dim1_max, dim2_min, dim2_max, start, stop)
+            return FrozenIndexBox(
+                x0=dim1_min, x1=dim1_max, y0=dim2_min, y1=dim2_max, z0=start, z1=stop
+            )
 
 
 def greedy_merge_boxes(
@@ -222,8 +229,8 @@ def greedy_merge_boxes(
 
                 remaining_occupancy[x:x1, y:y1, z:z1] = False
 
-                index_box = FrozenIndexBox(x, x1, y, y1, z, z1)
-                boxes.append(index_box.to_frozen_box(pitch, origin))
+                index_box = FrozenIndexBox(x0=x, x1=x1, y0=y, y1=y1, z0=z, z1=z1)
+                boxes.append(index_box.to_frozen_box(pitch=pitch, origin=origin))
 
                 x = x1
 
@@ -396,13 +403,13 @@ def _detect_boards_along_axis(
 
                 candidates.append(
                     FrozenIndexBox.create_from_axis_info(
-                        axis,
-                        start_voxel,
-                        end_voxel,
-                        dim1_min,
-                        dim1_max,
-                        dim2_min,
-                        dim2_max,
+                        axis=axis,
+                        start=start_voxel,
+                        stop=end_voxel,
+                        dim1_min=dim1_min,
+                        dim1_max=dim1_max,
+                        dim2_min=dim2_min,
+                        dim2_max=dim2_max,
                     )
                 )
 
@@ -480,7 +487,7 @@ def deduplicate_index_boxes(
 
         discard = False
         for previous in kept_boxes:
-            intersection_volume = candidate.intersection_volume_vox(previous)
+            intersection_volume = candidate.intersection_volume_vox(other=previous)
 
             # If most of this candidate is already covered, drop it.
             if intersection_volume / candidate_volume >= overlap_ratio_threshold:
@@ -546,7 +553,7 @@ def subtract_index_boxes_from_occupancy(
     return remaining_occupancy
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BoxDecomposer(MeshDecomposer):
     """
     Decompose a mesh into boxes using voxelization.
@@ -599,7 +606,7 @@ class BoxDecomposer(MeshDecomposer):
     Overlap threshold at which two boards are merged into one.
     """
 
-    def apply_to_mesh(self, mesh: Mesh) -> list[Box]:
+    def apply_to_mesh(self, *, mesh: Mesh) -> list[Box]:
         """
         Decompose a mesh into boxes.
 
@@ -628,7 +635,8 @@ class BoxDecomposer(MeshDecomposer):
             overlap_ratio_threshold=self.overlap_threshold,
         )
         board_boxes = [
-            box.to_frozen_box(self.voxel_size, origin) for box in board_index_boxes
+            box.to_frozen_box(pitch=self.voxel_size, origin=origin)
+            for box in board_index_boxes
         ]
 
         remainder_occupancy = subtract_index_boxes_from_occupancy(
@@ -653,8 +661,8 @@ class BoxDecomposer(MeshDecomposer):
             for box in all_boxes
         ]
 
-    def apply_to_mesh_and_save(self, mesh: Mesh, output_path: str) -> str:
-        boxes = self.apply_to_mesh(mesh)
+    def apply_to_mesh_and_save(self, *, mesh: Mesh, output_path: str) -> str:
+        boxes = self.apply_to_mesh(mesh=mesh)
         trimesh_boxes = []
         for box in boxes:
             box_mesh = trimesh.creation.box(

@@ -29,28 +29,28 @@ if TYPE_CHECKING:
 # %% where readings come from
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LidarSource(InputSource, ABC):
     """
     Where the readings of a lidar come from, either the world or a real scanner.
     """
 
     @abstractmethod
-    def get_lidar_reading(self, lidar: Lidar) -> LidarReading:
+    def get_lidar_reading(self, *, lidar: Lidar) -> LidarReading:
         """
         :param lidar: The lidar whose beams are read.
         :return: The most recent sweep of that lidar.
         """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SimulatedLidarSource(LidarSource):
     """
     A source that measures the world's collision geometry by casting a ray along every
     beam of the lidar's scan pattern.
     """
 
-    def get_lidar_reading(self, lidar: Lidar) -> LidarReading:
+    def get_lidar_reading(self, *, lidar: Lidar) -> LidarReading:
         world_T_lidar = lidar.root.global_transform.to_np()
         world_V_beams = lidar.scan_pattern.beam_directions @ world_T_lidar[:3, :3].T
         world_P_lidar = np.tile(
@@ -58,8 +58,9 @@ class SimulatedLidarSource(LidarSource):
         )
 
         ray_intersections = lidar.root._world.ray_tracer.ray_test(
-            world_P_lidar,
-            world_P_lidar + world_V_beams * lidar.scan_pattern.maximum_range,
+            origin_points=world_P_lidar,
+            target_points=world_P_lidar
+            + world_V_beams * lidar.scan_pattern.maximum_range,
             multiple_hits=True,
             min_distance=lidar.scan_pattern.minimum_range,
             max_distance=lidar.scan_pattern.maximum_range,
@@ -71,12 +72,16 @@ class SimulatedLidarSource(LidarSource):
             reference_frame=lidar.root,
             scan_pattern=lidar.scan_pattern,
             ranges=self._nearest_hit_per_beam(
-                hit_points, ray_indices, world_P_lidar, lidar.scan_pattern.beam_count
+                points=hit_points,
+                index_ray=ray_indices,
+                world_P_lidar=world_P_lidar,
+                beam_count=lidar.scan_pattern.beam_count,
             ),
         )
 
     def _nearest_hit_per_beam(
         self,
+        *,
         points: npt.NDArray[np.float64],
         index_ray: npt.NDArray[np.int_],
         world_P_lidar: npt.NDArray[np.float64],
@@ -104,7 +109,7 @@ class SimulatedLidarSource(LidarSource):
 # %% the lidar a robot carries
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Lidar(Sensor, AbstractRobotPart, HasInputSource[LidarSource], ABC):
     """
     A lidar is a sensor that measures the distance to the surfaces around it along a fan
@@ -133,7 +138,7 @@ class Lidar(Sensor, AbstractRobotPart, HasInputSource[LidarSource], ABC):
         """
         if self.source is None:
             raise MissingInputSourceError(robot_part=self)
-        return self.source.get_lidar_reading(self)
+        return self.source.get_lidar_reading(lidar=self)
 
     def setup_hardware_interfaces(self):
         pass
@@ -145,7 +150,7 @@ class Lidar(Sensor, AbstractRobotPart, HasInputSource[LidarSource], ABC):
     def simulated_source(cls) -> LidarSource:
         return SimulatedLidarSource()
 
-    def real_source(self, node: Node) -> LidarSource:
+    def real_source(self, *, node: Node) -> LidarSource:
         from semantic_digital_twin.adapters.ros.lidar import SubscribedLidarSource
 
         return SubscribedLidarSource(node=node, topic_name=self.topic_name)
@@ -153,7 +158,7 @@ class Lidar(Sensor, AbstractRobotPart, HasInputSource[LidarSource], ABC):
     @classmethod
     @abstractmethod
     def with_source(
-        cls, robot_root: KinematicStructureEntity, source: LidarSource
+        cls, *, robot_root: KinematicStructureEntity, source: LidarSource
     ) -> Self:
         """
         :param robot_root: The root of the robot carrying this lidar.
@@ -163,15 +168,15 @@ class Lidar(Sensor, AbstractRobotPart, HasInputSource[LidarSource], ABC):
         """
 
     @classmethod
-    def with_simulated_source(cls, robot_root: KinematicStructureEntity) -> Self:
+    def with_simulated_source(cls, *, robot_root: KinematicStructureEntity) -> Self:
         """
         :param robot_root: The root of the robot carrying this lidar.
         :return: This lidar, measuring the world it stands in.
         """
-        return cls.with_source(robot_root, cls.simulated_source())
+        return cls.with_source(robot_root=robot_root, source=cls.simulated_source())
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
-        return cls.with_simulated_source(robot_root)
+        return cls.with_simulated_source(robot_root=robot_root)

@@ -76,7 +76,9 @@ def perceivable_objects(world: World) -> list[IsPerceivable]:
     """
     :return: The perceivable annotations of ``world``.
     """
-    return world.get_semantic_annotations_by_type(IsPerceivable)
+    return world.get_semantic_annotations_by_type(
+        semantic_annotation_type=IsPerceivable
+    )
 
 
 def position_of(body: Body) -> np.ndarray:
@@ -149,20 +151,20 @@ def add_perceivable_object(
         connection with six degrees of freedom.
     :return: The body of the object.
     """
-    world_body = world.get_body_by_name(PrefixedName(name=FrameName.WORLD))
+    world_body = world.get_body_by_name(name=PrefixedName(name=FrameName.WORLD))
     world_T_object = HomogeneousTransformationMatrix.from_xyz_rpy(
         *position, yaw=yaw, reference_frame=world_body
     )
     body = Body(
-        name=PrefixedName("perceivable_object"),
+        name=PrefixedName(name="perceivable_object"),
         visual=ShapeCollection(
-            shapes=[geometry.Box(scale=geometry.Scale(0.1, 0.2, 0.3))]
+            shapes=[geometry.Box(scale=geometry.Scale(x=0.1, y=0.2, z=0.3))]
         ),
     )
     with world.modify_world():
         if fixed:
             world.add_connection(
-                FixedConnection.create_with_dofs(
+                connection=FixedConnection.create_with_dofs(
                     world=world,
                     parent=world_body,
                     child=body,
@@ -171,11 +173,13 @@ def add_perceivable_object(
             )
         else:
             world.add_connection(
-                Connection6DoF.create_with_dofs(
+                connection=Connection6DoF.create_with_dofs(
                     world=world, parent=world_body, child=body
                 )
             )
-        world.add_semantic_annotations([Milk(root=body, class_label=class_label)])
+        world.add_semantic_annotations(
+            semantic_annotations=[Milk(root=body, class_label=class_label)]
+        )
     if not fixed:
         body.parent_connection.origin = world_T_object
     return body
@@ -224,10 +228,10 @@ class ConcurrentChange:
         """
         with self.changed_world.modify_world():
             self.changed_world.add_connection(
-                Connection6DoF.create_with_dofs(
+                connection=Connection6DoF.create_with_dofs(
                     world=self.changed_world,
                     parent=self.changed_world.root,
-                    child=Body(name=PrefixedName("added_by_another_process")),
+                    child=Body(name=PrefixedName(name="added_by_another_process")),
                 )
             )
 
@@ -291,7 +295,7 @@ class TestNewObjects:
         [annotation] = perceivable_objects(world)
         [shape] = annotation.root.visual.shapes
         assert type(shape) is geometry.Box
-        assert shape.scale == geometry.Scale(*scale)
+        assert shape.scale == geometry.Scale(x=scale[0], y=scale[1], z=scale[2])
 
     def test_new_object_collides_with_the_shape_it_was_seen_with(
         self, *, robokudo: RoboKudo, world: World
@@ -307,7 +311,7 @@ class TestNewObjects:
         [annotation] = perceivable_objects(world)
         [shape] = annotation.root.collision.shapes
         assert type(shape) is geometry.Box
-        assert shape.scale == geometry.Scale(*scale)
+        assert shape.scale == geometry.Scale(x=scale[0], y=scale[1], z=scale[2])
 
     def test_confidently_classified_object_becomes_its_semantic_annotation(
         self, *, robokudo: RoboKudo, world: World
@@ -473,9 +477,9 @@ class TestNewObjects:
     def test_object_seen_against_a_prefixed_world_frame_becomes_a_body_below_it(
         self, *, robokudo: RoboKudo, world: World
     ) -> None:
-        world_body = Body(name=PrefixedName(FrameName.WORLD, prefix="robot"))
+        world_body = Body(name=PrefixedName(name=FrameName.WORLD, prefix="robot"))
         with world.modify_world():
-            world.add_body(world_body)
+            world.add_body(body=world_body)
         cas = cas_seen_from(world, camera_pose(), reference_frame=str(world_body.name))
 
         put_pass_into_world(robokudo, cas, make_object_hypothesis())
@@ -543,7 +547,7 @@ class TestObjectsWithoutABoundingBox:
         [annotation] = perceivable_objects(world)
         [shape] = annotation.root.visual.shapes
         assert np.allclose(position_of(annotation.root), translation)
-        assert shape.scale == geometry.Scale(*scale)
+        assert shape.scale == geometry.Scale(x=scale[0], y=scale[1], z=scale[2])
 
     def test_object_without_a_bounding_box_or_points_gets_no_body_and_a_warning(
         self, *, robokudo: RoboKudo, world: World, caplog: pytest.LogCaptureFixture
@@ -718,9 +722,9 @@ class TestObjectsSeenAgain:
         parent = body.parent_connection.parent
         parent_T_body = body.parent_connection.origin
         with world.modify_world():
-            world.remove_connection(body.parent_connection)
+            world.remove_connection(connection=body.parent_connection)
             world.add_connection(
-                FixedConnection(
+                connection=FixedConnection(
                     parent=parent,
                     child=body,
                     parent_T_connection_expression=parent_T_body,

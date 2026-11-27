@@ -91,9 +91,9 @@ def add_box_body(world: World, name: str, scale: Scale, x: float, y: float) -> B
     :param y: The y coordinate of the box's center.
     :return: The added body.
     """
-    body = Body(name=PrefixedName(name))
+    body = Body(name=PrefixedName(name=name))
     world.add_connection(
-        FixedConnection.create_with_dofs(
+        connection=FixedConnection.create_with_dofs(
             world=world,
             parent=world.root,
             child=body,
@@ -102,7 +102,7 @@ def add_box_body(world: World, name: str, scale: Scale, x: float, y: float) -> B
             ),
         )
     )
-    body.collision.append(Box(scale=scale))
+    body.collision.append(shape=Box(scale=scale))
     return body
 
 
@@ -116,12 +116,14 @@ def room_world() -> World:
     """
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName("map")))
+        world.add_kinematic_structure_entity(
+            kinematic_structure_entity=Body(name=PrefixedName(name="map"))
+        )
 
         wall_center = ROOM_HALF_EXTENT - WALL_THICKNESS / 2
         wall_length = 2 * ROOM_HALF_EXTENT
-        horizontal_wall = Scale(wall_length, WALL_THICKNESS, ROOM_HEIGHT)
-        vertical_wall = Scale(WALL_THICKNESS, wall_length, ROOM_HEIGHT)
+        horizontal_wall = Scale(x=wall_length, y=WALL_THICKNESS, z=ROOM_HEIGHT)
+        vertical_wall = Scale(x=WALL_THICKNESS, y=wall_length, z=ROOM_HEIGHT)
 
         add_box_body(world, "south_wall", horizontal_wall, 0.0, -wall_center)
         add_box_body(world, "north_wall", horizontal_wall, 0.0, wall_center)
@@ -130,7 +132,7 @@ def room_world() -> World:
         add_box_body(
             world,
             "pillar",
-            Scale(2 * PILLAR_HALF_EXTENT, 2 * PILLAR_HALF_EXTENT, ROOM_HEIGHT),
+            Scale(x=2 * PILLAR_HALF_EXTENT, y=2 * PILLAR_HALF_EXTENT, z=ROOM_HEIGHT),
             0.0,
             0.0,
         )
@@ -148,31 +150,31 @@ def room_scene_of(world: World, clearance: float = CLEARANCE) -> NavigationScene
     """
     origin = HomogeneousTransformationMatrix(reference_frame=world.root)
     search_space = BoundingBoxCollection(
-        [
+        shapes=[
             VolumetricBoundingBox(
-                -ROOM_HALF_EXTENT,
-                -ROOM_HALF_EXTENT,
-                0.0,
-                ROOM_HALF_EXTENT,
-                ROOM_HALF_EXTENT,
-                ROOM_HEIGHT,
-                origin,
+                min_x=-ROOM_HALF_EXTENT,
+                min_y=-ROOM_HALF_EXTENT,
+                min_z=0.0,
+                max_x=ROOM_HALF_EXTENT,
+                max_y=ROOM_HALF_EXTENT,
+                max_z=ROOM_HEIGHT,
+                origin=origin,
             )
         ],
-        world.root,
+        reference_frame=world.root,
     )
     graph = PlanarGraphOfBoundingBoxes.navigation_map_from_world(
         world=world, search_space=search_space, bloat_obstacles=clearance
     )
     query = hardest_path_query(graph)
-    waypoints = graph.path_from_to(query.start, query.goal)
+    waypoints = graph.path_from_to(start=query.start, goal=query.goal)
     obstacles = SemanticEnvironmentAnnotation(
         root=world.root, _world=world
-    ).as_bounding_box_collection_at_origin(origin)
+    ).as_bounding_box_collection_at_origin(origin=origin)
     return NavigationScene(
         graph_of_convex_sets=graph,
         environment_name="room",
-        path=NavigationPath(waypoints),
+        path=NavigationPath(waypoints=waypoints),
         obstacles=obstacles,
     )
 
@@ -185,7 +187,7 @@ def room_scene(room_world: World) -> NavigationScene:
     return room_scene_of(room_world)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BoxRowFixture:
     """
     A graph of three convex sets laid out in a row along x, whose farthest pair is known
@@ -203,18 +205,28 @@ def box_row() -> BoxRowFixture:
     """
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName("map")))
+        world.add_kinematic_structure_entity(
+            kinematic_structure_entity=Body(name=PrefixedName(name="map"))
+        )
 
-    graph = VolumetricGraphOfBoundingBoxes(world)
+    graph = VolumetricGraphOfBoundingBoxes(world=world)
     origin = HomogeneousTransformationMatrix(reference_frame=world.root)
     boxes = [
-        VolumetricBoundingBox(offset, 0.0, 0.0, offset + 1.0, 1.0, 1.0, origin)
+        VolumetricBoundingBox(
+            min_x=offset,
+            min_y=0.0,
+            min_z=0.0,
+            max_x=offset + 1.0,
+            max_y=1.0,
+            max_z=1.0,
+            origin=origin,
+        )
         for offset in (0.0, 1.0, 2.0)
     ]
     for box in boxes:
-        graph.add_node(box)
+        graph.add_node(box=box)
     graph.calculate_connectivity()
-    return BoxRowFixture(graph, boxes)
+    return BoxRowFixture(graph=graph, boxes=boxes)
 
 
 # %% the pieces a scene is made of
@@ -227,7 +239,15 @@ def test_footprint_projects_a_bounding_box_including_its_origin():
     """
     origin = HomogeneousTransformationMatrix.from_xyz_rpy(2.0, -1.0, 5.0)
     footprint = Footprint.of(
-        VolumetricBoundingBox(-0.5, -0.25, 0.0, 0.5, 0.25, 1.0, origin)
+        bounding_box=VolumetricBoundingBox(
+            min_x=-0.5,
+            min_y=-0.25,
+            min_z=0.0,
+            max_x=0.5,
+            max_y=0.25,
+            max_z=1.0,
+            origin=origin,
+        )
     )
 
     assert (footprint.min_x, footprint.max_x) == (1.5, 2.5)
@@ -242,10 +262,12 @@ def test_navigation_path_length_sums_its_segments():
     """
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName("map")))
+        world.add_kinematic_structure_entity(
+            kinematic_structure_entity=Body(name=PrefixedName(name="map"))
+        )
 
     corner_path = NavigationPath(
-        [
+        waypoints=[
             Point3(0.0, 0.0, 0.0, reference_frame=world.root),
             Point3(3.0, 0.0, 0.0, reference_frame=world.root),
             Point3(3.0, 4.0, 0.0, reference_frame=world.root),
@@ -262,17 +284,19 @@ def test_navigation_path_reports_how_much_of_it_is_vertical():
     """
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName("map")))
+        world.add_kinematic_structure_entity(
+            kinematic_structure_entity=Body(name=PrefixedName(name="map"))
+        )
 
     climbing_path = NavigationPath(
-        [
+        waypoints=[
             Point3(0.0, 0.0, 0.0, reference_frame=world.root),
             Point3(0.0, 0.0, 2.0, reference_frame=world.root),
             Point3(1.0, 0.0, 1.5, reference_frame=world.root),
         ]
     )
     level_path = NavigationPath(
-        [
+        waypoints=[
             Point3(0.0, 0.0, 1.0, reference_frame=world.root),
             Point3(5.0, 0.0, 1.0, reference_frame=world.root),
         ]
@@ -289,13 +313,23 @@ def test_a_graph_with_no_connected_pair_has_nothing_to_plan_between():
     """
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName("map")))
+        world.add_kinematic_structure_entity(
+            kinematic_structure_entity=Body(name=PrefixedName(name="map"))
+        )
 
-    graph = VolumetricGraphOfBoundingBoxes(world)
+    graph = VolumetricGraphOfBoundingBoxes(world=world)
     origin = HomogeneousTransformationMatrix(reference_frame=world.root)
     for offset in (0.0, 10.0):
         graph.add_node(
-            VolumetricBoundingBox(offset, 0.0, 0.0, offset + 1.0, 1.0, 1.0, origin)
+            box=VolumetricBoundingBox(
+                min_x=offset,
+                min_y=0.0,
+                min_z=0.0,
+                max_x=offset + 1.0,
+                max_y=1.0,
+                max_z=1.0,
+                origin=origin,
+            )
         )
     graph.calculate_connectivity()
 
@@ -340,9 +374,11 @@ def test_query_measures_distance_along_the_graph_not_across_it():
     """
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName("map")))
+        world.add_kinematic_structure_entity(
+            kinematic_structure_entity=Body(name=PrefixedName(name="map"))
+        )
 
-    graph = VolumetricGraphOfBoundingBoxes(world)
+    graph = VolumetricGraphOfBoundingBoxes(world=world)
     origin = HomogeneousTransformationMatrix(reference_frame=world.root)
     # A U of unit boxes: the two tips face each other one meter apart, but reaching one
     # tip from the other means walking around the whole U.
@@ -357,8 +393,14 @@ def test_query_measures_distance_along_the_graph_not_across_it():
     ]
     for offset_x, offset_y in corner_offsets:
         graph.add_node(
-            VolumetricBoundingBox(
-                offset_x, offset_y, 0.0, offset_x + 1.0, offset_y + 1.0, 1.0, origin
+            box=VolumetricBoundingBox(
+                min_x=offset_x,
+                min_y=offset_y,
+                min_z=0.0,
+                max_x=offset_x + 1.0,
+                max_y=offset_y + 1.0,
+                max_z=1.0,
+                origin=origin,
             )
         )
     graph.calculate_connectivity()
@@ -381,13 +423,19 @@ def test_convex_sets_keep_the_clearance_away_from_every_obstacle(
     a path through the sets passable for a robot of that radius.
     """
     bloated_obstacles = [
-        Footprint.of(obstacle.bloat(CLEARANCE, CLEARANCE, 0.0))
+        Footprint.of(
+            bounding_box=obstacle.bloat(
+                x_amount=CLEARANCE, y_amount=CLEARANCE, z_amount=0.0
+            )
+        )
         for obstacle in room_scene.obstacles
     ]
 
     overlaps = [
         (convex_set, obstacle)
-        for convex_set in map(Footprint.of, room_scene.convex_sets)
+        for convex_set in (
+            Footprint.of(bounding_box=box) for box in room_scene.convex_sets
+        )
         for obstacle in bloated_obstacles
         if convex_set.min_x < obstacle.max_x
         and obstacle.min_x < convex_set.max_x
@@ -434,29 +482,29 @@ def test_navigation_scene_derives_a_planar_obstacle_collection_for_a_planar_grap
     """
     origin = HomogeneousTransformationMatrix(reference_frame=room_world.root)
     search_space = BoundingBoxCollection(
-        [
+        shapes=[
             VolumetricBoundingBox(
-                -ROOM_HALF_EXTENT,
-                -ROOM_HALF_EXTENT,
-                0.0,
-                ROOM_HALF_EXTENT,
-                ROOM_HALF_EXTENT,
-                ROOM_HEIGHT,
-                origin,
+                min_x=-ROOM_HALF_EXTENT,
+                min_y=-ROOM_HALF_EXTENT,
+                min_z=0.0,
+                max_x=ROOM_HALF_EXTENT,
+                max_y=ROOM_HALF_EXTENT,
+                max_z=ROOM_HEIGHT,
+                origin=origin,
             )
         ],
-        room_world.root,
+        reference_frame=room_world.root,
     )
     graph = PlanarGraphOfBoundingBoxes.navigation_map_from_world(
         world=room_world, search_space=search_space, bloat_obstacles=CLEARANCE
     )
     query = hardest_path_query(graph)
-    waypoints = graph.path_from_to(query.start, query.goal)
+    waypoints = graph.path_from_to(start=query.start, goal=query.goal)
 
     scene = NavigationScene(
         graph_of_convex_sets=graph,
         environment_name="room",
-        path=NavigationPath(waypoints),
+        path=NavigationPath(waypoints=waypoints),
     )
 
     assert len(scene.obstacles.bounding_boxes) > 0
@@ -476,10 +524,12 @@ def test_wide_environments_are_stacked_and_compact_ones_are_placed_side_by_side(
     wide = Footprint(min_x=0.0, min_y=0.0, max_x=20.0, max_y=5.0)
     compact = Footprint(min_x=0.0, min_y=0.0, max_x=6.0, max_y=6.0)
 
-    assert PanelArrangement.for_extent(wide, 3) == PanelArrangement(rows=3, columns=1)
-    assert PanelArrangement.for_extent(compact, 3) == PanelArrangement(
-        rows=1, columns=3
+    assert PanelArrangement.for_extent(extent=wide, panel_count=3) == PanelArrangement(
+        rows=3, columns=1
     )
+    assert PanelArrangement.for_extent(
+        extent=compact, panel_count=3
+    ) == PanelArrangement(rows=1, columns=3)
 
 
 def test_a_meter_is_the_same_length_in_every_panel():
@@ -490,7 +540,7 @@ def test_a_meter_is_the_same_length_in_every_panel():
     extent = Footprint(min_x=0.0, min_y=0.0, max_x=4.0, max_y=4.0)
     arrangement = PanelArrangement(rows=1, columns=3)
 
-    width, _ = arrangement.figure_size(extent)
+    width, _ = arrangement.figure_size(extent=extent)
 
     assert width == pytest.approx(3 * 4.0 * arrangement.preferred_inches_per_meter)
 
@@ -503,12 +553,12 @@ def test_a_legend_too_wide_for_the_figure_wraps_into_even_rows():
     narrow = Footprint(min_x=0.0, min_y=0.0, max_x=12.0, max_y=8.0)
     arrangement = PanelArrangement(rows=3, columns=1)
 
-    width, _ = arrangement.figure_size(narrow)
+    width, _ = arrangement.figure_size(extent=narrow)
     entries_that_fit = int(width / arrangement.legend_entry_inches)
 
     assert entries_that_fit == 3
-    assert arrangement.legend_columns(narrow, 7) == 3
-    assert arrangement.legend_columns(narrow, 4) == 2
+    assert arrangement.legend_columns(extent=narrow, entry_count=7) == 3
+    assert arrangement.legend_columns(extent=narrow, entry_count=4) == 2
 
 
 def test_a_legend_that_fits_stays_on_one_row():
@@ -518,10 +568,12 @@ def test_a_legend_that_fits_stays_on_one_row():
     wide = Footprint(min_x=0.0, min_y=0.0, max_x=6.0, max_y=6.0)
     arrangement = PanelArrangement(rows=1, columns=3)
 
-    width, _ = arrangement.figure_size(wide)
+    width, _ = arrangement.figure_size(extent=wide)
     entry_count = int(width / arrangement.legend_entry_inches)
 
-    assert arrangement.legend_columns(wide, entry_count) == entry_count
+    assert (
+        arrangement.legend_columns(extent=wide, entry_count=entry_count) == entry_count
+    )
 
 
 def test_figure_draws_one_titled_panel_per_stage(room_scene: NavigationScene):
@@ -529,7 +581,7 @@ def test_figure_draws_one_titled_panel_per_stage(room_scene: NavigationScene):
     The figure walks through what the planner is given, what it builds and what it
     returns, each panel labelled and quantified.
     """
-    figure = GraphOfConvexSetsFigure(room_scene)
+    figure = GraphOfConvexSetsFigure(scene=room_scene)
 
     rendered = figure.render()
     titles = [axes.get_title(loc="left") for axes in rendered.axes]
@@ -539,7 +591,7 @@ def test_figure_draws_one_titled_panel_per_stage(room_scene: NavigationScene):
         f"(b) {ConvexSetsPanel().name}",
         f"(c) {OptimalPathPanel().name}",
     ]
-    assert ConvexSetsPanel().subtitle(room_scene) == (
+    assert ConvexSetsPanel().subtitle(scene=room_scene) == (
         f"{len(room_scene.convex_sets)} convex sets, "
         f"{len(room_scene.adjacencies)} adjacencies"
     )
@@ -549,7 +601,7 @@ def test_figure_is_painted_on_its_theme_surface(room_scene: NavigationScene):
     """
     A theme's palette is applied to the figure itself, not only to the marks in it.
     """
-    rendered = GraphOfConvexSetsFigure(room_scene, theme=Theme.DARK).render()
+    rendered = GraphOfConvexSetsFigure(scene=room_scene, theme=Theme.DARK).render()
 
     assert rendered.get_facecolor() == pytest.approx(to_rgba(Theme.DARK.value.surface))
 
@@ -559,7 +611,9 @@ def test_figure_is_saved_as_vector_and_raster(room_scene, tmp_path):
     Saving produces both a file to typeset and a file to look at, named after the
     environment and the theme.
     """
-    written = GraphOfConvexSetsFigure(room_scene).save(tmp_path / "figures")
+    written = GraphOfConvexSetsFigure(scene=room_scene).save(
+        output_directory=tmp_path / "figures"
+    )
 
     assert [path.name for path in written] == [
         "graph_of_convex_sets_room_light.pdf",

@@ -104,7 +104,9 @@ def perceived_body_id(world: World) -> UUID:
     """
     :return: The id of the body of the one perceivable object of ``world``.
     """
-    [annotation] = world.get_semantic_annotations_by_type(IsPerceivable)
+    [annotation] = world.get_semantic_annotations_by_type(
+        semantic_annotation_type=IsPerceivable
+    )
     return annotation.root.id
 
 
@@ -273,7 +275,9 @@ class TestPerceptionWorld:
 
         assert robokudo.synchronizer is None
         assert (
-            WorldSynchronizer.all_callbacks_of_this_type_from_world(robokudo.world)
+            WorldSynchronizer.all_callbacks_of_this_type_from_world(
+                world=robokudo.world
+            )
             == []
         )
         robokudo.close()
@@ -291,7 +295,7 @@ class TestJoiningSharedWorld:
         self, *, shared_world: SharedWorld, joined_robokudo: RoboKudo
     ) -> None:
         assert WorldSynchronizer.all_callbacks_of_this_type_from_world(
-            joined_robokudo.world
+            world=joined_robokudo.world
         ) == [joined_robokudo.synchronizer]
         assert [body.id for body in joined_robokudo.world.bodies] == [
             body.id for body in shared_world.world.bodies
@@ -310,9 +314,9 @@ class TestJoiningSharedWorld:
         """
         with shared_world.world.modify_world():
             shared_world.world.add_connection(
-                Connection6DoF.create_with_dofs(
+                connection=Connection6DoF.create_with_dofs(
                     parent=shared_world.world.root,
-                    child=Body(name=PrefixedName("table")),
+                    child=Body(name=PrefixedName(name="table")),
                     world=shared_world.world,
                 )
             )
@@ -327,10 +331,10 @@ class TestJoiningSharedWorld:
     def test_changes_of_the_shared_world_reach_perception(
         self, *, shared_world: SharedWorld, joined_robokudo: RoboKudo
     ) -> None:
-        table = Body(name=PrefixedName("table"))
+        table = Body(name=PrefixedName(name="table"))
         with shared_world.world.modify_world():
             shared_world.world.add_connection(
-                Connection6DoF.create_with_dofs(
+                connection=Connection6DoF.create_with_dofs(
                     parent=shared_world.world.root,
                     child=table,
                     world=shared_world.world,
@@ -353,15 +357,15 @@ class TestJoiningSharedWorld:
         world_released_during_publish = []
         publish = synchronizer.publish
 
-        def publish_noting_the_world_lock(update: WorldUpdate) -> None:
+        def publish_noting_the_world_lock(*, msg: WorldUpdate) -> None:
             """
-            Note whether the world is released when ``update`` is published, then
-            publish it.
+            Note whether the world is released when ``msg`` is published, then publish
+            it.
             """
             world_released_during_publish.append(
                 lock_is_free_for_another_thread(world_lock)
             )
-            publish(update)
+            publish(msg=msg)
 
         monkeypatch.setattr(synchronizer, "publish", publish_noting_the_world_lock)
 
@@ -388,7 +392,7 @@ class TestJoiningSharedWorld:
         body_id = perceived_body_id(joined_robokudo.world)
 
         perceived_body = joined_robokudo.world.get_kinematic_structure_entity_by_id(
-            body_id
+            id=body_id
         )
         expected_pose = perceived_body.global_transform.to_np()
         assert wait_until(
@@ -396,13 +400,15 @@ class TestJoiningSharedWorld:
                 body_id in [body.id for body in shared_world.world.bodies]
                 and np.allclose(
                     shared_world.world.get_kinematic_structure_entity_by_id(
-                        body_id
+                        id=body_id
                     ).global_transform.to_np(),
                     expected_pose,
                 )
             )
         )
-        shared_body = shared_world.world.get_kinematic_structure_entity_by_id(body_id)
+        shared_body = shared_world.world.get_kinematic_structure_entity_by_id(
+            id=body_id
+        )
         assert [shape.scale for shape in shared_body.visual.shapes] == [
             shape.scale for shape in perceived_body.visual.shapes
         ]
@@ -424,7 +430,7 @@ class TestJoiningSharedWorld:
                 [
                     (type(annotation), annotation.class_label)
                     for annotation in shared_world.world.get_semantic_annotations_by_type(
-                        IsPerceivable
+                        semantic_annotation_type=IsPerceivable
                     )
                     if annotation.root.id == body_id
                 ]
@@ -453,7 +459,7 @@ class TestJoiningSharedWorld:
                 [
                     type(annotation)
                     for annotation in shared_world.world.get_semantic_annotations_by_type(
-                        IsPerceivable
+                        semantic_annotation_type=IsPerceivable
                     )
                     if annotation.root.id == body_id
                 ]
@@ -474,7 +480,7 @@ class TestJoiningSharedWorld:
         assert wait_until(
             lambda: body_id in [body.id for body in shared_world.world.bodies]
         )
-        assert shared_world.world.get_bodies_by_name(FrameName.CAMERA) == []
+        assert shared_world.world.get_bodies_by_name(name=FrameName.CAMERA) == []
 
     def test_closed_robokudo_no_longer_shares_its_world(
         self, *, joined_robokudo: RoboKudo
@@ -483,7 +489,7 @@ class TestJoiningSharedWorld:
 
         assert (
             WorldSynchronizer.all_callbacks_of_this_type_from_world(
-                joined_robokudo.world
+                world=joined_robokudo.world
             )
             == []
         )
@@ -506,15 +512,15 @@ class TestJoiningAWorldWithARobot:
     ) -> None:
         shared = shared_world_with_a_robot.world
         shared.get_body_by_name(
-            FrameName.HEAD
+            name=FrameName.HEAD
         ).parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
             x=0.5, z=1.2, yaw=0.3, reference_frame=shared.root
         )
         moved_camera_pose = shared.get_body_by_name(
-            FrameName.CAMERA
+            name=FrameName.CAMERA
         ).global_transform.to_np()
         camera_body = robokudo_joined_to_a_robot.world.get_body_by_name(
-            FrameName.CAMERA
+            name=FrameName.CAMERA
         )
         assert wait_until(
             lambda: np.allclose(camera_body.global_transform.to_np(), moved_camera_pose)
@@ -540,7 +546,7 @@ class TestJoiningAWorldWithARobot:
             annotation_type=BoundingBox3DAnnotation
         )
         expected_pose = (
-            shared.get_body_by_name(FrameName.CAMERA).global_transform.to_np()
+            shared.get_body_by_name(name=FrameName.CAMERA).global_transform.to_np()
             @ HomogeneousTransformationMatrix.from_xyz_quaternion(
                 *bounding_box.pose.translation, *bounding_box.pose.rotation
             ).to_np()
@@ -552,7 +558,7 @@ class TestJoiningAWorldWithARobot:
                 robokudo_joined_to_a_robot.world,
                 HomogeneousTransformationMatrix(
                     data=shared.get_body_by_name(
-                        FrameName.CAMERA
+                        name=FrameName.CAMERA
                     ).global_transform.to_np()
                 ),
             ),
@@ -565,7 +571,7 @@ class TestJoiningAWorldWithARobot:
                 body_id in [body.id for body in shared.bodies]
                 and np.allclose(
                     shared.get_kinematic_structure_entity_by_id(
-                        body_id
+                        id=body_id
                     ).global_transform.to_np(),
                     expected_pose,
                 )
@@ -586,7 +592,7 @@ class TestDiscoveringASharedWorld:
     ) -> None:
         world = World()
         with world.modify_world():
-            world.add_body(Body(name=PrefixedName(FrameName.WORLD)))
+            world.add_body(body=Body(name=PrefixedName(name=FrameName.WORLD)))
         served_worlds = []
         serving = Timer(
             1.0,
@@ -798,7 +804,7 @@ class TestObjectsOfAFinishedPass:
         robokudo.tick_tree()
 
         [unknown_object] = robokudo.world.get_semantic_annotations_by_type(
-            UnknownObject
+            semantic_annotation_type=UnknownObject
         )
         assert unknown_object.root in robokudo.world.bodies
         robokudo.close()
@@ -811,7 +817,12 @@ class TestObjectsOfAFinishedPass:
 
         robokudo.tick_tree()
 
-        assert robokudo.world.get_semantic_annotations_by_type(UnknownObject) == []
+        assert (
+            robokudo.world.get_semantic_annotations_by_type(
+                semantic_annotation_type=UnknownObject
+            )
+            == []
+        )
         robokudo.close()
 
     def test_pass_without_a_world_updating_annotator_puts_nothing_into_the_world(
@@ -828,7 +839,12 @@ class TestObjectsOfAFinishedPass:
         robokudo.tick_tree()
 
         assert robokudo.pipeline.status == Status.SUCCESS
-        assert robokudo.world.get_semantic_annotations_by_type(UnknownObject) == []
+        assert (
+            robokudo.world.get_semantic_annotations_by_type(
+                semantic_annotation_type=UnknownObject
+            )
+            == []
+        )
         robokudo.close()
 
 
@@ -862,7 +878,7 @@ class TestPublishingItsOwnWorld:
         robokudo.tick_tree()
 
         [unknown_object] = robokudo.world.get_semantic_annotations_by_type(
-            UnknownObject
+            semantic_annotation_type=UnknownObject
         )
         tf_publisher = robokudo.world_publisher.tf_publisher
         published = tf_publisher.tf_model_callback
@@ -874,7 +890,10 @@ class TestPublishingItsOwnWorld:
             for transform in transforms
             for frame in (transform.header.frame_id, transform.child_frame_id)
         }
-        assert tf_publisher.frame_names.assign(unknown_object.root) in published_frames
+        assert (
+            tf_publisher.frame_names.assign(entity=unknown_object.root)
+            in published_frames
+        )
         assert published_frames & {FrameName.WORLD, FrameName.CAMERA} == set()
         robokudo.close()
 
@@ -885,12 +904,14 @@ class TestPublishingItsOwnWorld:
         robokudo.tick_tree()
 
         [unknown_object] = robokudo.world.get_semantic_annotations_by_type(
-            UnknownObject
+            semantic_annotation_type=UnknownObject
         )
         world_publisher = robokudo.world_publisher
         assert {
             marker.header.frame_id for marker in world_publisher.markers.markers
-        } == {world_publisher.tf_publisher.frame_names.assign(unknown_object.root)}
+        } == {
+            world_publisher.tf_publisher.frame_names.assign(entity=unknown_object.root)
+        }
         robokudo.close()
 
     def test_publishes_nothing_unless_asked_to(self, *, node: Node) -> None:
@@ -926,7 +947,12 @@ class TestPublishingItsOwnWorld:
         robokudo.close()
 
         assert (
-            VizMarkerPublisher.all_callbacks_of_this_type_from_world(robokudo.world)
+            VizMarkerPublisher.all_callbacks_of_this_type_from_world(
+                world=robokudo.world
+            )
             == []
         )
-        assert TFPublisher.all_callbacks_of_this_type_from_world(robokudo.world) == []
+        assert (
+            TFPublisher.all_callbacks_of_this_type_from_world(world=robokudo.world)
+            == []
+        )

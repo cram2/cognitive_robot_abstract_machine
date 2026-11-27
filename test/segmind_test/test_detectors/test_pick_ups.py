@@ -75,7 +75,7 @@ def test_losing_several_supports_in_one_lift_is_one_pick_up(milk_in_the_apartmen
             ),
             LossOfSupportEvent(
                 tracked_object=milk,
-                with_object=world.get_body_by_name("box_2"),
+                with_object=world.get_body_by_name(name="box_2"),
                 timestamp=lifted_at,
             ),
         ]

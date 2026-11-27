@@ -94,7 +94,7 @@ def add_joints(world: World, parent: Body, specs: list[ConnectionSpec]) -> None:
     connections: list[ActiveConnection1DOF] = []
     with world.modify_world():
         for index, spec in enumerate(specs):
-            child = Body(name=PrefixedName(f"body_{index}"))
+            child = Body(name=PrefixedName(name=f"body_{index}"))
             connection = ScrewAxisConnection.create_with_dofs(
                 screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
                     axis=Vector3.Z()
@@ -102,10 +102,10 @@ def add_joints(world: World, parent: Body, specs: list[ConnectionSpec]) -> None:
                 world=world,
                 parent=parent,
                 child=child,
-                name=PrefixedName(spec.name),
+                name=PrefixedName(name=spec.name),
                 multiplier=spec.multiplier,
             )
-            world.add_connection(connection)
+            world.add_connection(connection=connection)
             connections.append(connection)
             parent = child
     for spec, connection in zip(specs, connections):
@@ -117,7 +117,7 @@ def build_world_with_joints(specs: list[ConnectionSpec]) -> World:
     Build a world holding a chain of connections with their commanded velocities.
     """
     world = World()
-    add_joints(world, Body(name=PrefixedName("base")), specs)
+    add_joints(world, Body(name=PrefixedName(name="base")), specs)
     return world
 
 
@@ -133,10 +133,10 @@ def add_removable_joint(world: World, parent: Body) -> ActiveConnection1DOF:
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
             world=world,
             parent=parent,
-            child=Body(name=PrefixedName("removable_body")),
-            name=PrefixedName("removable_joint"),
+            child=Body(name=PrefixedName(name="removable_body")),
+            name=PrefixedName(name="removable_joint"),
         )
-        world.add_connection(connection)
+        world.add_connection(connection=connection)
     return connection
 
 
@@ -145,9 +145,11 @@ def remove_joint(world: World, connection: ActiveConnection1DOF) -> None:
     Remove a joint, its child body and its degree of freedom from the world.
     """
     with world.modify_world():
-        world.remove_connection(connection)
-        world.remove_kinematic_structure_entity(connection.child)
-        world.remove_degree_of_freedom(connection.raw_dof)
+        world.remove_connection(connection=connection)
+        world.remove_kinematic_structure_entity(
+            kinematic_structure_entity=connection.child
+        )
+        world.remove_degree_of_freedom(dof=connection.raw_dof)
 
 
 def build_group_publisher(
@@ -181,7 +183,7 @@ def group_publisher_for(
     return JointGroupVelocityCommandPublisher(
         world=world,
         command_topic="test_cmd",
-        connections=[world.get_connection_by_name(spec.name) for spec in specs],
+        connections=[world.get_connection_by_name(name=spec.name) for spec in specs],
         minimum_velocities=JointMinimumVelocities.from_magnitudes(
             default=minimum_valid_velocity, overrides=minimum_velocity_overrides
         ),
@@ -238,10 +240,10 @@ def add_drive(
         drive = drive_type.create_with_dofs(
             world=world,
             parent=parent,
-            child=Body(name=PrefixedName("base_footprint")),
-            name=PrefixedName("brumbrum"),
+            child=Body(name=PrefixedName(name="base_footprint")),
+            name=PrefixedName(name="brumbrum"),
         )
-        world.add_connection(drive)
+        world.add_connection(connection=drive)
 
 
 def build_drive_world(
@@ -251,7 +253,7 @@ def build_drive_world(
     Build a world whose only connection is a drive.
     """
     world = World()
-    add_drive(world, Body(name=PrefixedName("odom")), drive_type)
+    add_drive(world, Body(name=PrefixedName(name="odom")), drive_type)
     return world
 
 
@@ -414,17 +416,19 @@ def test_group_publisher_follows_its_joints_through_a_model_change(
         ConnectionSpec(name="joint_b", velocity=0.2),
     ]
     world = World()
-    base = Body(name=PrefixedName("base"))
+    base = Body(name=PrefixedName(name="base"))
     removable = add_removable_joint(world, base)
     add_joints(world, base, specs)
     controller = group_publisher_for(world, specs)
-    commanded_dofs = [world.get_connection_by_name(spec.name).raw_dof for spec in specs]
-    columns_before = world.state.column_indices(commanded_dofs)
+    commanded_dofs = [
+        world.get_connection_by_name(name=spec.name).raw_dof for spec in specs
+    ]
+    columns_before = world.state.column_indices(dofs=commanded_dofs)
     publish_group(controller)
 
     remove_joint(world, removable)
 
-    assert world.state.column_indices(commanded_dofs) != columns_before
+    assert world.state.column_indices(dofs=commanded_dofs) != columns_before
     assert publish_group(controller) == pytest.approx([0.1, 0.2])
 
 
@@ -438,7 +442,7 @@ def test_group_publisher_publishes_the_velocities_of_the_current_cycle(
     controller.command_publisher = recorder
 
     controller.publish()
-    world.get_connection_by_name("joint_a").velocity = 0.4
+    world.get_connection_by_name(name="joint_a").velocity = 0.4
     controller.publish()
 
     recorded = [list(message.data) for message in recorder.published_messages]
@@ -574,7 +578,7 @@ def build_drive_publisher(
     return DriveVelocityCommandPublisher(
         world=world,
         command_topic="/cmd_vel",
-        connection=world.get_connection_by_name("brumbrum"),
+        connection=world.get_connection_by_name(name="brumbrum"),
         minimum_linear_velocity=MinimumVelocity(magnitude=minimum_linear_velocity),
         minimum_angular_velocity=MinimumVelocity(magnitude=minimum_angular_velocity),
         command_format=command_format or TwistFormat(),
@@ -583,7 +587,7 @@ def build_drive_publisher(
 
 def test_slow_drive_command_is_raised_without_turning(init_background_node):
     world = build_drive_world(OmniDrive)
-    drive = world.get_connection_by_name("brumbrum")
+    drive = world.get_connection_by_name(name="brumbrum")
     world.state[drive.x_velocity.id].velocity = 0.02
     world.state[drive.y_velocity.id].velocity = 0.02
     publisher = build_drive_publisher(world, minimum_linear_velocity=0.05)
@@ -596,7 +600,7 @@ def test_slow_drive_command_is_raised_without_turning(init_background_node):
 
 def test_linear_and_angular_minimums_are_independent(init_background_node):
     world = build_drive_world(OmniDrive)
-    drive = world.get_connection_by_name("brumbrum")
+    drive = world.get_connection_by_name(name="brumbrum")
     world.state[drive.x_velocity.id].velocity = 0.5
     world.state[drive.yaw.id].velocity = 0.01
     publisher = build_drive_publisher(
@@ -624,7 +628,7 @@ def test_drive_at_rest_stays_at_rest(init_background_node):
 
 def test_drive_without_minimums_publishes_unchanged_velocities(init_background_node):
     world = build_drive_world(OmniDrive)
-    drive = world.get_connection_by_name("brumbrum")
+    drive = world.get_connection_by_name(name="brumbrum")
     world.state[drive.x_velocity.id].velocity = 0.001
     world.state[drive.yaw.id].velocity = 0.002
     publisher = build_drive_publisher(world)
@@ -640,7 +644,7 @@ def test_drive_without_minimums_publishes_unchanged_velocities(init_background_n
 
 def test_default_drive_format_publishes_a_twist(init_background_node):
     world = build_drive_world(OmniDrive)
-    drive = world.get_connection_by_name("brumbrum")
+    drive = world.get_connection_by_name(name="brumbrum")
     world.state[drive.x_velocity.id].velocity = 0.3
 
     command = publish_drive(build_drive_publisher(world)).published_message
@@ -653,7 +657,7 @@ def test_stamped_drive_format_publishes_the_twist_in_the_frame_the_drive_moves(
     init_background_node,
 ):
     world = build_drive_world(OmniDrive)
-    drive = world.get_connection_by_name("brumbrum")
+    drive = world.get_connection_by_name(name="brumbrum")
     world.state[drive.x_velocity.id].velocity = 0.3
     world.state[drive.yaw.id].velocity = 0.4
     publisher = build_drive_publisher(world, command_format=TwistStampedFormat())
@@ -670,7 +674,7 @@ def test_stopping_publishes_a_zero_twist_in_the_configured_drive_format(
     init_background_node,
 ):
     world = build_drive_world(OmniDrive)
-    drive = world.get_connection_by_name("brumbrum")
+    drive = world.get_connection_by_name(name="brumbrum")
     world.state[drive.x_velocity.id].velocity = 0.3
     publisher = build_drive_publisher(world, command_format=TwistStampedFormat())
     recorder = RecordingPublisher()
@@ -687,19 +691,21 @@ def test_stopping_publishes_a_zero_twist_in_the_configured_drive_format(
 
 def test_drive_publisher_follows_its_dofs_through_a_model_change(init_background_node):
     world = World()
-    odom = Body(name=PrefixedName("odom"))
+    odom = Body(name=PrefixedName(name="odom"))
     removable = add_removable_joint(world, odom)
     add_drive(world, odom, OmniDrive)
-    drive = world.get_connection_by_name("brumbrum")
+    drive = world.get_connection_by_name(name="brumbrum")
     world.state[drive.x_velocity.id].velocity = 0.3
     world.state[drive.yaw.id].velocity = 0.4
     publisher = build_drive_publisher(world)
-    columns_before = world.state.column_indices([drive.x_velocity, drive.yaw])
+    columns_before = world.state.column_indices(dofs=[drive.x_velocity, drive.yaw])
     publish_drive(publisher)
 
     remove_joint(world, removable)
 
-    assert world.state.column_indices([drive.x_velocity, drive.yaw]) != columns_before
+    assert (
+        world.state.column_indices(dofs=[drive.x_velocity, drive.yaw]) != columns_before
+    )
     command = publish_drive(publisher).published_message
     assert command.linear.x == pytest.approx(0.3)
     assert command.angular.z == pytest.approx(0.4)
@@ -709,7 +715,7 @@ def test_drive_publisher_publishes_the_velocities_of_the_current_cycle(
     init_background_node,
 ):
     world = build_drive_world(OmniDrive)
-    drive = world.get_connection_by_name("brumbrum")
+    drive = world.get_connection_by_name(name="brumbrum")
     world.state[drive.x_velocity.id].velocity = 0.3
     publisher = build_drive_publisher(world)
     recorder = RecordingPublisher()
@@ -726,7 +732,7 @@ def test_drive_publisher_publishes_the_velocities_of_the_current_cycle(
 
 def test_differential_drive_is_raised_along_x_only(init_background_node):
     world = build_drive_world(DifferentialDrive)
-    drive = world.get_connection_by_name("brumbrum")
+    drive = world.get_connection_by_name(name="brumbrum")
     world.state[drive.x_velocity.id].velocity = -0.01
     publisher = build_drive_publisher(world, minimum_linear_velocity=0.05)
 

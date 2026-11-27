@@ -205,7 +205,9 @@ class BenchmarkRobot(GiskardTester):
     def setup_giskard(self) -> Giskard:
         return Giskard(
             world_source=WorldSpecification(
-                robots=[RobotSpecification.specify_real_robot(PR2)]
+                robots=[
+                    RobotSpecification.specify_real_robot(semantic_annotation_type=PR2)
+                ]
             ),
             robot_interface_config=RealTimeStandAloneRobotInterfaceConfig(),
             server_config=GiskardServerConfig(),
@@ -232,7 +234,7 @@ class BenchmarkRobot(GiskardTester):
         :param name: Name of the kinematic structure entity in the world.
         :return: The entity registered under that name.
         """
-        return self.api.world.get_kinematic_structure_entity_by_name(name)
+        return self.api.world.get_kinematic_structure_entity_by_name(name=name)
 
     def teleport_to_configuration(self, *, joint_state: dict[str, float]) -> None:
         """
@@ -244,13 +246,13 @@ class BenchmarkRobot(GiskardTester):
         :param joint_state: Target position for each connection, by connection name.
         """
         connections = {
-            self.api.world.get_connection_by_name(name): target
+            self.api.world.get_connection_by_name(name=name): target
             for name, target in joint_state.items()
         }
         motion_statechart = Statechart(context=self.api.context)
         seed_configuration = SetSeedConfiguration(
             name="initial configuration",
-            seed_configuration=JointState.from_mapping(connections),
+            seed_configuration=JointState.from_mapping(mapping=connections),
         )
         motion_statechart.add_node(node=seed_configuration)
         reached = seed_configuration.observes_true
@@ -550,7 +552,7 @@ class KitchenPointingScenario(BenchmarkScenario):
                                 ),
                                 JointPositionList(
                                     goal_state=JointState.from_str_dict(
-                                        arm_pose, world=robot.api.world
+                                        mapping=arm_pose, world=robot.api.world
                                     )
                                 ),
                             ]

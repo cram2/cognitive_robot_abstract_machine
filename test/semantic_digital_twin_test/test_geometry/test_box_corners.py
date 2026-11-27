@@ -22,7 +22,9 @@ from semantic_digital_twin.world_description.world_entity import Body
 def origin() -> HomogeneousTransformationMatrix:
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName("map")))
+        world.add_kinematic_structure_entity(
+            kinematic_structure_entity=Body(name=PrefixedName(name="map"))
+        )
     return HomogeneousTransformationMatrix.from_xyz_rpy(
         1, 2, 3, reference_frame=world.root
     )
@@ -31,8 +33,10 @@ def origin() -> HomogeneousTransformationMatrix:
 @pytest.fixture(params=[PlanarBoundingBox, VolumetricBoundingBox])
 def box(request, origin):
     if request.param is PlanarBoundingBox:
-        return PlanarBoundingBox(-1, -2, 4, 5, origin)
-    return VolumetricBoundingBox(-1, -2, -3, 4, 5, 6, origin)
+        return PlanarBoundingBox(min_x=-1, min_y=-2, max_x=4, max_y=5, origin=origin)
+    return VolumetricBoundingBox(
+        min_x=-1, min_y=-2, min_z=-3, max_x=4, max_y=5, max_z=6, origin=origin
+    )
 
 
 def test_a_box_in_space_implements_the_bounds_interface(box):
@@ -70,7 +74,9 @@ def test_a_segment_through_the_bounds_is_clipped_to_the_part_inside():
     bounds = CoordinateBounds(lower=np.array([0.0, 0.0]), upper=np.array([1.0, 1.0]))
     start = np.array([-1.0, 0.5])
     direction = np.array([4.0, 0.0])
-    assert bounds.clip_segment(start, direction) == SimpleInterval.from_data(
+    assert bounds.clip_segment(
+        start=start, direction=direction
+    ) == SimpleInterval.from_data(
         lower=0.25, upper=0.5, left=Bound.CLOSED, right=Bound.CLOSED
     )
 
@@ -79,4 +85,4 @@ def test_a_segment_that_misses_the_bounds_is_not_clipped():
     bounds = CoordinateBounds(lower=np.array([0.0, 0.0]), upper=np.array([1.0, 1.0]))
     start = np.array([-1.0, 2.0])
     direction = np.array([4.0, 0.0])
-    assert bounds.clip_segment(start, direction) is None
+    assert bounds.clip_segment(start=start, direction=direction) is None

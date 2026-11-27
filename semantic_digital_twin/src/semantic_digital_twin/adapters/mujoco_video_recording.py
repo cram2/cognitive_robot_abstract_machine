@@ -25,14 +25,16 @@ from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 from semantic_digital_twin.world import World
 
 
-@dataclass
+@dataclass(kw_only=True)
 class VideoResolution:
     """
     Pixel dimensions of a rendered video frame.
     """
 
     width: int
-    """The frame width in pixels."""
+    """
+    The frame width in pixels.
+    """
 
     height: int
     """
@@ -40,14 +42,16 @@ class VideoResolution:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RecordedVideo:
     """
     The raw result of a :class:`MujocoVideoRecorder` session, before encoding.
     """
 
     frames: list[np.ndarray]
-    """The captured RGB frames, in playback order."""
+    """
+    The captured RGB frames, in playback order.
+    """
 
     frames_per_second: int
     """
@@ -66,7 +70,7 @@ class RecordedVideo:
         """
         return [i / self.frames_per_second for i in range(len(self.frames))]
 
-    def write(self, output_path: Path) -> Path:
+    def write(self, *, output_path: Path) -> Path:
         """
         Encodes :attr:`frames` into a video file.
 
@@ -83,7 +87,7 @@ class RecordedVideo:
         return output_path
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class _FrameCaptureCallback(StateChangeCallback):
     """
     Sibling callback owned by a :class:`MujocoVideoRecorder`.
@@ -101,7 +105,7 @@ class _FrameCaptureCallback(StateChangeCallback):
         self.recorder._on_world_state_change()
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MujocoVideoRecorder:
     """
     Records a video of a :class:`~semantic_digital_twin.world.World` while it is being
@@ -274,7 +278,7 @@ class MujocoVideoRecorder:
         self._frames = []
         return recorded_video
 
-    def advance_simulation(self, duration: float) -> None:
+    def advance_simulation(self, *, duration: float) -> None:
         """
         Steps the MuJoCo mirror's own physics (gravity, contacts, ...) forward by
         ``duration`` simulated seconds, capturing frames along the way.
@@ -328,11 +332,11 @@ class MujocoVideoRecorder:
         simulator = self._multi_sim.simulator
         with simulator._model_lock:
             mujoco.mj_forward(simulator._mj_model, simulator._mj_data)
-            renderer = self._renderer_for(simulator._mj_model)
+            renderer = self._renderer_for(model=simulator._mj_model)
             renderer.update_scene(simulator._mj_data, camera=self.camera.name)
             self._frames.append(renderer.render())
 
-    def _renderer_for(self, model: mujoco.MjModel) -> mujoco.Renderer:
+    def _renderer_for(self, *, model: mujoco.MjModel) -> mujoco.Renderer:
         """
         The renderer of :attr:`resolution` for ``model``, kept across frames and built
         anew only when the simulator has recompiled its model.
@@ -356,11 +360,11 @@ class MujocoVideoRecorder:
 
         :return: The newly attached camera.
         """
-        bounds = RayTracer(self.world).scene.bounds
+        bounds = RayTracer(world=self.world).scene.bounds
         if bounds is None:
             raise EmptyWorldVideoRecordingError(world=self.world)
 
-        pose = MujocoCamera.overview_pose(np.asarray(bounds))
+        pose = MujocoCamera.overview_pose(bounds=np.asarray(bounds))
         # MuJoCo orders the quaternion scalar-first, while Quaternion.to_np is [x, y, z, w].
         quaternion_xyzw = pose.quaternion.to_np().tolist()
         camera = MujocoCamera(
@@ -370,5 +374,5 @@ class MujocoVideoRecorder:
             quaternion=[quaternion_xyzw[3]] + quaternion_xyzw[:3],
             resolution=[float(self.resolution.width), float(self.resolution.height)],
         )
-        self.world.root.add_simulator_property(camera)
+        self.world.root.add_simulator_property(simulator_property=camera)
         return camera

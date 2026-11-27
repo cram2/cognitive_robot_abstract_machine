@@ -390,7 +390,7 @@ def test_underspecified_language(apartment_world_pr2_copy_with_context):
     Test that entire plans can be underspecified.
     """
     world, robot, extensions = apartment_world_pr2_copy_with_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     plan_generator = a(Sequence)(
         nodes=[
             a(NavigateAction)(
@@ -667,15 +667,15 @@ def test_a_trial_catches_its_copy_up_with_what_the_world_gained(
         trial_executor_type=KinematicallySimulatedPlanExecutor,
     )
     copied = trial._copy()
-    body = Body(name=PrefixedName("added_after_the_copy"))
+    body = Body(name=PrefixedName(name="added_after_the_copy"))
     with world.modify_world():
-        world.add_kinematic_structure_entity(body)
-        world.add_connection(FixedConnection(parent=world.root, child=body))
+        world.add_kinematic_structure_entity(kinematic_structure_entity=body)
+        world.add_connection(connection=FixedConnection(parent=world.root, child=body))
 
     caught_up = trial._copy()
 
     assert caught_up is copied
-    assert caught_up.get_kinematic_structure_entity_by_id(body.id).name == body.name
+    assert caught_up.get_kinematic_structure_entity_by_id(id=body.id).name == body.name
     trial.discard()
 
 
@@ -1006,10 +1006,12 @@ def test_a_trial_moves_the_tool_center_point_the_way_the_robot_does(
     copied = trial._copy()
     trial_executor = trial._trial_executor(world=copied)
     reach = ReachAction(
-        grasp_candidate=copied.get_semantic_annotations_by_type(Handle)[
+        grasp_candidate=copied.get_semantic_annotations_by_type(
+            semantic_annotation_type=Handle
+        )[0].grasp_candidates()[0],
+        arm=copied.get_semantic_annotations_by_type(semantic_annotation_type=Stretch)[
             0
-        ].grasp_candidates()[0],
-        arm=copied.get_semantic_annotations_by_type(Stretch)[0].all_arms[0],
+        ].all_arms[0],
     )
 
     trial_executor.prepare(statechart=statechart_of(trial_executor, reach))

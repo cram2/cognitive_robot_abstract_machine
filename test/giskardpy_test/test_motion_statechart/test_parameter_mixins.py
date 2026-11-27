@@ -506,10 +506,11 @@ def test_the_goal_reference_frame_is_the_frame_of_the_goal():
     A task's goal reference frame is the frame its goal is expressed in, not the root of
     its chain.
     """
-    goal_frame = Body(name=PrefixedName("goal_frame"))
+    goal_frame = Body(name=PrefixedName(name="goal_frame"))
     task = CartesianPosition(
         kinematic_chain=KinematicChain(
-            root=Body(name=PrefixedName("root")), tip=Body(name=PrefixedName("tip"))
+            root=Body(name=PrefixedName(name="root")),
+            tip=Body(name=PrefixedName(name="tip")),
         ),
         goal_point=Point3(reference_frame=goal_frame),
     )
@@ -521,7 +522,10 @@ def test_nodes_with_equal_parameters_are_told_apart_by_identity():
     Two nodes built from equal parameters are still two nodes, in comparisons and in
     sets.
     """
-    root, tip = Body(name=PrefixedName("root")), Body(name=PrefixedName("tip"))
+    root, tip = (
+        Body(name=PrefixedName(name="root")),
+        Body(name=PrefixedName(name="tip")),
+    )
     goal = Point3(reference_frame=root)
     first = CartesianPosition(
         kinematic_chain=KinematicChain(root=root, tip=tip), goal_point=goal

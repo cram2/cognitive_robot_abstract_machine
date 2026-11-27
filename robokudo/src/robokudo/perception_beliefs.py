@@ -216,11 +216,11 @@ class PerceptionBelief:
         body = self.annotation.root
         with world.modify_world():
             world.add_connection(
-                Connection6DoF.create_with_dofs(
+                connection=Connection6DoF.create_with_dofs(
                     world=world, parent=self.pose.reference_frame, child=body
                 )
             )
-            world.add_semantic_annotation(self.annotation)
+            world.add_semantic_annotation(semantic_annotation=self.annotation)
             body.parent_connection.origin = self.pose
 
     def update_object_in_world(
@@ -280,9 +280,9 @@ class PerceptionBelief:
         if isinstance(self.annotation, UnknownObject):
             return
         with world.modify_world():
-            world.remove_semantic_annotation(unknown_object)
+            world.remove_semantic_annotation(semantic_annotation=unknown_object)
             world.add_semantic_annotation(
-                type(self.annotation)(
+                semantic_annotation=type(self.annotation)(
                     root=unknown_object.root, class_label=self.annotation.class_label
                 )
             )
@@ -395,7 +395,7 @@ class ObjectMatcher:
         if not body.visual.shapes:
             return root_T_body.position
         bounding_box = body.visual.as_bounding_box_collection_in_frame(
-            body
+            reference_frame=body
         ).bounding_box()
         return root_T_body @ bounding_box.center
 
@@ -407,7 +407,9 @@ class ObjectMatcher:
             body.
         """
         perceivable_objects = {}
-        for annotation in world.get_semantic_annotations_by_type(IsPerceivable):
+        for annotation in world.get_semantic_annotations_by_type(
+            semantic_annotation_type=IsPerceivable
+        ):
             if not isinstance(annotation, HasRootBody):
                 continue
             perceivable_objects.setdefault(annotation.root.id, annotation)

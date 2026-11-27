@@ -69,7 +69,7 @@ class MMPDresdenJoint(JointName):
     GRIPPER_LEFT_KNUCKLE = "arm_0_gripper_robotiq_85_left_knuckle_joint"
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class MMPDresdenThumb(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -79,19 +79,21 @@ class MMPDresdenThumb(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "arm_0_gripper_robotiq_85_left_knuckle_link"
+                branch_root=robot_root,
+                name="arm_0_gripper_robotiq_85_left_knuckle_link",
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "arm_0_gripper_robotiq_85_left_finger_tip_link"
+                branch_root=robot_root,
+                name="arm_0_gripper_robotiq_85_left_finger_tip_link",
             ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class MMPDresdenIndexFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -101,19 +103,21 @@ class MMPDresdenIndexFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "arm_0_gripper_robotiq_85_right_knuckle_link"
+                branch_root=robot_root,
+                name="arm_0_gripper_robotiq_85_right_knuckle_link",
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "arm_0_gripper_robotiq_85_right_finger_tip_link"
+                branch_root=robot_root,
+                name="arm_0_gripper_robotiq_85_right_finger_tip_link",
             ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class MMPDresdenGripper(
     EndEffector, HasTwoFingers[MMPDresdenThumb, MMPDresdenIndexFinger]
 ):
@@ -126,18 +130,18 @@ class MMPDresdenGripper(
         gripper mimics, at its lower limit and closed with it at its upper limit.
         """
         knuckle: ActiveConnection1DOF = self._world.get_connection_by_name(
-            MMPDresdenJoint.GRIPPER_LEFT_KNUCKLE
+            name=MMPDresdenJoint.GRIPPER_LEFT_KNUCKLE
         )
         limits = knuckle.raw_dof.limits
 
         gripper_open = JointState.from_mapping(
-            name=PrefixedName(f"{self.name.name}_open", prefix=self.name.name),
+            name=PrefixedName(name=f"{self.name.name}_open", prefix=self.name.name),
             mapping={knuckle: limits.lower.position},
             state_type=GripperState.OPEN,
         )
 
         gripper_close = JointState.from_mapping(
-            name=PrefixedName(f"{self.name.name}_close", prefix=self.name.name),
+            name=PrefixedName(name=f"{self.name.name}_close", prefix=self.name.name),
             mapping={knuckle: limits.upper.position},
             state_type=GripperState.CLOSE,
         )
@@ -154,27 +158,27 @@ class MMPDresdenGripper(
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "arm_0_flange"
+                branch_root=robot_root, name="arm_0_flange"
             ),
             tool_frame=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "arm_0_tool_frame"
+                branch_root=robot_root, name="arm_0_tool_frame"
             ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class MMPDresdenCamera(RobotCamera[FieldOfViewCameraModel]):
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "pan_and_tilt_camera_color_optical_frame"
+                branch_root=robot_root, name="pan_and_tilt_camera_color_optical_frame"
             ),
             camera_model=FieldOfViewCameraModel(
                 angular_extent=FieldOfView(horizontal_angle=1.047, vertical_angle=0.785)
@@ -191,19 +195,19 @@ class MMPDresdenCamera(RobotCamera[FieldOfViewCameraModel]):
         return []
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class MMPDresdenArm(Arm[MMPDresdenGripper]):
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
     def setup_joint_states(self) -> list[JointState]:
         arm_park = JointState.from_mapping(
-            name=PrefixedName("arm_park", prefix=self.name.name),
+            name=PrefixedName(name="arm_park", prefix=self.name.name),
             mapping=dict(zip(self.active_connections, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0])),
             state_type=StaticJointState.PARK,
         )
         arm_both = JointState.from_mapping(
-            name=PrefixedName("arm_both", prefix=self.name.name),
+            name=PrefixedName(name="arm_both", prefix=self.name.name),
             mapping=dict(
                 zip(
                     self.active_connections,
@@ -216,19 +220,19 @@ class MMPDresdenArm(Arm[MMPDresdenGripper]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "hub_holder_link"
+                branch_root=robot_root, name="hub_holder_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "arm_0_flange"
+                branch_root=robot_root, name="arm_0_flange"
             ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class MMPDresdenTorso(Torso, HasOneArm[MMPDresdenArm], HasSensors[MMPDresdenCamera]):
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
@@ -238,17 +242,19 @@ class MMPDresdenTorso(Torso, HasOneArm[MMPDresdenArm], HasSensors[MMPDresdenCame
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "base_link"),
+            root=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="base_link"
+            ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "hub_holder_link"
+                branch_root=robot_root, name="hub_holder_link"
             ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class MMPDresdenMobileBase(MobileBase[OmniDrive], HasTorso[MMPDresdenTorso]):
     @classproperty
     def forward_axis(cls) -> Vector3:
@@ -256,10 +262,12 @@ class MMPDresdenMobileBase(MobileBase[OmniDrive], HasTorso[MMPDresdenTorso]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "base_link"),
+            root=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="base_link"
+            ),
         )
 
     def setup_hardware_interfaces(self) -> None:
@@ -269,7 +277,7 @@ class MMPDresdenMobileBase(MobileBase[OmniDrive], HasTorso[MMPDresdenTorso]):
         return []
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class MMPDresden(AbstractRobot, HasMobileBase[MMPDresdenMobileBase]):
     """
     The  Mobile Manipulation Platform (MMP) Dresden version.

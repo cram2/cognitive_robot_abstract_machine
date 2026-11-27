@@ -98,7 +98,9 @@ def controlled_joint_names(world: World) -> set[str]:
     """
     return {
         connection.name.name
-        for connection in world.get_connections_by_type(ActiveConnection1DOF)
+        for connection in world.get_connections_by_type(
+            connection_type=ActiveConnection1DOF
+        )
         if connection.is_controlled
     }
 
@@ -175,7 +177,7 @@ def test_a_world_with_an_omni_drive_robot_controls_its_drive(
 ) -> None:
     world = pr2_world_specification.create_world()
 
-    [drive] = world.get_connections_by_type(OmniDrive)
+    [drive] = world.get_connections_by_type(connection_type=OmniDrive)
     assert drive.is_controlled
 
 
@@ -184,7 +186,7 @@ def test_a_world_with_a_differential_drive_robot_controls_its_drive(
 ) -> None:
     world = stretch_world_specification.create_world()
 
-    [drive] = world.get_connections_by_type(DifferentialDrive)
+    [drive] = world.get_connections_by_type(connection_type=DifferentialDrive)
     assert drive.is_controlled
 
 
@@ -258,7 +260,7 @@ def test_closed_loop_does_not_control_a_drive_nothing_commands(
 
     giskard.setup()
 
-    [drive] = giskard.world.get_connections_by_type(OmniDrive)
+    [drive] = giskard.world.get_connections_by_type(connection_type=OmniDrive)
     assert not drive.is_controlled
 
 
@@ -283,7 +285,7 @@ def test_a_drive_command_without_a_drive_commands_the_only_drive_of_the_world(
 
     giskard.setup()
 
-    [drive] = giskard.world.get_connections_by_type(OmniDrive)
+    [drive] = giskard.world.get_connections_by_type(connection_type=OmniDrive)
     [publisher] = giskard.motion_server.control_loop.command_publishers
     assert publisher.connection is drive
 

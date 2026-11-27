@@ -18,13 +18,13 @@ from random_events.product_algebra import Event, SimpleEvent
 
 def test_volumetric_bounding_box_transform_same_frame(pr2_apartment_state_reset):
     bb = VolumetricBoundingBox(
-        -1,
-        -1,
-        -1,
-        1,
-        1,
-        1,
-        HomogeneousTransformationMatrix.from_xyz_rpy(
+        min_x=-1,
+        min_y=-1,
+        min_z=-1,
+        max_x=1,
+        max_y=1,
+        max_z=1,
+        origin=HomogeneousTransformationMatrix.from_xyz_rpy(
             reference_frame=pr2_apartment_state_reset.root
         ),
     )
@@ -41,7 +41,7 @@ def test_volumetric_bounding_box_transform_same_frame(pr2_apartment_state_reset)
     assert bb.max_z == 1
     assert bb.origin.position.to_np().tolist() == [0, 0, 0, 1]
 
-    new_origin_bb = bb.transform_to_origin(new_origin)
+    new_origin_bb = bb.transform_to_origin(reference_T_new_origin=new_origin)
 
     assert new_origin_bb.min_x == -1
     assert new_origin_bb.max_x == 1
@@ -54,14 +54,22 @@ def test_volumetric_bounding_box_transform_same_frame(pr2_apartment_state_reset)
 
 def test_volumetric_bounding_box_transform_different_frame(pr2_apartment_state_reset):
     bb = VolumetricBoundingBox(
-        0, 0, 0, 1, 1, 1, pr2_apartment_state_reset.root.global_pose
+        min_x=0,
+        min_y=0,
+        min_z=0,
+        max_x=1,
+        max_y=1,
+        max_z=1,
+        origin=pr2_apartment_state_reset.root.global_pose,
     )
 
     new_origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         0,
         0,
         0,
-        reference_frame=pr2_apartment_state_reset.get_body_by_name("base_footprint"),
+        reference_frame=pr2_apartment_state_reset.get_body_by_name(
+            name="base_footprint"
+        ),
     )
 
     assert bb.min_x == 0
@@ -72,7 +80,7 @@ def test_volumetric_bounding_box_transform_different_frame(pr2_apartment_state_r
     assert bb.max_z == 1
     assert bb.origin.position.to_np().tolist() == [0, 0, 0, 1]
 
-    new_origin_bb = bb.transform_to_origin(new_origin)
+    new_origin_bb = bb.transform_to_origin(reference_T_new_origin=new_origin)
 
     assert new_origin_bb.min_x == -1.3
     assert new_origin_bb.max_x == pytest.approx(-0.3, abs=0.001)
@@ -86,22 +94,32 @@ def test_volumetric_bounding_box_transform_different_frame(pr2_apartment_state_r
 def test_volumetric_bounding_box_transform_rotated():
     world = World()
     with world.modify_world():
-        body1 = Body(name=PrefixedName("body1"))
-        body2 = Body(name=PrefixedName("body2"))
+        body1 = Body(name=PrefixedName(name="body1"))
+        body2 = Body(name=PrefixedName(name="body2"))
 
         connection = FixedConnection(
-            body1,
-            body2,
-            HomogeneousTransformationMatrix.from_xyz_rpy(1, 0, 0, yaw=np.pi / 2),
+            parent=body1,
+            child=body2,
+            parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
+                1, 0, 0, yaw=np.pi / 2
+            ),
         )
 
-        world.add_connection(connection)
+        world.add_connection(connection=connection)
 
-    bb = VolumetricBoundingBox(-0.5, -1, 0, 0.5, 1, 1, body2.global_pose)
+    bb = VolumetricBoundingBox(
+        min_x=-0.5,
+        min_y=-1,
+        min_z=0,
+        max_x=0.5,
+        max_y=1,
+        max_z=1,
+        origin=body2.global_pose,
+    )
 
     new_origin = HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=body1)
 
-    new_bb = bb.transform_to_origin(new_origin)
+    new_bb = bb.transform_to_origin(reference_T_new_origin=new_origin)
 
     assert new_bb.min_x == 0.0
     assert new_bb.max_x == 2.0
@@ -124,7 +142,9 @@ def test_event_casting(pr2_apartment_state_reset):
     event = Event.from_simple_sets(simple_event)
 
     bbc = BoundingBoxCollection.from_event(
-        VolumetricBoundingBox, pr2_apartment_state_reset.root, event
+        box_type=VolumetricBoundingBox,
+        reference_frame=pr2_apartment_state_reset.root,
+        event=event,
     )
     bb = bbc.bounding_boxes[0]
     assert len(bbc.bounding_boxes) == 1
@@ -142,7 +162,13 @@ def test_event_casting(pr2_apartment_state_reset):
 
 def test_volume():
     bb = VolumetricBoundingBox(
-        -0.5, -1, 0, 0.5, 1, 3, HomogeneousTransformationMatrix()
+        min_x=-0.5,
+        min_y=-1,
+        min_z=0,
+        max_x=0.5,
+        max_y=1,
+        max_z=3,
+        origin=HomogeneousTransformationMatrix(),
     )
 
     assert bb.volume == 6.0
@@ -150,7 +176,13 @@ def test_volume():
 
 def test_volume_of_a_flat_bounding_box_vanishes():
     bb = VolumetricBoundingBox(
-        -0.5, -1, 1, 0.5, 1, 1, HomogeneousTransformationMatrix()
+        min_x=-0.5,
+        min_y=-1,
+        min_z=1,
+        max_x=0.5,
+        max_y=1,
+        max_z=1,
+        origin=HomogeneousTransformationMatrix(),
     )
 
     assert bb.volume == 0.0
@@ -158,9 +190,15 @@ def test_volume_of_a_flat_bounding_box_vanishes():
 
 def test_contains(pr2_apartment_state_reset):
     bb = VolumetricBoundingBox(
-        -0.5, -1, 0, 0.5, 1, 1, pr2_apartment_state_reset.root.global_pose
+        min_x=-0.5,
+        min_y=-1,
+        min_z=0,
+        max_x=0.5,
+        max_y=1,
+        max_z=1,
+        origin=pr2_apartment_state_reset.root.global_pose,
     )
 
     point = Point3(0, 0, 0, reference_frame=pr2_apartment_state_reset.root)
 
-    assert bb.contains(point)
+    assert bb.contains(point=point)

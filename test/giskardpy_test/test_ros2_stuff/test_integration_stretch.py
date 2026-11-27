@@ -49,13 +49,17 @@ class StretchTester(GiskardTester):
     def __post_init__(self):
         super().__post_init__()
         self.tool_frame = self.api.world.get_kinematic_structure_entity_by_name(
-            "link_grasp_center"
+            name="link_grasp_center"
         )
 
     def setup_giskard(self) -> Giskard:
         return Giskard(
             world_source=WorldSpecification(
-                robots=[RobotSpecification.specify_real_robot(Stretch)]
+                robots=[
+                    RobotSpecification.specify_real_robot(
+                        semantic_annotation_type=Stretch
+                    )
+                ]
             ),
             robot_interface_config=StandAloneRobotInterfaceConfig(),
             server_config=GiskardServerConfig(),
@@ -64,7 +68,9 @@ class StretchTester(GiskardTester):
 
     @property
     def robot(self) -> AbstractRobot:
-        return self.world.get_semantic_annotations_by_type(Stretch)[0]
+        return self.world.get_semantic_annotations_by_type(
+            semantic_annotation_type=Stretch
+        )[0]
 
 
 # %% fixtures
@@ -100,7 +106,7 @@ def tool_frame_height(giskard: StretchTester) -> float:
     """
     The height of the tool frame above the base, which the lift motions change.
     """
-    base_link = giskard.world.get_kinematic_structure_entity_by_name("base_link")
+    base_link = giskard.world.get_kinematic_structure_entity_by_name(name="base_link")
     return giskard.world.compute_forward_kinematics(
         root=base_link, tip=giskard.tool_frame
     ).position.to_np()[2]
@@ -114,7 +120,9 @@ def test_standalone_interface_controls_the_base_drive(giskard: StretchTester):
     The base drive is controlled in standalone, so the controller can actually move the
     base rather than silently holding it.
     """
-    drive = giskard.api.world.get_connections_by_type(DifferentialDrive)[0]
+    drive = giskard.api.world.get_connections_by_type(
+        connection_type=DifferentialDrive
+    )[0]
 
     assert drive.has_hardware_interface
 
@@ -145,7 +153,7 @@ def test_lift_goal_moves_the_tool_frame(giskard: StretchTester):
         node=(
             lift_goal := JointPositionList(
                 goal_state=JointState.from_str_dict(
-                    {"joint_lift": LIFT_GOAL_HEIGHT}, giskard.api.world
+                    mapping={"joint_lift": LIFT_GOAL_HEIGHT}, world=giskard.api.world
                 )
             )
         )
@@ -172,7 +180,7 @@ def test_local_minimum_ends_a_motion(giskard: StretchTester):
     motion_statechart.add_node(
         node=JointPositionList(
             goal_state=JointState.from_str_dict(
-                {"joint_lift": LIFT_GOAL_HEIGHT}, giskard.api.world
+                mapping={"joint_lift": LIFT_GOAL_HEIGHT}, world=giskard.api.world
             )
         )
     )

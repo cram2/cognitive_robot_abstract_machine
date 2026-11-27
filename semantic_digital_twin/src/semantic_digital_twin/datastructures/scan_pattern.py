@@ -8,7 +8,7 @@ import numpy.typing as npt
 from semantic_digital_twin.exceptions import InvalidScanPattern
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ScanPattern:
     """
     The directions a lidar sweeps and the distances it can measure.

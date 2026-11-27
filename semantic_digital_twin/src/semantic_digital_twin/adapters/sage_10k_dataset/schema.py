@@ -54,7 +54,7 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Sage10kBase(SubclassJSONSerializer):
     """
     Base class for all classes of the Sage 10k dataset.
@@ -71,7 +71,7 @@ class Sage10kBase(SubclassJSONSerializer):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Sage10kWithID(Sage10kBase):
     """
     Base class for Sage10k classes that have an id.
@@ -84,6 +84,7 @@ class Sage10kWithID(Sage10kBase):
 
     def create_in_world(
         self,
+        *,
         world: World,
         directory: Path,
         parent: KinematicStructureEntity,
@@ -101,7 +102,7 @@ class Sage10kWithID(Sage10kBase):
         """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class HasXYZ(Sage10kBase):
     """
     Parent for Sage10ks position and orientation to deduplicate the code.
@@ -124,7 +125,7 @@ class HasXYZ(Sage10kBase):
         return cls(x=data["x"], y=data["y"], z=data["z"])
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Sage10kRotation(HasXYZ):
     """
     Rotations in the Sage 10k world.
@@ -141,7 +142,7 @@ class Sage10kRotation(HasXYZ):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Sage10kPosition(HasXYZ):
     """
     Position of an entity in a Sage10k scene.
@@ -150,7 +151,7 @@ class Sage10kPosition(HasXYZ):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Sage10kSize(Sage10kBase):
     """
     The scale of an object.
@@ -196,7 +197,7 @@ class Sage10kSize(Sage10kBase):
         return cls(height=data["height"], length=data["length"], width=data["width"])
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Sage10kPhysicallyBasedRendering(SubclassJSONSerializer):
     """
     Parameters for super realistic renderers.
@@ -223,7 +224,7 @@ class Sage10kPhysicallyBasedRendering(SubclassJSONSerializer):
         return cls(metallic=data["metallic"], roughness=data["roughness"])
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Sage10kWall(Sage10kWithID):
     """
     Description of a wall for a room.
@@ -298,7 +299,7 @@ class Sage10kWall(Sage10kWithID):
             assert_never(self)
         return wall_length, yaw
 
-    def create_in_world(self, world: World, directory: Path, parent: Body) -> Wall:
+    def create_in_world(self, *, world: World, directory: Path, parent: Body) -> Wall:
         wall_length, yaw = self.wall_length_and_yaw
 
         wall_scale = Scale(x=self.thickness, y=wall_length, z=self.height)
@@ -335,7 +336,7 @@ class Sage10kWall(Sage10kWithID):
         wall_length, _ = self.wall_length_and_yaw
 
         geometry_with_texture = ShapeCollection(
-            [
+            shapes=[
                 Mesh.from_trimesh(
                     origin=HomogeneousTransformationMatrix(reference_frame=body),
                     mesh=wall_mesh,
@@ -352,7 +353,7 @@ class Sage10kWall(Sage10kWithID):
         return annotation
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Sage10kObject(Sage10kWithID):
     """
     Like a Body, but from Sage10k.
@@ -424,6 +425,7 @@ class Sage10kObject(Sage10kWithID):
 
     def create_in_world(
         self,
+        *,
         world: World,
         directory: Path,
         parent: KinematicStructureEntity,
@@ -452,8 +454,8 @@ class Sage10kObject(Sage10kWithID):
         )
 
         # Create a Body with the loaded mesh as both visual and collision geometry
-        visual = ShapeCollection([mesh], reference_frame=body)
-        collision = ShapeCollection([mesh], reference_frame=body)
+        visual = ShapeCollection(shapes=[mesh], reference_frame=body)
+        collision = ShapeCollection(shapes=[mesh], reference_frame=body)
         body.visual = visual
         body.collision = collision
 
@@ -470,8 +472,8 @@ class Sage10kObject(Sage10kWithID):
                 parent_T_connection_expression=root_T_body,
             )
             # Add the body to the world
-            world.add_body(body)
-            world.add_connection(root_C_body)
+            world.add_body(body=body)
+            world.add_connection(connection=root_C_body)
 
         # create semantic annotation
         annotation = NaturalLanguageWithTypeDescription(
@@ -479,7 +481,7 @@ class Sage10kObject(Sage10kWithID):
         )
 
         with world.modify_world():
-            world.add_semantic_annotation(annotation)
+            world.add_semantic_annotation(semantic_annotation=annotation)
 
         return body
 
@@ -528,7 +530,7 @@ class Sage10kObject(Sage10kWithID):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Sage10kDoor(Sage10kWithID):
     """
     A door of a wall in Sage10k.
@@ -606,6 +608,7 @@ class Sage10kDoor(Sage10kWithID):
 
     def create_in_world(
         self,
+        *,
         world: World,
         directory: Path,
         parent: KinematicStructureEntity,
@@ -628,7 +631,9 @@ class Sage10kDoor(Sage10kWithID):
             z=self.height / 2,
             reference_frame=parent,
         )
-        world_root_T_self = world.transform(parent_T_body, world.root)
+        world_root_T_self = world.transform(
+            spatial_object=parent_T_body, target_frame=world.root
+        )
 
         with world.modify_world():
             annotation = DoorWithType.create_with_new_body_in_world(
@@ -649,7 +654,7 @@ class Sage10kDoor(Sage10kWithID):
         )
 
         geometry_with_texture = ShapeCollection(
-            [
+            shapes=[
                 Mesh.from_trimesh(
                     origin=HomogeneousTransformationMatrix(reference_frame=body),
                     mesh=door_mesh,
@@ -666,11 +671,11 @@ class Sage10kDoor(Sage10kWithID):
         with world.modify_world():
             wall_annotation.add(part=annotation.entry_way)
 
-        self._create_handle_in_world(world, annotation)
-        self._create_hinge_in_world(annotation)
+        self._create_handle_in_world(world=world, door=annotation)
+        self._create_hinge_in_world(door=annotation)
         return annotation
 
-    def _create_handle_in_world(self, world: World, door: Door) -> Handle:
+    def _create_handle_in_world(self, *, world: World, door: Door) -> Handle:
         """
         Create the handle of the door.
 
@@ -678,7 +683,9 @@ class Sage10kDoor(Sage10kWithID):
         :param door: The door to create the handle for.
         :return: The handle of the door.
         """
-        floor = world.get_semantic_annotations_by_type(Floor)[0]
+        floor = world.get_semantic_annotations_by_type(semantic_annotation_type=Floor)[
+            0
+        ]
 
         door_T_handle = HomogeneousTransformationMatrix.from_xyz_rpy(
             y=0.1,
@@ -686,9 +693,11 @@ class Sage10kDoor(Sage10kWithID):
             reference_frame=door.root,
         )
 
-        door_T_world = world.transform(door_T_handle, world.root)
+        door_T_world = world.transform(
+            spatial_object=door_T_handle, target_frame=world.root
+        )
         floor_bounding_box = floor.root.collision.as_bounding_box_collection_at_origin(
-            world.root.global_pose
+            origin=world.root.global_pose
         )
         is_handle_in_room = floor_bounding_box.event.marginal(
             variables=SpatialVariables.xy
@@ -702,19 +711,21 @@ class Sage10kDoor(Sage10kWithID):
                 yaw=np.pi,
             )
 
-        world_root_T_handle = world.transform(door_T_handle, world.root)
+        world_root_T_handle = world.transform(
+            spatial_object=door_T_handle, target_frame=world.root
+        )
 
         with world.modify_world():
             handle = Handle.create_with_new_body_in_world(
                 name=f"{self.id}_handle",
                 world=world,
                 world_root_T_self=world_root_T_handle,
-                scale=Scale(0.05, 0.02, 0.2),
+                scale=Scale(x=0.05, y=0.02, z=0.2),
             )
             door.add(part=handle)
         return handle
 
-    def _create_hinge_in_world(self, door: Door) -> ActiveConnection1DOF:
+    def _create_hinge_in_world(self, *, door: Door) -> ActiveConnection1DOF:
         """
         Hang the door on the hinge that makes it openable.
 
@@ -731,7 +742,7 @@ class Sage10kDoor(Sage10kWithID):
             )
 
         return door.mount_on_movable_joint(
-            ScrewAxisConnectionSpecification(
+            connection_specification=ScrewAxisConnectionSpecification(
                 screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
                     axis=Vector3.Z()
                 ),
@@ -740,7 +751,7 @@ class Sage10kDoor(Sage10kWithID):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Sage10kRoom(Sage10kWithID):
     """
     A room of the Sage10k dataset.
@@ -784,7 +795,7 @@ class Sage10kRoom(Sage10kWithID):
     """
 
     def _create_floor(
-        self, world: World, directory: Path, parent: KinematicStructureEntity
+        self, *, world: World, directory: Path, parent: KinematicStructureEntity
     ) -> Floor:
         """
         Create the floor of this room.
@@ -827,7 +838,7 @@ class Sage10kRoom(Sage10kWithID):
         floor_body = floor_annotation.root
 
         floor_geometry_with_texture = ShapeCollection(
-            [
+            shapes=[
                 Mesh.from_trimesh(
                     origin=HomogeneousTransformationMatrix(reference_frame=floor_body),
                     mesh=floor_mesh,
@@ -845,18 +856,23 @@ class Sage10kRoom(Sage10kWithID):
 
     def create_in_world(
         self,
+        *,
         world: World,
         directory: Path,
         parent: KinematicStructureEntity,
         **kwargs,
     ) -> Body:
-        floor_annotation = self._create_floor(world, directory, parent)
+        floor_annotation = self._create_floor(
+            world=world, directory=directory, parent=parent
+        )
 
         walls_of_room = []
         doors_of_room = []
 
         for wall in self.walls:
-            wall_annotation = wall.create_in_world(world, directory, parent)
+            wall_annotation = wall.create_in_world(
+                world=world, directory=directory, parent=parent
+            )
             walls_of_room.append(wall_annotation)
             doors_of_this_wall = [
                 door for door in self.doors if door.wall_id == wall.id
@@ -865,7 +881,11 @@ class Sage10kRoom(Sage10kWithID):
             # create doors
             doors_of_room += [
                 door.create_in_world(
-                    world, directory, wall_annotation.root, wall, wall_annotation
+                    world=world,
+                    directory=directory,
+                    parent=wall_annotation.root,
+                    sage_10k_wall=wall,
+                    wall_annotation=wall_annotation,
                 )
                 for door in doors_of_this_wall
             ]
@@ -882,7 +902,7 @@ class Sage10kRoom(Sage10kWithID):
             )
 
             geometry_with_texture = ShapeCollection(
-                [
+                shapes=[
                     Mesh.from_trimesh(
                         origin=HomogeneousTransformationMatrix(reference_frame=body),
                         mesh=wall_mesh,
@@ -904,11 +924,11 @@ class Sage10kRoom(Sage10kWithID):
         )
 
         with world.modify_world():
-            world.add_semantic_annotation(room_annotation)
+            world.add_semantic_annotation(semantic_annotation=room_annotation)
 
         # create the objects
         for sage_object in self.objects:
-            sage_object.create_in_world(world, directory, parent=parent)
+            sage_object.create_in_world(world=world, directory=directory, parent=parent)
 
         return world.root
 
@@ -941,7 +961,7 @@ class Sage10kRoom(Sage10kWithID):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Sage10kScene(Sage10kWithID):
     """
     An entire scene from Sage10k.
@@ -1012,7 +1032,7 @@ class Sage10kScene(Sage10kWithID):
         root = Body(name=PrefixedName(name="map"))
 
         with world.modify_world():
-            world.add_body(root)
+            world.add_body(body=root)
 
         for room in self.rooms:
             room.create_in_world(

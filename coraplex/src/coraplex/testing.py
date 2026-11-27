@@ -88,7 +88,7 @@ def attach_tool(world: World, arm: Arm, tool_world: World, mount: dict) -> Body:
         ),
     )
     with world.modify_world():
-        world.merge_world(tool_world, connection)
+        world.merge_world(other=tool_world, root_connection=connection)
     return connection.child
 
 
@@ -100,43 +100,45 @@ def setup_world() -> World:
     logger.setLevel(logging.DEBUG)
 
     pr2_sem_world = URDFParser.from_file(
-        "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
+        file_path="package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
     ).create_world()
     apartment_world = URDFParser.from_file(
-        "package://iai_apartment/urdf/apartment.urdf"
+        file_path="package://iai_apartment/urdf/apartment.urdf"
     ).create_world()
-    milk_world = STLParser("package://iai_objects/objects/milk.stl").create_world()
+    milk_world = STLParser(
+        file_path="package://iai_objects/objects/milk.stl"
+    ).create_world()
     cereal_world = STLParser(
-        "package://iai_objects/objects/breakfast_cereal.stl"
+        file_path="package://iai_objects/objects/breakfast_cereal.stl"
     ).create_world()
     # apartment_world.merge_world(pr2_sem_world)
-    apartment_world.merge_world(milk_world)
-    apartment_world.merge_world(cereal_world)
+    apartment_world.merge_world(other=milk_world)
+    apartment_world.merge_world(other=cereal_world)
 
     with apartment_world.modify_world():
-        pr2_root = pr2_sem_world.get_body_by_name("base_footprint")
+        pr2_root = pr2_sem_world.get_body_by_name(name="base_footprint")
         apartment_root = apartment_world.root
         c_root_bf = OmniDrive.create_with_dofs(
             parent=apartment_root, child=pr2_root, world=apartment_world
         )
-        apartment_world.merge_world(pr2_sem_world, c_root_bf)
+        apartment_world.merge_world(other=pr2_sem_world, root_connection=c_root_bf)
         c_root_bf.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
             1.5, 2.5, 0, reference_frame=apartment_root
         )
 
     apartment_world.get_body_by_name(
-        "milk.stl"
+        name="milk.stl"
     ).parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         2.37, 2, 1.0345, reference_frame=apartment_world.root
     )
     apartment_world.get_body_by_name(
-        "breakfast_cereal.stl"
+        name="breakfast_cereal.stl"
     ).parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         2.37, 1.8, 1.0487, reference_frame=apartment_world.root
     )
-    milk_view = Milk(root=apartment_world.get_body_by_name("milk.stl"))
+    milk_view = Milk(root=apartment_world.get_body_by_name(name="milk.stl"))
     with apartment_world.modify_world():
-        apartment_world.add_semantic_annotation(milk_view)
+        apartment_world.add_semantic_annotation(semantic_annotation=milk_view)
 
     return apartment_world
 

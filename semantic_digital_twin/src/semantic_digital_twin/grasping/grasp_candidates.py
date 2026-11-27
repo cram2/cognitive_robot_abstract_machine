@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 # %% grasp candidates
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class GraspCandidate:
     """
     A grasp an object offers, together with the object offering it.
@@ -64,7 +64,7 @@ class GraspCandidate:
         :param graspable: The annotation of the object to be grasped.
         :return: A grasp at that object's origin.
         """
-        return cls(graspable, Pose(reference_frame=graspable.root))
+        return cls(graspable=graspable, grasp_pose=Pose(reference_frame=graspable.root))
 
     @property
     def width_along_closing_axis(self) -> float:
@@ -79,9 +79,9 @@ class GraspCandidate:
         """
         body = self.graspable.root
         if not body.has_collision():
-            raise ObjectHasNoWidthWithoutCollision(body.name)
+            raise ObjectHasNoWidthWithoutCollision(object_name=body.name)
         bounding_box = body.collision.as_bounding_box_collection_in_frame(
-            body
+            reference_frame=body
         ).bounding_box()
         extents = np.array(
             [
@@ -102,9 +102,9 @@ class GraspCandidate:
         :return: The grasp frame in the world frame, where the object is now.
         """
         world = self.graspable.root._world
-        return world.transform(self.grasp_pose, world.root)
+        return world.transform(spatial_object=self.grasp_pose, target_frame=world.root)
 
-    def moved_to(self, reference_T_object: Pose) -> Pose:
+    def moved_to(self, *, reference_T_object: Pose) -> Pose:
         """
         Transform this grasp candidate to where it would be, once the object is placed.
 

@@ -27,7 +27,7 @@ def test_a_mobile_base_is_moved_by_the_drive_of_its_robot(
     cylinder_bot_diff_world: World,
 ):
     robot = cylinder_bot_diff_world.get_semantic_annotations_by_type(
-        RobotOnADifferentialDrive
+        semantic_annotation_type=RobotOnADifferentialDrive
     )[0]
 
     assert robot.mobile_base.drive is robot.drive
@@ -36,8 +36,8 @@ def test_a_mobile_base_is_moved_by_the_drive_of_its_robot(
 def test_a_mobile_base_of_a_robot_attached_without_a_drive_has_no_drive():
     world = World()
     with world.modify_world():
-        world.add_body(Body(name=PrefixedName("bot")))
-    robot = RobotOnADifferentialDrive.from_world(world)
+        world.add_body(body=Body(name=PrefixedName(name="bot")))
+    robot = RobotOnADifferentialDrive.from_world(world=world)
 
     with pytest.raises(MissingDriveConnectionError) as raised:
         robot.mobile_base.drive

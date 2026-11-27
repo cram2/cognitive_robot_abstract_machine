@@ -162,7 +162,7 @@ class CartesianPosition(
 
         # Get current tip position in root frame
         root_P_current = self.context.world.compose_forward_kinematics_expression(
-            self.kinematic_chain.root, self.kinematic_chain.tip
+            root=self.kinematic_chain.root, tip=self.kinematic_chain.tip
         ).position
 
         # Add constraints to move tip towards goal
@@ -215,7 +215,7 @@ class DistanceAlongAxis(
         artifacts = MotionNodeArtifacts()
         root_P_reference, root_P_tip = (
             self.context.world.compose_forward_kinematics_expression(
-                self.root_link, point.reference_frame
+                root=self.root_link, tip=point.reference_frame
             )
             @ point
             for point in (self.reference_point, self.tip_point)
@@ -331,7 +331,7 @@ class CartesianPositionTrajectory(
 
         # Get current tip position in root frame
         root_P_current = self.context.world.compose_forward_kinematics_expression(
-            self.kinematic_chain.root, self.kinematic_chain.tip
+            root=self.kinematic_chain.root, tip=self.kinematic_chain.tip
         ).position
 
         # Add constraints to move tip towards goal
@@ -360,7 +360,7 @@ class CartesianPositionTrajectory(
         :param float_variable_data: The data the variable is registered with.
         """
         self.remaining_distance = FloatVariable(
-            str(PrefixedName("remaining_distance", str(self.name)))
+            str(PrefixedName(name="remaining_distance", prefix=str(self.name)))
         )
         float_variable_data.register_expression(expression=self.remaining_distance)
         float_variable_data.set_value(
@@ -401,7 +401,7 @@ class CartesianPositionTrajectory(
             after a change of the world structure therefore keeps one stale compiled function per rebuild.
         """
         root_T_tip = self.context.world.compose_forward_kinematics_expression(
-            self.kinematic_chain.root, self.kinematic_chain.tip
+            root=self.kinematic_chain.root, tip=self.kinematic_chain.tip
         )
         goal_reference_frame_T_tip = (
             self.root_T_goal_reference_frame.inverse() @ root_T_tip
@@ -568,7 +568,7 @@ class CartesianPositionStraight(
         """
         super().set_up()
         self._line_start_binding = ForwardKinematicsBinding(
-            name=PrefixedName("root_T_line_start", str(self.name)),
+            name=PrefixedName(name="root_T_line_start", prefix=str(self.name)),
             kinematic_chain=self.kinematic_chain,
             float_variable_data=self.context.float_variable_data,
         )
@@ -599,7 +599,7 @@ class CartesianPositionStraight(
         root_P_goal = self.root_T_goal_reference_frame @ self.goal_point
         root_P_line_start = self._line_start_binding.root_T_tip.position
         root_P_tip = self.context.world.compose_forward_kinematics_expression(
-            self.kinematic_chain.root, self.kinematic_chain.tip
+            root=self.kinematic_chain.root, tip=self.kinematic_chain.tip
         ).position
 
         root_V_line = root_P_goal - root_P_line_start
@@ -672,7 +672,7 @@ class CartesianOrientation(
 
         # Get current tip orientation in root frame
         root_T_current = self.context.world.compose_forward_kinematics_expression(
-            self.kinematic_chain.root, self.kinematic_chain.tip
+            root=self.kinematic_chain.root, tip=self.kinematic_chain.tip
         )
         root_R_current = root_T_current.rotation_matrix
 
@@ -794,7 +794,7 @@ class HoldLink(Task, HasKinematicChainParameter, ABC):
         """
         super().set_up()
         self._pose_to_keep = ForwardKinematicsBinding(
-            name=PrefixedName("pose_to_keep", str(self.name)),
+            name=PrefixedName(name="pose_to_keep", prefix=str(self.name)),
             kinematic_chain=self.kinematic_chain,
             float_variable_data=self.context.float_variable_data,
         )
@@ -819,7 +819,7 @@ class HoldLink(Task, HasKinematicChainParameter, ABC):
         :return: Whether the link is within `threshold` of that orientation.
         """
         root_R_tip = self.context.world.compose_forward_kinematics_expression(
-            self.kinematic_chain.root, self.kinematic_chain.tip
+            root=self.kinematic_chain.root, tip=self.kinematic_chain.tip
         ).rotation_matrix
         root_R_tip_when_started = self._pose_to_keep.root_T_tip.rotation_matrix
         artifacts.geometry.add_rotation_goal_constraints(
@@ -849,7 +849,7 @@ class HoldLink(Task, HasKinematicChainParameter, ABC):
         :return: Whether the link is within `threshold` of that position.
         """
         root_P_tip = self.context.world.compose_forward_kinematics_expression(
-            self.kinematic_chain.root, self.kinematic_chain.tip
+            root=self.kinematic_chain.root, tip=self.kinematic_chain.tip
         ).position
         root_P_tip_when_started = self._pose_to_keep.root_T_tip.position
         artifacts.geometry.add_point_goal_constraints(
@@ -948,7 +948,7 @@ class RigidCoupling(
         """
         artifacts = MotionNodeArtifacts()
         root_T_tip = self.context.world.compose_forward_kinematics_expression(
-            self.kinematic_chain.root, self.kinematic_chain.tip
+            root=self.kinematic_chain.root, tip=self.kinematic_chain.tip
         )
         root_R_tip = root_T_tip.rotation_matrix
         self._keep_at_rest(

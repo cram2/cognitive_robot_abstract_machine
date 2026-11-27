@@ -112,9 +112,9 @@ class TestHoldPose:
         A link is held against a task that pulls at it, so the constraints have to be
         real ones rather than a preference the solver can trade away.
         """
-        bot = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+        bot = cylinder_bot_world.get_kinematic_structure_entity_by_name(name="bot")
         start = cylinder_bot_world.compute_forward_kinematics_np(
-            cylinder_bot_world.root, bot
+            root=cylinder_bot_world.root, tip=bot
         ).copy()
         executor = self.executor_for(world=cylinder_bot_world)
         motion_statechart = Statechart(context=executor.context)
@@ -142,7 +142,7 @@ class TestHoldPose:
             executor.tick()
 
         reached = cylinder_bot_world.compute_forward_kinematics_np(
-            cylinder_bot_world.root, bot
+            root=cylinder_bot_world.root, tip=bot
         )
         assert np.linalg.norm(reached[:3, 3] - start[:3, 3]) < 1e-3
 
@@ -154,7 +154,7 @@ class TestHoldPose:
         must not count it among the tasks whose progress decides whether a motion is
         getting anywhere.
         """
-        bot = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+        bot = cylinder_bot_world.get_kinematic_structure_entity_by_name(name="bot")
         goal = CartesianPosition(
             kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=bot),
             goal_point=Point3(1, 0, 0, reference_frame=cylinder_bot_world.root),
@@ -180,7 +180,7 @@ class TestHoldPose:
         A held pose has no goal to reach, so it must report itself satisfied: a motion
         that ends once everything under it reached its goal would otherwise never end.
         """
-        bot = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+        bot = cylinder_bot_world.get_kinematic_structure_entity_by_name(name="bot")
         hold = HoldPose(
             kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=bot)
         )
@@ -201,7 +201,7 @@ class TestHoldPose:
         A hold that a stronger task overrules no longer keeps its link in place, and has
         to say so rather than report an invariant that does not hold.
         """
-        bot = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+        bot = cylinder_bot_world.get_kinematic_structure_entity_by_name(name="bot")
         hold = HoldPose(
             kinematic_chain=KinematicChain(root=cylinder_bot_world.root, tip=bot),
             weight=DefaultWeights.WEIGHT_BELOW_COLLISION_AVOIDANCE,
@@ -236,8 +236,8 @@ class TestHoldPose:
         only the turning is held off.
         """
         world = cylinder_bot_world
-        bot = world.get_kinematic_structure_entity_by_name("bot")
-        start = world.compute_forward_kinematics_np(world.root, bot).copy()
+        bot = world.get_kinematic_structure_entity_by_name(name="bot")
+        start = world.compute_forward_kinematics_np(root=world.root, tip=bot).copy()
         goal_point = Point3(1, 0, 0, reference_frame=world.root)
         executor = self.executor_for(world=world)
         motion_statechart = Statechart(context=executor.context)
@@ -266,7 +266,7 @@ class TestHoldPose:
         executor.compile(statechart=motion_statechart)
         executor.tick_until_end()
 
-        reached = world.compute_forward_kinematics_np(world.root, bot)
+        reached = world.compute_forward_kinematics_np(root=world.root, tip=bot)
         np.testing.assert_allclose(
             reached[:3, 3], goal_point.to_np()[:3], atol=moving.threshold
         )
@@ -334,8 +334,8 @@ def peak_angle_per_tick_towards_roll_goal(world: World, angle: float) -> float:
     :param angle: How far the goal is rolled away from the current orientation.
     :return: The largest angle the gripper turned within one control cycle.
     """
-    tip = world.get_kinematic_structure_entity_by_name("r_gripper_tool_frame")
-    root = world.get_kinematic_structure_entity_by_name("base_link")
+    tip = world.get_kinematic_structure_entity_by_name(name="r_gripper_tool_frame")
+    root = world.get_kinematic_structure_entity_by_name(name="base_link")
     executor = StatechartExecutor(
         context=StatechartContext(world=world), extensions=[MotionControl()]
     )
@@ -381,11 +381,13 @@ class TipMotion:
         Ticks a compiled executor until its statechart ends, recording the tip.
         """
         world = executor.context.world
-        transforms = [world.compute_forward_kinematics_np(root_link, tip_link).copy()]
+        transforms = [
+            world.compute_forward_kinematics_np(root=root_link, tip=tip_link).copy()
+        ]
         while not executor.statechart.is_ended():
             executor.tick()
             transforms.append(
-                world.compute_forward_kinematics_np(root_link, tip_link).copy()
+                world.compute_forward_kinematics_np(root=root_link, tip=tip_link).copy()
             )
         return cls(transforms=transforms)
 
@@ -431,7 +433,9 @@ def record_tip_path(
     life_cycle_state = executor.statechart.life_cycle_state
 
     def tip_position() -> np.ndarray:
-        return world.compute_forward_kinematics_np(root_link, tip_link)[:3, 3].copy()
+        return world.compute_forward_kinematics_np(root=root_link, tip=tip_link)[
+            :3, 3
+        ].copy()
 
     path = []
     if life_cycle_state[task] == LifeCycleValue.RUNNING:
@@ -506,10 +510,12 @@ class TestCartesianPositionTrajectory:
         for state_view in world_state_trajectory.values():
             # Temporarily set the world's state to the recorded one
             for derivative in Derivatives:
-                world.state.set_derivative(derivative, state_view.data[derivative, :])
+                world.state.set_derivative(
+                    derivative=derivative, new_state=state_view.data[derivative, :]
+                )
             world.notify_state_change()
             p = (
-                world.compute_forward_kinematics(root_link, tip_link)
+                world.compute_forward_kinematics(root=root_link, tip=tip_link)
                 .position.evaluate()[:-1]
                 .astype(float)
             )
@@ -555,7 +561,9 @@ class TestCartesianPositionTrajectory:
         cartesian_trajectory = CartesianPositionTrajectory(
             kinematic_chain=KinematicChain(
                 root=cylinder_bot_world.root,
-                tip=cylinder_bot_world.get_kinematic_structure_entity_by_name("bot"),
+                tip=cylinder_bot_world.get_kinematic_structure_entity_by_name(
+                    name="bot"
+                ),
             ),
             goal_points=points,
         )
@@ -601,7 +609,9 @@ class TestCartesianPositionTrajectory:
         cartesian_trajectory = CartesianPositionTrajectory(
             kinematic_chain=KinematicChain(
                 root=cylinder_bot_world.root,
-                tip=cylinder_bot_world.get_kinematic_structure_entity_by_name("bot"),
+                tip=cylinder_bot_world.get_kinematic_structure_entity_by_name(
+                    name="bot"
+                ),
             ),
             goal_points=points,
             maximum_skip_ahead=20,
@@ -629,7 +639,7 @@ class TestCartesianPositionTrajectory:
         first.
         """
         root = cylinder_bot_world.root
-        tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+        tip = cylinder_bot_world.get_kinematic_structure_entity_by_name(name="bot")
         points = [Point3(0, y, 0, reference_frame=tip) for y in np.linspace(0, 0.2, 21)]
 
         executor = StatechartExecutor(
@@ -656,7 +666,7 @@ class TestCartesianPositionTrajectory:
         root_P_tip_start = move_away.goal_point.to_np()[:3]
         tip_start_P_last_point = points[-1].to_np()[:3]
         assert np.allclose(
-            cylinder_bot_world.compute_forward_kinematics_np(root, tip)[:3, 3],
+            cylinder_bot_world.compute_forward_kinematics_np(root=root, tip=tip)[:3, 3],
             root_P_tip_start + tip_start_P_last_point,
             atol=move_away.threshold + cartesian_trajectory.threshold,
         )
@@ -666,7 +676,7 @@ class TestCartesianPositionTrajectory:
         The index advanced while following the trajectory keeps its declared type, so
         database drivers and JSON encoders that reject numpy scalars can store it.
         """
-        tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+        tip = cylinder_bot_world.get_kinematic_structure_entity_by_name(name="bot")
         points = [Point3(0, y, 0, reference_frame=tip) for y in np.linspace(0, 0.2, 21)]
 
         executor = StatechartExecutor(
@@ -694,15 +704,15 @@ class TestCartesianPositionTrajectory:
         seeded arm configuration.
         """
         root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "base_footprint"
+            name="base_footprint"
         )
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "r_gripper_tool_frame"
+            name="r_gripper_tool_frame"
         )
 
         seed = SetSeedConfiguration(
             seed_configuration=JointState.from_str_dict(
-                better_pr2_pose, world=pr2_world_state_reset
+                mapping=better_pr2_pose, world=pr2_world_state_reset
             )
         )
         add_to_statechart_with_motion_control(seed, pr2_world_state_reset)
@@ -723,7 +733,9 @@ class TestCartesianPositionTrajectory:
                 reference_frame=tip,
             )
             points.append(point)
-            root_points.append(pr2_world_state_reset.transform(point, root))
+            root_points.append(
+                pr2_world_state_reset.transform(spatial_object=point, target_frame=root)
+            )
         executor = StatechartExecutor(
             context=StatechartContext(world=pr2_world_state_reset),
             extensions=[
@@ -764,7 +776,7 @@ class TestCartesianTasks:
         """
         A pose goal of the cylinder bot ends with the bot at the goal pose.
         """
-        tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+        tip = cylinder_bot_world.get_kinematic_structure_entity_by_name(name="bot")
 
         executor = StatechartExecutor(
             context=StatechartContext(world=cylinder_bot_world),
@@ -789,7 +801,9 @@ class TestCartesianTasks:
         executor.tick_until_end()
 
         assert np.allclose(
-            cylinder_bot_world.compute_forward_kinematics(cylinder_bot_world.root, tip),
+            cylinder_bot_world.compute_forward_kinematics(
+                root=cylinder_bot_world.root, tip=tip
+            ),
             goal.goal_pose,
             atol=goal.position_threshold,
         )
@@ -811,7 +825,7 @@ class TestCartesianTasks:
         The orientation sub-tasks are inspected directly, because the observation of the
         enclosing :class:`Parallel` only reflects its children on the following tick.
         """
-        tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+        tip = cylinder_bot_world.get_kinematic_structure_entity_by_name(name="bot")
         goal_pose = Pose.from_xyz_rpy(yaw=0.05, reference_frame=cylinder_bot_world.root)
 
         executor = StatechartExecutor(
@@ -863,7 +877,7 @@ class TestCartesianTasks:
         A loose ``threshold`` makes the task report "reached" long before the base has
         slowed down, so the base is still moving fast when that happens.
         """
-        tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+        tip = cylinder_bot_world.get_kinematic_structure_entity_by_name(name="bot")
 
         executor = StatechartExecutor(
             context=StatechartContext(world=cylinder_bot_world),
@@ -931,7 +945,7 @@ class TestCartesianTasks:
                     kinematic_chain=KinematicChain(
                         root=pr2_world_state_reset.root,
                         tip=pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-                            "base_footprint"
+                            name="base_footprint"
                         ),
                     ),
                     goal_pose=Pose.from_xyz_rpy(
@@ -940,7 +954,7 @@ class TestCartesianTasks:
                 ),
                 JointPositionList(
                     goal_state=JointState.from_str_dict(
-                        {
+                        mapping={
                             PR2Joint.TORSO_LIFT: 0.2999225173357618,
                             PR2Joint.HEAD_PAN: 0.042,
                             PR2Joint.HEAD_TILT: -0.37,
@@ -977,13 +991,15 @@ class TestCartesianTasks:
         gripper at the goal pose.
         """
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "r_gripper_tool_frame"
+            name="r_gripper_tool_frame"
         )
         root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "base_footprint"
+            name="base_footprint"
         )
         tip_goal = Pose.from_xyz_quaternion(pos_x=-0.2, reference_frame=tip)
-        expected = pr2_world_state_reset.transform(tip_goal, root)
+        expected = pr2_world_state_reset.transform(
+            spatial_object=tip_goal, target_frame=root
+        )
 
         executor = StatechartExecutor(
             context=StatechartContext(world=pr2_world_state_reset),
@@ -1005,7 +1021,7 @@ class TestCartesianTasks:
         executor.tick_until_end()
 
         assert np.allclose(
-            executor.context.world.compute_forward_kinematics(root, tip),
+            executor.context.world.compute_forward_kinematics(root=root, tip=tip),
             expected,
             atol=cart_goal.position_threshold,
         )
@@ -1018,7 +1034,7 @@ class TestCartesianTasks:
         minimum instead of reaching it.
         """
         base_footprint = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "base_footprint"
+            name="base_footprint"
         )
         executor = StatechartExecutor(
             context=StatechartContext(world=pr2_world_state_reset),
@@ -1053,17 +1069,17 @@ class TestCartesianTasks:
         Goals that keep the orientation of both grippers are reached, although an
         orientation error of zero is a singularity of the rotation error.
         """
-        JointState.from_str_dict(default_pr2_pose, pr2_world_state_reset).apply_to(
-            pr2_world_state_reset
-        )
+        JointState.from_str_dict(
+            mapping=default_pr2_pose, world=pr2_world_state_reset
+        ).apply_to(world=pr2_world_state_reset)
         base_link = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "base_link"
+            name="base_link"
         )
         right_tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "r_gripper_tool_frame"
+            name="r_gripper_tool_frame"
         )
         left_tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "l_gripper_tool_frame"
+            name="l_gripper_tool_frame"
         )
         executor = StatechartExecutor(
             context=StatechartContext(world=pr2_world_state_reset),
@@ -1107,14 +1123,14 @@ class TestCartesianTasks:
         """
         A goal for one gripper relative to the other moves both arms.
         """
-        JointState.from_str_dict(default_pr2_pose, pr2_world_state_reset).apply_to(
-            pr2_world_state_reset
-        )
+        JointState.from_str_dict(
+            mapping=default_pr2_pose, world=pr2_world_state_reset
+        ).apply_to(world=pr2_world_state_reset)
         left_tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "l_gripper_tool_frame"
+            name="l_gripper_tool_frame"
         )
         right_tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "r_gripper_tool_frame"
+            name="r_gripper_tool_frame"
         )
         goal_pose = HomogeneousTransformationMatrix.from_point_rotation_matrix(
             point=Point3(0.2, 0.0, reference_frame=left_tip),
@@ -1143,7 +1159,9 @@ class TestCartesianTasks:
         executor.tick_until_end()
 
         assert np.allclose(
-            pr2_world_state_reset.compute_forward_kinematics(left_tip, right_tip),
+            pr2_world_state_reset.compute_forward_kinematics(
+                root=left_tip, tip=right_tip
+            ),
             goal_pose,
             atol=cart_goal.position_threshold,
         )
@@ -1156,18 +1174,20 @@ class TestCartesianTasks:
         joints below it.
         """
         torso_lift_link = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "torso_lift_link"
+            name="torso_lift_link"
         )
         right_tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "r_gripper_tool_frame"
+            name="r_gripper_tool_frame"
         )
         base_footprint = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "base_footprint"
+            name="base_footprint"
         )
         goal_pose = Pose.from_xyz_rpy(
             x=0.8, y=-0.5, z=1.0, reference_frame=base_footprint
         )
-        expected = pr2_world_state_reset.transform(goal_pose, torso_lift_link)
+        expected = pr2_world_state_reset.transform(
+            spatial_object=goal_pose, target_frame=torso_lift_link
+        )
         executor = StatechartExecutor(
             context=StatechartContext(world=pr2_world_state_reset),
             extensions=[MotionControl()],
@@ -1188,7 +1208,7 @@ class TestCartesianTasks:
 
         assert np.allclose(
             pr2_world_state_reset.compute_forward_kinematics(
-                torso_lift_link, right_tip
+                root=torso_lift_link, tip=right_tip
             ),
             expected,
             atol=cart_goal.position_threshold,
@@ -1212,7 +1232,7 @@ class TestCartesianTasks:
         An omnidirectional base drives sideways, diagonally and turning to its goal.
         """
         base_footprint = hsr_world_copy.get_kinematic_structure_entity_by_name(
-            "base_footprint"
+            name="base_footprint"
         )
         goal_pose = Pose.from_xyz_rpy(
             x=goal_x, y=goal_y, yaw=goal_yaw, reference_frame=hsr_world_copy.root
@@ -1239,7 +1259,7 @@ class TestCartesianTasks:
 
         assert np.allclose(
             hsr_world_copy.compute_forward_kinematics(
-                hsr_world_copy.root, base_footprint
+                root=hsr_world_copy.root, tip=base_footprint
             ),
             goal_pose,
             atol=cart_goal.position_threshold,
@@ -1252,15 +1272,19 @@ class TestCartesianTasks:
         A pose goal relative to the arm's base brings a Daisy finger tip to the goal
         pose.
         """
-        JointState.from_str_dict(default_daisy_pose, daisy_world_copy).apply_to(
-            daisy_world_copy
+        JointState.from_str_dict(
+            mapping=default_daisy_pose, world=daisy_world_copy
+        ).apply_to(world=daisy_world_copy)
+        base = daisy_world_copy.get_kinematic_structure_entity_by_name(
+            name="left_base_link"
         )
-        base = daisy_world_copy.get_kinematic_structure_entity_by_name("left_base_link")
         finger_tip = daisy_world_copy.get_kinematic_structure_entity_by_name(
-            "left_gripper_left_finger_tip_link"
+            name="left_gripper_left_finger_tip_link"
         )
         goal_pose = Pose.from_xyz_axis_angle(z=0.2, reference_frame=finger_tip)
-        expected = daisy_world_copy.transform(goal_pose, base)
+        expected = daisy_world_copy.transform(
+            spatial_object=goal_pose, target_frame=base
+        )
         executor = StatechartExecutor(
             context=StatechartContext(world=daisy_world_copy),
             extensions=[MotionControl()],
@@ -1280,7 +1304,7 @@ class TestCartesianTasks:
         executor.tick_until_end()
 
         assert np.allclose(
-            daisy_world_copy.compute_forward_kinematics(base, finger_tip),
+            daisy_world_copy.compute_forward_kinematics(root=base, tip=finger_tip),
             expected,
             atol=cart_goal.position_threshold,
         )
@@ -1291,8 +1315,10 @@ class TestCartesianTasks:
         """
         with _hsr_world_setup.modify_world():
             box = Body(
-                name=PrefixedName("muh"),
-                collision=ShapeCollection([Box(scale=Scale(0.1, 0.1, 0.1))]),
+                name=PrefixedName(name="muh"),
+                collision=ShapeCollection(
+                    shapes=[Box(scale=Scale(x=0.1, y=0.1, z=0.1))]
+                ),
             )
             connection = FixedConnection(
                 parent=_hsr_world_setup.root,
@@ -1301,10 +1327,14 @@ class TestCartesianTasks:
                     x=2, z=0.5
                 ),
             )
-            _hsr_world_setup.add_connection(connection)
+            _hsr_world_setup.add_connection(connection=connection)
 
-        hsr = _hsr_world_setup.get_semantic_annotations_by_type(HSRB)[0]
-        hand = _hsr_world_setup.get_semantic_annotations_by_type(EndEffector)[0]
+        hsr = _hsr_world_setup.get_semantic_annotations_by_type(
+            semantic_annotation_type=HSRB
+        )[0]
+        hand = _hsr_world_setup.get_semantic_annotations_by_type(
+            semantic_annotation_type=EndEffector
+        )[0]
         executor = StatechartExecutor(
             context=StatechartContext(world=_hsr_world_setup),
             extensions=[MotionControl()],
@@ -1312,7 +1342,7 @@ class TestCartesianTasks:
         motion_statechart = Statechart(context=executor.context)
         orientation_goal = hand.tool_R_grasp.inverse()
         orientation_goal.reference_frame = _hsr_world_setup.get_body_by_name(
-            "base_footprint"
+            name="base_footprint"
         )
         motion_statechart.add_node(
             node=(
@@ -1348,10 +1378,10 @@ class TestCartesianTasks:
         Test CartesianPose sequence with Bind_at_build policy.
         """
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "base_footprint"
+            name="base_footprint"
         )
         root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "odom_combined"
+            name="odom_combined"
         )
 
         tip_goal1 = Pose.from_xyz_quaternion(pos_x=-2, reference_frame=tip)
@@ -1386,7 +1416,7 @@ class TestCartesianTasks:
         executor.tick_until_end()
 
         forward_kinematics = pr2_world_state_reset.compute_forward_kinematics_np(
-            root, tip
+            root=root, tip=tip
         )
         assert np.allclose(
             forward_kinematics, tip_goal2.to_np(), atol=cart_goal2.position_threshold
@@ -1397,10 +1427,10 @@ class TestCartesianTasks:
         Test CartesianPose sequence with Bind_on_start policy (default).
         """
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "base_footprint"
+            name="base_footprint"
         )
         root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "odom_combined"
+            name="odom_combined"
         )
 
         tip_goal1 = Pose.from_xyz_quaternion(pos_x=-0.2, reference_frame=tip)
@@ -1434,7 +1464,7 @@ class TestCartesianTasks:
         executor.tick_until_end()
 
         forward_kinematics = pr2_world_state_reset.compute_forward_kinematics_np(
-            root, tip
+            root=root, tip=tip
         )
         expected = np.eye(4)
         assert np.allclose(
@@ -1446,10 +1476,10 @@ class TestCartesianTasks:
         Test basic CartesianOrientation goal.
         """
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "base_footprint"
+            name="base_footprint"
         )
         root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "odom_combined"
+            name="odom_combined"
         )
 
         tip_goal = RotationMatrix.from_axis_angle(
@@ -1474,7 +1504,7 @@ class TestCartesianTasks:
         executor.tick_until_end()
 
         forward_kinematics = pr2_world_state_reset.compute_forward_kinematics_np(
-            root, tip
+            root=root, tip=tip
         )
         assert np.allclose(
             forward_kinematics, tip_goal.to_np(), atol=cart_goal.threshold
@@ -1487,10 +1517,10 @@ class TestCartesianTasks:
         Test CartesianPosition with Bind_at_build policy.
         """
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "base_footprint"
+            name="base_footprint"
         )
         root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "odom_combined"
+            name="odom_combined"
         )
 
         tip_goal1 = Point3(-0.2, 0, 0, reference_frame=tip)
@@ -1526,7 +1556,7 @@ class TestCartesianTasks:
         executor.tick_until_end()
 
         forward_kinematics = pr2_world_state_reset.compute_forward_kinematics_np(
-            root, tip
+            root=root, tip=tip
         )
         # goal2 was captured at build time, so should end at that absolute position
         expected = HomogeneousTransformationMatrix.from_xyz_quaternion(
@@ -1543,10 +1573,10 @@ class TestCartesianTasks:
         Test CartesianPosition with Bind_on_start policy (default).
         """
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "base_footprint"
+            name="base_footprint"
         )
         root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "odom_combined"
+            name="odom_combined"
         )
 
         tip_goal1 = Point3(-0.2, 0, 0, reference_frame=tip)
@@ -1582,7 +1612,7 @@ class TestCartesianTasks:
         executor.tick_until_end()
 
         forward_kinematics = pr2_world_state_reset.compute_forward_kinematics_np(
-            root, tip
+            root=root, tip=tip
         )
         # Both goals captured when tasks start, so should return near origin
         expected = np.eye(4)
@@ -1598,10 +1628,10 @@ class TestCartesianTasks:
         back and then 0.2 m forward from where it is, ending where it began.
         """
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "base_footprint"
+            name="base_footprint"
         )
         root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "odom_combined"
+            name="odom_combined"
         )
 
         tip_goal1 = Point3(-0.2, 0, 0, reference_frame=tip)
@@ -1633,7 +1663,7 @@ class TestCartesianTasks:
         executor.tick_until_end()
 
         forward_kinematics = pr2_world_state_reset.compute_forward_kinematics_np(
-            root, tip
+            root=root, tip=tip
         )
         # Both goals captured when tasks start, so should return near origin
         expected = np.eye(4)
@@ -1648,14 +1678,16 @@ class TestCartesianTasks:
         Test CartesianOrientation with Bind_at_build policy.
         """
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "base_footprint"
+            name="base_footprint"
         )
         root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "odom_combined"
+            name="odom_combined"
         )
 
         # Store initial orientation for comparison
-        initial_fk = pr2_world_state_reset.compute_forward_kinematics_np(root, tip)
+        initial_fk = pr2_world_state_reset.compute_forward_kinematics_np(
+            root=root, tip=tip
+        )
 
         tip_rot1 = RotationMatrix.from_axis_angle(
             AxisAngle(Vector3.Z(), np.pi / 6, reference_frame=tip)
@@ -1694,7 +1726,7 @@ class TestCartesianTasks:
         executor.tick_until_end()
 
         forward_kinematics = pr2_world_state_reset.compute_forward_kinematics_np(
-            root, tip
+            root=root, tip=tip
         )
 
         # goal2 captured at build, so ends at -pi/6 from original
@@ -1708,10 +1740,10 @@ class TestCartesianTasks:
         Test CartesianOrientation with Bind_on_start policy (default).
         """
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "base_footprint"
+            name="base_footprint"
         )
         root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "odom_combined"
+            name="odom_combined"
         )
 
         tip_rot1 = RotationMatrix.from_axis_angle(
@@ -1751,7 +1783,7 @@ class TestCartesianTasks:
         executor.tick_until_end()
 
         forward_kinematics = pr2_world_state_reset.compute_forward_kinematics_np(
-            root, tip
+            root=root, tip=tip
         )
         # Both goals captured when tasks start, so rotates +pi/6 then -pi/6 = back to origin
         expected = np.eye(4)
@@ -1764,10 +1796,10 @@ class TestCartesianTasks:
         Verifies that the tip reaches the goal and (ideally) follows a straight path.
         """
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "base_footprint"
+            name="base_footprint"
         )
         root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "odom_combined"
+            name="odom_combined"
         )
 
         goal_point = Point3(0.1, 0, 0, reference_frame=tip)
@@ -1799,10 +1831,10 @@ class TestCartesianTasks:
         Test CartesianPositionStraight basic functionality.
         """
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "base_footprint"
+            name="base_footprint"
         )
         root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "odom_combined"
+            name="odom_combined"
         )
 
         goal_pose = Pose.from_xyz_rpy(0.1, 2, 0, reference_frame=tip)
@@ -1838,10 +1870,10 @@ class TestCartesianTasks:
         orientation task within the orientation threshold of the goal.
         """
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "r_gripper_tool_frame"
+            name="r_gripper_tool_frame"
         )
         root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "odom_combined"
+            name="odom_combined"
         )
         executor = StatechartExecutor(
             context=StatechartContext(world=pr2_world_state_reset),
@@ -1872,12 +1904,14 @@ class TestCartesianTasks:
         the straight line motion is under way.
         """
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "r_gripper_tool_frame"
+            name="r_gripper_tool_frame"
         )
         root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "odom_combined"
+            name="odom_combined"
         )
-        start = pr2_world_state_reset.compute_forward_kinematics_np(root, tip)[:3, 3]
+        start = pr2_world_state_reset.compute_forward_kinematics_np(root=root, tip=tip)[
+            :3, 3
+        ]
         goal_pose = Pose.from_xyz_rpy(
             x=start[0] + 0.3,
             y=start[1],
@@ -1952,7 +1986,9 @@ class TestCartesianTasks:
         task = CartesianPositionStraight(
             kinematic_chain=KinematicChain(
                 root=cylinder_bot_world.root,
-                tip=cylinder_bot_world.get_kinematic_structure_entity_by_name("bot"),
+                tip=cylinder_bot_world.get_kinematic_structure_entity_by_name(
+                    name="bot"
+                ),
             ),
             goal_point=Point3(x=1, reference_frame=cylinder_bot_world.root),
             weight=DefaultWeights.WEIGHT_COLLISION_AVOIDANCE,
@@ -1984,12 +2020,14 @@ class TestCartesianTasks:
         diagonal of the cap instead.
         """
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "r_gripper_tool_frame"
+            name="r_gripper_tool_frame"
         )
         root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "odom_combined"
+            name="odom_combined"
         )
-        start = pr2_world_state_reset.compute_forward_kinematics_np(root, tip)[:3, 3]
+        start = pr2_world_state_reset.compute_forward_kinematics_np(root=root, tip=tip)[
+            :3, 3
+        ]
         goal_point = Point3(
             start[0] + 0.25, start[1] + 0.15, start[2] + 0.1, reference_frame=root
         )
@@ -2021,12 +2059,14 @@ class TestCartesianTasks:
         starts after that motion has moved the tip somewhere else.
         """
         tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "r_gripper_tool_frame"
+            name="r_gripper_tool_frame"
         )
         root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-            "odom_combined"
+            name="odom_combined"
         )
-        start = pr2_world_state_reset.compute_forward_kinematics_np(root, tip)[:3, 3]
+        start = pr2_world_state_reset.compute_forward_kinematics_np(root=root, tip=tip)[
+            :3, 3
+        ]
         goal_point = Point3(start[0] + 0.2, start[1], start[2], reference_frame=root)
 
         executor = StatechartExecutor(
@@ -2036,7 +2076,7 @@ class TestCartesianTasks:
         motion_statechart = Statechart(context=executor.context)
         wrist_goal = JointPositionList(
             goal_state=JointState.from_str_dict(
-                {PR2Joint.RIGHT_WRIST_FLEX: -np.pi / 2},
+                mapping={PR2Joint.RIGHT_WRIST_FLEX: -np.pi / 2},
                 world=pr2_world_state_reset,
             )
         )
@@ -2068,7 +2108,9 @@ class TestCartesianTasks:
         world = World()
         # Define 3 identical sections of 0.3m, 0.02m radius, and 10 resolution
         sections = [SoftTrunkSection(length=0.3, radius=0.02, resolution=10)] * 3
-        trunk = SoftTrunk.build_piecewise_constant_curvature(world, sections)
+        trunk = SoftTrunk.build_piecewise_constant_curvature(
+            world=world, sections=sections
+        )
 
         # Define a reachable Cartesian target point relative to the base root
         goal_point = Point3(0.3, 0.0, 0.6, reference_frame=world.root)
@@ -2089,7 +2131,7 @@ class TestCartesianTasks:
 
         # Retrieve the final tip pose
         tip_body = trunk.arms[0].tip
-        fk = world.compute_forward_kinematics_np(world.root, tip_body)
+        fk = world.compute_forward_kinematics_np(root=world.root, tip=tip_body)
 
         # Verify that the tip reached the target point within the goal threshold
         actual_position = fk[:3, 3]
@@ -2119,8 +2161,8 @@ def base_motion_towards_pose_goal(
     :param cruise_linear_velocity: The linear cruise velocity of the goal.
     :param cruise_angular_velocity: The angular cruise velocity of the goal.
     """
-    tip = world.get_kinematic_structure_entity_by_name("base_footprint")
-    root = world.get_kinematic_structure_entity_by_name("odom_combined")
+    tip = world.get_kinematic_structure_entity_by_name(name="base_footprint")
+    root = world.get_kinematic_structure_entity_by_name(name="odom_combined")
     executor = StatechartExecutor(
         context=StatechartContext(world=world), extensions=[MotionControl()]
     )
@@ -2233,7 +2275,7 @@ class PositionWhileRunning(TickingExecutorExtension):
             return
         world = executor.context.world
         self.positions.append(
-            world.compute_forward_kinematics_np(world.root, self.body)[:3, 3]
+            world.compute_forward_kinematics_np(root=world.root, tip=self.body)[:3, 3]
         )
 
 
@@ -2272,7 +2314,7 @@ class TestDiffDriveBaseGoal:
         cylinder_bot_diff_world,
         goal_pose: Pose,
     ):
-        bot = cylinder_bot_diff_world.get_body_by_name("bot")
+        bot = cylinder_bot_diff_world.get_body_by_name(name="bot")
         executor = StatechartExecutor(
             context=StatechartContext(world=cylinder_bot_diff_world),
             extensions=[MotionControl()],
@@ -2283,7 +2325,7 @@ class TestDiffDriveBaseGoal:
             node=(
                 goal := DifferentialDriveBaseGoal(
                     mobile_base=cylinder_bot_diff_world.get_semantic_annotations_by_type(
-                        MobileBase
+                        semantic_annotation_type=MobileBase
                     )[0],
                     goal_pose=goal_pose,
                 )
@@ -2296,7 +2338,7 @@ class TestDiffDriveBaseGoal:
 
         assert np.allclose(
             cylinder_bot_diff_world.compute_forward_kinematics(
-                cylinder_bot_diff_world.root, bot
+                root=cylinder_bot_diff_world.root, tip=bot
             ),
             goal_pose,
             atol=1e-2,
@@ -2322,7 +2364,7 @@ class TestDiffDriveBaseGoal:
             node=(
                 goal := DifferentialDriveBaseGoal(
                     mobile_base=cylinder_bot_diff_world.get_semantic_annotations_by_type(
-                        MobileBase
+                        semantic_annotation_type=MobileBase
                     )[0],
                     goal_pose=goal_pose,
                     threshold=0.3,
@@ -2364,7 +2406,7 @@ class TestDiffDriveBaseGoal:
             node=(
                 first_leg := DifferentialDriveBaseGoal(
                     mobile_base=cylinder_bot_diff_world.get_semantic_annotations_by_type(
-                        MobileBase
+                        semantic_annotation_type=MobileBase
                     )[0],
                     goal_pose=first_goal_pose,
                 )
@@ -2374,7 +2416,7 @@ class TestDiffDriveBaseGoal:
             node=(
                 second_leg := DifferentialDriveBaseGoal(
                     mobile_base=cylinder_bot_diff_world.get_semantic_annotations_by_type(
-                        MobileBase
+                        semantic_annotation_type=MobileBase
                     )[0],
                     goal_pose=second_goal_pose,
                 )
@@ -2388,8 +2430,8 @@ class TestDiffDriveBaseGoal:
 
         assert np.allclose(
             cylinder_bot_diff_world.compute_forward_kinematics(
-                cylinder_bot_diff_world.root,
-                cylinder_bot_diff_world.get_body_by_name("bot"),
+                root=cylinder_bot_diff_world.root,
+                tip=cylinder_bot_diff_world.get_body_by_name(name="bot"),
             ),
             second_goal_pose,
             atol=1e-2,
@@ -2410,7 +2452,7 @@ class TestDiffDriveBaseGoal:
         the second starts, so where the second leg ends depends on when its goal frame
         is bound.
         """
-        bot = cylinder_bot_diff_world.get_body_by_name("bot")
+        bot = cylinder_bot_diff_world.get_body_by_name(name="bot")
         executor = StatechartExecutor(
             context=StatechartContext(world=cylinder_bot_diff_world),
             extensions=[MotionControl()],
@@ -2420,7 +2462,7 @@ class TestDiffDriveBaseGoal:
             node=(
                 first_leg := DifferentialDriveBaseGoal(
                     mobile_base=cylinder_bot_diff_world.get_semantic_annotations_by_type(
-                        MobileBase
+                        semantic_annotation_type=MobileBase
                     )[0],
                     goal_pose=Pose.from_xyz_rpy(
                         x=1, reference_frame=cylinder_bot_diff_world.root
@@ -2432,7 +2474,7 @@ class TestDiffDriveBaseGoal:
             node=(
                 second_leg := DifferentialDriveBaseGoal(
                     mobile_base=cylinder_bot_diff_world.get_semantic_annotations_by_type(
-                        MobileBase
+                        semantic_annotation_type=MobileBase
                     )[0],
                     goal_pose=Pose.from_xyz_rpy(x=0.5, reference_frame=bot),
                     goal_binding_policy=goal_binding_policy,
@@ -2447,7 +2489,7 @@ class TestDiffDriveBaseGoal:
 
         assert np.allclose(
             cylinder_bot_diff_world.compute_forward_kinematics_np(
-                cylinder_bot_diff_world.root, bot
+                root=cylinder_bot_diff_world.root, tip=bot
             ),
             Pose.from_xyz_rpy(x=expected_x).to_np(),
             atol=1e-2,
@@ -2462,8 +2504,8 @@ class TestDiffDriveBaseGoal:
         relative to the drive's parent as it is then, and leaves the lift where it is.
         """
         world = cylinder_bot_diff_world
-        base = world.get_connections_by_type(DifferentialDrive)[0].child
-        lift = Body(name=PrefixedName("lift"))
+        base = world.get_connections_by_type(connection_type=DifferentialDrive)[0].child
+        lift = Body(name=PrefixedName(name="lift"))
         with world.modify_world():
             lift_connection = ScrewAxisConnection.create_with_dofs(
                 screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
@@ -2476,8 +2518,10 @@ class TestDiffDriveBaseGoal:
                     maximum_speed=1
                 ),
             )
-            world.add_connection(lift_connection)
-            world.set_dofs_has_hardware_interface(lift_connection.active_dofs, True)
+            world.add_connection(connection=lift_connection)
+            world.set_dofs_has_hardware_interface(
+                dofs=lift_connection.active_dofs, value=True
+            )
         lift_height = 1.0
         executor = StatechartExecutor(
             context=StatechartContext(world=world), extensions=[MotionControl()]
@@ -2490,12 +2534,12 @@ class TestDiffDriveBaseGoal:
                         MoveBranch(branch_root=base, new_parent=lift),
                         raising := JointPositionList(
                             goal_state=JointState.from_mapping(
-                                {lift_connection: lift_height}
+                                mapping={lift_connection: lift_height}
                             )
                         ),
                         DifferentialDriveBaseGoal(
                             mobile_base=world.get_semantic_annotations_by_type(
-                                MobileBase
+                                semantic_annotation_type=MobileBase
                             )[0],
                             goal_pose=Pose.from_xyz_rpy(x=1, reference_frame=lift),
                         ),
@@ -2512,7 +2556,7 @@ class TestDiffDriveBaseGoal:
             lift_height, abs=raising.threshold
         )
         assert np.allclose(
-            world.compute_forward_kinematics_np(lift, base),
+            world.compute_forward_kinematics_np(root=lift, tip=base),
             Pose.from_xyz_rpy(x=1).to_np(),
             atol=1e-2,
         )
@@ -2526,10 +2570,12 @@ class TestDiffDriveBaseGoal:
         with the base.
         """
         world = cylinder_bot_diff_world
-        base = world.get_connections_by_type(DifferentialDrive)[0].child
-        platform = Body(name=PrefixedName("platform"))
+        base = world.get_connections_by_type(connection_type=DifferentialDrive)[0].child
+        platform = Body(name=PrefixedName(name="platform"))
         with world.modify_world():
-            world.add_connection(FixedConnection(parent=world.root, child=platform))
+            world.add_connection(
+                connection=FixedConnection(parent=world.root, child=platform)
+            )
         executor = StatechartExecutor(
             context=StatechartContext(world=world), extensions=[MotionControl()]
         )
@@ -2537,7 +2583,9 @@ class TestDiffDriveBaseGoal:
         motion_statechart.add_node(
             node=(
                 drive := DifferentialDriveBaseGoal(
-                    mobile_base=world.get_semantic_annotations_by_type(MobileBase)[0],
+                    mobile_base=world.get_semantic_annotations_by_type(
+                        semantic_annotation_type=MobileBase
+                    )[0],
                     goal_pose=Pose.from_xyz_rpy(x=1, reference_frame=base),
                 )
             )
@@ -2562,7 +2610,7 @@ class TestDiffDriveBaseGoal:
 
         assert base.parent_kinematic_structure_entity is platform
         assert np.allclose(
-            world.compute_forward_kinematics_np(world.root, base),
+            world.compute_forward_kinematics_np(root=world.root, tip=base),
             Pose.from_xyz_rpy(x=1).to_np(),
             atol=2 * drive.threshold,
         )
@@ -2575,8 +2623,8 @@ class TestDiffDriveBaseGoal:
         driving in an arc; the first step must only turn it.
         """
         world = cylinder_bot_diff_world
-        base = world.get_connections_by_type(DifferentialDrive)[0].child
-        start = world.compute_forward_kinematics_np(world.root, base)[:3, 3]
+        base = world.get_connections_by_type(connection_type=DifferentialDrive)[0].child
+        start = world.compute_forward_kinematics_np(root=world.root, tip=base)[:3, 3]
         recording = PositionWhileRunning(body=base)
         executor = StatechartExecutor(
             context=StatechartContext(world=world),
@@ -2586,7 +2634,9 @@ class TestDiffDriveBaseGoal:
         motion_statechart.add_node(
             node=(
                 drive := DifferentialDriveBaseGoal(
-                    mobile_base=world.get_semantic_annotations_by_type(MobileBase)[0],
+                    mobile_base=world.get_semantic_annotations_by_type(
+                        semantic_annotation_type=MobileBase
+                    )[0],
                     goal_pose=Pose.from_xyz_rpy(y=1, reference_frame=world.root),
                 )
             )
@@ -2615,7 +2665,7 @@ class TestDebugExpressions:
         and the current colour.
         """
         root = cylinder_bot_world.root
-        tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+        tip = cylinder_bot_world.get_kinematic_structure_entity_by_name(name="bot")
         task = CartesianPosition(
             kinematic_chain=KinematicChain(root=root, tip=tip),
             goal_point=Point3(x=1, reference_frame=root),
@@ -2640,7 +2690,7 @@ class TestDebugExpressions:
         in the goal and the current colour.
         """
         root = cylinder_bot_world.root
-        tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+        tip = cylinder_bot_world.get_kinematic_structure_entity_by_name(name="bot")
         task = CartesianPositionStraight(
             kinematic_chain=KinematicChain(root=root, tip=tip),
             goal_point=Point3(x=1, reference_frame=root),
@@ -2665,7 +2715,7 @@ class TestDebugExpressions:
         goal and the current colour.
         """
         root = cylinder_bot_world.root
-        tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+        tip = cylinder_bot_world.get_kinematic_structure_entity_by_name(name="bot")
         task = CartesianOrientation(
             kinematic_chain=KinematicChain(root=root, tip=tip),
             goal_orientation=RotationMatrix.from_rpy(
@@ -2692,7 +2742,7 @@ class TestDebugExpressions:
         position as points in the goal and the current colour.
         """
         root = cylinder_bot_world.root
-        tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+        tip = cylinder_bot_world.get_kinematic_structure_entity_by_name(name="bot")
         task = CartesianPositionTrajectory(
             kinematic_chain=KinematicChain(root=root, tip=tip),
             goal_points=[
@@ -2719,7 +2769,7 @@ class TestDebugExpressions:
         name.
         """
         root = cylinder_bot_world.root
-        tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+        tip = cylinder_bot_world.get_kinematic_structure_entity_by_name(name="bot")
         task = CartesianPose(
             kinematic_chain=KinematicChain(root=root, tip=tip),
             goal_pose=Pose.from_xyz_rpy(x=1, reference_frame=root),
@@ -2759,8 +2809,8 @@ class TestDistanceAlongAxis:
     def test_points_on_two_links_end_the_distance_apart_along_the_axis(
         self, *, prismatic_bot2: World
     ) -> None:
-        reference = prismatic_bot2.get_body_by_name("robot")
-        tip = prismatic_bot2.get_body_by_name("robot2")
+        reference = prismatic_bot2.get_body_by_name(name="robot")
+        tip = prismatic_bot2.get_body_by_name(name="robot2")
         executor = StatechartExecutor(
             context=StatechartContext(world=prismatic_bot2),
             extensions=[MotionControl()],

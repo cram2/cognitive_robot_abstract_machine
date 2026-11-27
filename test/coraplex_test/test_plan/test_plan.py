@@ -28,7 +28,7 @@ from ...plan_running import run_plan, with_grounding
 
 def _torso_position(world):
     return world.state[
-        world.get_degree_of_freedom_by_name(PR2Joint.TORSO_LIFT).id
+        world.get_degree_of_freedom_by_name(name=PR2Joint.TORSO_LIFT).id
     ].position
 
 
@@ -96,7 +96,7 @@ def test_parameterization_of_pick_up(apartment_world_pr2_copy_with_context):
     """
     world, robot_view, extensions = apartment_world_pr2_copy_with_context
 
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
 
     grasp_variable = variable_from(milk.grasp_candidates())
 

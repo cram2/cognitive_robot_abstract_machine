@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 # %% grasps around an object's axis
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AxialGrasp(ObjectRelativeGrasp):
     """
     A grasp of an elongated object with the gripper's tool centre point on the object's
@@ -78,4 +78,4 @@ class AxialGrasp(ObjectRelativeGrasp):
             ),
             reference_frame=graspable.root,
         )
-        return GraspCandidate(graspable, root_T_grasp.pose)
+        return GraspCandidate(graspable=graspable, grasp_pose=root_T_grasp.pose)

@@ -75,13 +75,17 @@ def _record_trajectory(
     # Start at a non-zero time to verify normalization in the plotter
     start_time = 10.0
 
-    moving_degree_of_freedom_id = world.get_connection(right_parent, right_child).dof.id
+    moving_degree_of_freedom_id = world.get_connection(
+        parent=right_parent, child=right_child
+    ).dof.id
 
     # Offset initial position of the moving DOF to exercise center_positions
     world.state[moving_degree_of_freedom_id].position = 5.0
     world.notify_state_change()
 
-    trajectory = WorldStateTrajectory.from_world_state(world.state, start_time)
+    trajectory = WorldStateTrajectory.from_world_state(
+        state=world.state, time=start_time
+    )
 
     # Apply a jerk command to the moving DOF only; keep the others zero
     command = np.zeros(len(world.state))
@@ -91,8 +95,10 @@ def _record_trajectory(
     time = start_time
     for _ in range(step_count):
         time += time_step
-        world.apply_control_commands(command, time_step, Derivatives.jerk)
-        trajectory.append(world.state, time)
+        world.apply_control_commands(
+            commands=command, dt=time_step, derivative=Derivatives.jerk
+        )
+        trajectory.append(state=world.state, time=time)
 
     return trajectory
 
@@ -105,37 +111,39 @@ def _record_a_few_of_many_joints_moving(
     of which only the last `moving` in name order move.
     """
     world = World()
-    root = Body(name=PrefixedName("root"))
+    root = Body(name=PrefixedName(name="root"))
     degrees_of_freedom = []
     with world.modify_world():
-        world.add_kinematic_structure_entity(root)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=root)
         for index in range(joints):
             degree_of_freedom = DegreeOfFreedom(
-                name=PrefixedName(f"joint_{index:02d}"),
+                name=PrefixedName(name=f"joint_{index:02d}"),
                 limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                     maximum_speed=1
                 ),
             )
-            world.add_degree_of_freedom(degree_of_freedom)
+            world.add_degree_of_freedom(dof=degree_of_freedom)
             world.add_connection(
-                ScrewAxisConnection(
+                connection=ScrewAxisConnection(
                     screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
                         axis=Vector3.X(reference_frame=root)
                     ),
                     parent=root,
-                    child=Body(name=PrefixedName(f"link_{index:02d}")),
+                    child=Body(name=PrefixedName(name=f"link_{index:02d}")),
                     raw_dof=degree_of_freedom,
                 )
             )
             degrees_of_freedom.append(degree_of_freedom)
-    trajectory = WorldStateTrajectory.from_world_state(world.state, 0.0)
+    trajectory = WorldStateTrajectory.from_world_state(state=world.state, time=0.0)
     command = np.zeros(len(world.state))
     for degree_of_freedom in degrees_of_freedom[-moving:]:
         command[trajectory._index[degree_of_freedom.id]] = 1.0
     time_step = 0.1
     for step in range(1, 11):
-        world.apply_control_commands(command, time_step, Derivatives.jerk)
-        trajectory.append(world.state, step * time_step)
+        world.apply_control_commands(
+            commands=command, dt=time_step, derivative=Derivatives.jerk
+        )
+        trajectory.append(state=world.state, time=step * time_step)
     return trajectory
 
 
@@ -378,7 +386,7 @@ def test_a_trajectory_of_one_state_is_not_plotted(world_setup, tmp_path):
     """
     world, *_ = world_setup
     plotter = WorldStateTrajectoryPlotter()
-    plotter.reset(world.state)
+    plotter.reset(initial_state=world.state)
     file_name = tmp_path / "trajectory.pdf"
 
     plotter.plot_trajectory(file_name=file_name)

@@ -10,7 +10,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_source import WorldSource
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MeshParser(WorldSource):
     """
     Adapter for mesh files.
@@ -31,48 +31,48 @@ class MeshParser(WorldSource):
             origin=HomogeneousTransformationMatrix(), filename=self.file_path
         )
         body = Body(
-            name=PrefixedName(file_name),
-            collision=ShapeCollection([mesh_shape]),
-            visual=ShapeCollection([mesh_shape]),
+            name=PrefixedName(name=file_name),
+            collision=ShapeCollection(shapes=[mesh_shape]),
+            visual=ShapeCollection(shapes=[mesh_shape]),
         )
 
         world = World()
         with world.modify_world():
-            world.add_kinematic_structure_entity(body)
+            world.add_kinematic_structure_entity(kinematic_structure_entity=body)
 
         return world
 
 
-@dataclass
+@dataclass(kw_only=True)
 class STLParser(MeshParser):
     pass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class OBJParser(MeshParser):
     pass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DAEParser(MeshParser):
     pass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PLYParser(MeshParser):
     pass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class OFFParser(MeshParser):
     pass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GLBParser(MeshParser):
     pass
 
 
-@dataclass
+@dataclass(kw_only=True)
 class XYZParser(MeshParser):
     pass

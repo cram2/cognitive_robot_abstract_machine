@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from krrood.exceptions import DataclassException
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DatabaseNotAvailableError(DataclassException):
     """
     Exception raised when a database is not available.

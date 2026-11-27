@@ -23,7 +23,7 @@ from semantic_digital_twin.semantic_annotations.part_whole.relationship_marker i
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PartRelationshipInspector:
     """
     Tells what a part-whole relationship field of an annotation type asks for: which
@@ -101,7 +101,9 @@ class PartRelationshipInspector:
         ]
         if len(matching) != 1:
             raise NoSinglePartWholeRelationshipField(
-                whole_type, part_type, [relationship.name for relationship in matching]
+                annotation=whole_type,
+                part_type=part_type,
+                matching_fields=[relationship.name for relationship in matching],
             )
         return matching[0]
 

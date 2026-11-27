@@ -1060,15 +1060,17 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
         name = f"{self.name}#{self._node_id}"
         self._life_cycle_predicate_expression_cache = {}
         self._observation_variable = ObservationVariable(
-            name=str(PrefixedName("observation", name)),
+            name=str(PrefixedName(name="observation", prefix=name)),
             statechart_node=self,
         )
         self._life_cycle_variable = LifeCycleVariable(
-            name=str(PrefixedName("life_cycle", name)),
+            name=str(PrefixedName(name="life_cycle", prefix=name)),
             statechart_node=self,
         )
         self._last_observation_variable = LastObservationVariable(
-            name=str(PrefixedName(LastObservationVariable.attribute_name, name)),
+            name=str(
+                PrefixedName(name=LastObservationVariable.attribute_name, prefix=name)
+            ),
             statechart_node=self,
         )
 
@@ -2016,7 +2018,8 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
                 LifeCyclePredicateVariable(
                     name=str(
                         PrefixedName(
-                            predicate.attribute_name, f"{self.name}#{self._node_id}"
+                            name=predicate.attribute_name,
+                            prefix=f"{self.name}#{self._node_id}",
                         )
                     ),
                     statechart_node=self,
@@ -2091,7 +2094,8 @@ class StatechartNode(SubclassJSONSerializer, metaclass=ABCMeta):
                 ObservationPredicateVariable(
                     name=str(
                         PrefixedName(
-                            predicate.attribute_name, f"{self.name}#{self._node_id}"
+                            name=predicate.attribute_name,
+                            prefix=f"{self.name}#{self._node_id}",
                         )
                     ),
                     statechart_node=self,

@@ -68,20 +68,22 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 
 class TestCollisionRules:
-    def test_get_distances(self, pr2_world_copy):
+    def test_get_distances(self, *, pr2_world_copy):
         with pr2_world_copy.modify_world():
             env = Body(
-                name=PrefixedName("env"),
-                collision=ShapeCollection([Sphere(radius=0.5)]),
+                name=PrefixedName(name="env"),
+                collision=ShapeCollection(shapes=[Sphere(radius=0.5)]),
             )
-            root_C_env = FixedConnection(pr2_world_copy.root, env)
-            pr2_world_copy.add_connection(root_C_env)
+            root_C_env = FixedConnection(parent=pr2_world_copy.root, child=env)
+            pr2_world_copy.add_connection(connection=root_C_env)
 
-        base_link = pr2_world_copy.get_body_by_name("base_link")
-        torso_lift_link = pr2_world_copy.get_body_by_name("torso_lift_link")
-        head_pan_link = pr2_world_copy.get_body_by_name("head_pan_link")
+        base_link = pr2_world_copy.get_body_by_name(name="base_link")
+        torso_lift_link = pr2_world_copy.get_body_by_name(name="torso_lift_link")
+        head_pan_link = pr2_world_copy.get_body_by_name(name="head_pan_link")
 
-        pr2 = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
+        pr2 = pr2_world_copy.get_semantic_annotations_by_type(
+            semantic_annotation_type=PR2
+        )[0]
 
         collision_manager = CollisionManager(
             _world=pr2_world_copy,
@@ -89,20 +91,20 @@ class TestCollisionRules:
         )
         with pr2_world_copy.modify_world():
             collision_manager.add_default_rule(
-                AvoidAllCollisions(
+                rule=AvoidAllCollisions(
                     buffer_zone_distance=0.2,
                     violated_distance=0.05,
                 )
             )
             collision_manager.add_default_rule(
-                AvoidExternalCollisions(
+                rule=AvoidExternalCollisions(
                     buffer_zone_distance=0.1,
                     robot=pr2,
                     body_subset={torso_lift_link},
                 )
             )
             collision_manager.add_default_rule(
-                AvoidExternalCollisions(
+                rule=AvoidExternalCollisions(
                     buffer_zone_distance=0.05,
                     robot=pr2,
                     body_subset={head_pan_link},
@@ -111,24 +113,43 @@ class TestCollisionRules:
         collision_manager.update_collision_matrix()
         # PR2 has a rule for base_link: buffer=0.2, violated=0.05
         # It's added to low_priority_rules
-        assert collision_manager.get_buffer_zone_distance(base_link, env) == 0.2
-        assert collision_manager.get_violated_distance(base_link, env) == 0.05
+        assert (
+            collision_manager.get_buffer_zone_distance(body_a=base_link, body_b=env)
+            == 0.2
+        )
+        assert (
+            collision_manager.get_violated_distance(body_a=base_link, body_b=env)
+            == 0.05
+        )
 
         # Test with a body that only has the general PR2 rule (buffer=0.1, violated=0.0)
-        assert collision_manager.get_buffer_zone_distance(torso_lift_link, env) == 0.1
-        assert collision_manager.get_violated_distance(torso_lift_link, env) == 0.0
+        assert (
+            collision_manager.get_buffer_zone_distance(
+                body_a=torso_lift_link, body_b=env
+            )
+            == 0.1
+        )
+        assert (
+            collision_manager.get_violated_distance(body_a=torso_lift_link, body_b=env)
+            == 0.0
+        )
 
         # Add a high priority rule to override
         override_rule = AvoidAllCollisions(
             buffer_zone_distance=0.5, violated_distance=0.1
         )
         with pr2_world_copy.modify_world():
-            collision_manager.add_temporary_rule(override_rule)
+            collision_manager.add_temporary_rule(rule=override_rule)
         collision_manager.update_collision_matrix()
-        assert collision_manager.get_buffer_zone_distance(base_link, env) == 0.5
-        assert collision_manager.get_violated_distance(base_link, env) == 0.1
+        assert (
+            collision_manager.get_buffer_zone_distance(body_a=base_link, body_b=env)
+            == 0.5
+        )
+        assert (
+            collision_manager.get_violated_distance(body_a=base_link, body_b=env) == 0.1
+        )
 
-    def test_get_distances_no_rule(self, cylinder_bot_world):
+    def test_get_distances_no_rule(self, *, cylinder_bot_world):
         collision_manager = cylinder_bot_world.collision_manager
 
         body = cylinder_bot_world.bodies_with_collision[0]
@@ -139,10 +160,12 @@ class TestCollisionRules:
         collision_manager.ignore_collision_rules = []
 
         with pytest.raises(ValueError):
-            collision_manager.get_buffer_zone_distance(body, body2)
+            collision_manager.get_buffer_zone_distance(body_a=body, body_b=body2)
 
-    def test_AvoidCollisionBetweenGroups(self, pr2_world_state_reset):
-        pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
+    def test_AvoidCollisionBetweenGroups(self, *, pr2_world_state_reset):
+        pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(
+            semantic_annotation_type=PR2
+        )[0]
 
         collision_matrix = CollisionMatrix()
 
@@ -158,8 +181,8 @@ class TestCollisionRules:
                 - set(pr2.right_arm.end_effector.bodies_with_collision)
             ),
         )
-        rule.update(pr2_world_state_reset)
-        rule.apply_to_collision_matrix(collision_matrix)
+        rule.update(world=pr2_world_state_reset)
+        rule.apply_to_collision_matrix(collision_matrix=collision_matrix)
         # -1 because torso is in both chains
         assert (
             len(collision_matrix.collision_checks)
@@ -174,10 +197,16 @@ class TestCollisionRules:
             - 1
         )
 
-    def test_AvoidCollisionBetweenGroups2(self, cylinder_bot_world):
-        env1 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment")
-        env2 = cylinder_bot_world.get_kinematic_structure_entity_by_name("environment2")
-        robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
+    def test_AvoidCollisionBetweenGroups2(self, *, cylinder_bot_world):
+        env1 = cylinder_bot_world.get_kinematic_structure_entity_by_name(
+            name="environment"
+        )
+        env2 = cylinder_bot_world.get_kinematic_structure_entity_by_name(
+            name="environment2"
+        )
+        robot = cylinder_bot_world.get_semantic_annotations_by_type(
+            semantic_annotation_type=MinimalRobot
+        )[0]
 
         collision_manager = cylinder_bot_world.collision_manager
         collision_manager.temporary_rules.extend(
@@ -199,11 +228,19 @@ class TestCollisionRules:
 
         collision_manager.update_collision_matrix()
         # -1 because torso is in both chains
-        assert collision_manager.get_buffer_zone_distance(robot.root, env1) == 10
-        assert collision_manager.get_buffer_zone_distance(robot.root, env2) == 15
+        assert (
+            collision_manager.get_buffer_zone_distance(body_a=robot.root, body_b=env1)
+            == 10
+        )
+        assert (
+            collision_manager.get_buffer_zone_distance(body_a=robot.root, body_b=env2)
+            == 15
+        )
 
-    def test_AllowCollisionBetweenGroups(self, pr2_world_state_reset):
-        pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
+    def test_AllowCollisionBetweenGroups(self, *, pr2_world_state_reset):
+        pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(
+            semantic_annotation_type=PR2
+        )[0]
 
         collision_matrix = CollisionMatrix()
 
@@ -217,25 +254,31 @@ class TestCollisionRules:
             body_group_a=pr2.left_arm.bodies, body_group_b=pr2.right_arm.bodies
         )
 
-        rule1.apply_to_collision_matrix(collision_matrix)
-        rule2.apply_to_collision_matrix(collision_matrix)
+        rule1.apply_to_collision_matrix(collision_matrix=collision_matrix)
+        rule2.apply_to_collision_matrix(collision_matrix=collision_matrix)
         assert len(collision_matrix.collision_checks) == 0
 
-    def test_AllowNonRobotCollisions(self, pr2_apartment_world):
-        pr2 = pr2_apartment_world.get_semantic_annotations_by_type(PR2)[0]
+    def test_AllowNonRobotCollisions(self, *, pr2_apartment_world):
+        pr2 = pr2_apartment_world.get_semantic_annotations_by_type(
+            semantic_annotation_type=PR2
+        )[0]
         pr2_body1 = pr2.bodies_with_collision[0]
         pr2_body2 = pr2.bodies_with_collision[2]
 
-        apartment_body1 = pr2_apartment_world.get_body_by_name("handle_cab3_door_top")
-        apartment_body2 = pr2_apartment_world.get_body_by_name("cabinet6_drawer_top")
+        apartment_body1 = pr2_apartment_world.get_body_by_name(
+            name="handle_cab3_door_top"
+        )
+        apartment_body2 = pr2_apartment_world.get_body_by_name(
+            name="cabinet6_drawer_top"
+        )
 
         collision_matrix = CollisionMatrix()
         avoid_all = AvoidAllCollisions(
             buffer_zone_distance=0.05,
             violated_distance=0,
         )
-        avoid_all.update(pr2_apartment_world)
-        avoid_all.apply_to_collision_matrix(collision_matrix)
+        avoid_all.update(world=pr2_apartment_world)
+        avoid_all.apply_to_collision_matrix(collision_matrix=collision_matrix)
         # collisions between pr2 bodies and between apartment bodies should be avoided
         assert (
             CollisionCheck.create_and_validate(
@@ -251,8 +294,8 @@ class TestCollisionRules:
         )
 
         rule = AllowNonRobotCollisions()
-        rule._update(pr2_apartment_world)
-        rule.apply_to_collision_matrix(collision_matrix)
+        rule._update(world=pr2_apartment_world)
+        rule.apply_to_collision_matrix(collision_matrix=collision_matrix)
         # collisions between apartment bodies should be allowed
         assert (
             CollisionCheck.create_and_validate(
@@ -267,14 +310,16 @@ class TestCollisionRules:
             in collision_matrix.collision_checks
         )
 
-    def test_AvoidExternalCollisions(self, pr2_apartment_world):
-        pr2 = pr2_apartment_world.get_semantic_annotations_by_type(PR2)[0]
+    def test_AvoidExternalCollisions(self, *, pr2_apartment_world):
+        pr2 = pr2_apartment_world.get_semantic_annotations_by_type(
+            semantic_annotation_type=PR2
+        )[0]
         collision_matrix = CollisionMatrix()
         rule = AvoidExternalCollisions(
             buffer_zone_distance=1, violated_distance=0.1, robot=pr2
         )
-        rule.update(pr2_apartment_world)
-        rule.apply_to_collision_matrix(collision_matrix)
+        rule.update(world=pr2_apartment_world)
+        rule.apply_to_collision_matrix(collision_matrix=collision_matrix)
         pr2_bodies = set(pr2.bodies_with_collision)
         for collision_check in collision_matrix.collision_checks:
             body_a_is_robot = collision_check.body_a in pr2_bodies
@@ -286,74 +331,84 @@ class TestCollisionRules:
                 and body_b_is_robot
             )
 
-    def test_AllowCollisionForEndEffector_with_attached_body(self, pr2_world_copy):
+    def test_AllowCollisionForEndEffector_with_attached_body(self, *, pr2_world_copy):
         """
         The rule resolves the end effector's bodies whenever the world model changes, so
         a body grasped after the rule was created is freed together with the fingers
         holding it -- a rule that captured body lists when it was made would not be.
         """
-        pr2 = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
+        pr2 = pr2_world_copy.get_semantic_annotations_by_type(
+            semantic_annotation_type=PR2
+        )[0]
         end_effector = pr2.right_arm.end_effector
         rule = AllowCollisionForEndEffector(end_effector=end_effector)
-        rule.update(pr2_world_copy)
+        rule.update(world=pr2_world_copy)
         assert rule.allowed_collision_bodies == set(end_effector.bodies_with_collision)
 
         with pr2_world_copy.modify_world():
             grasped_body = Body(
-                name=PrefixedName("grasped"),
+                name=PrefixedName(name="grasped"),
                 collision=ShapeCollection(shapes=[Sphere(radius=0.05)]),
             )
             pr2_world_copy.add_connection(
-                FixedConnection(parent=end_effector.tool_frame, child=grasped_body)
+                connection=FixedConnection(
+                    parent=end_effector.tool_frame, child=grasped_body
+                )
             )
 
-        rule.update(pr2_world_copy)
+        rule.update(world=pr2_world_copy)
         assert grasped_body in rule.allowed_collision_bodies
 
-    def test_a_robot_holding_nothing_has_no_held_body_pairs(self, pr2_world_copy):
+    def test_a_robot_holding_nothing_has_no_held_body_pairs(self, *, pr2_world_copy):
         rule = AllowCollisionBetweenEndEffectorsAndHeldBodies()
-        rule.update(pr2_world_copy)
+        rule.update(world=pr2_world_copy)
         assert rule.allowed_collision_pairs == set()
 
-    def test_a_held_body_may_touch_the_end_effector_holding_it(self, pr2_world_copy):
+    def test_a_held_body_may_touch_the_end_effector_holding_it(self, *, pr2_world_copy):
         """
         A body attached below a tool frame is freed against the end effector holding it,
         and only against that end effector, so it stays checked against the rest of the
         robot.
         """
-        pr2 = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
+        pr2 = pr2_world_copy.get_semantic_annotations_by_type(
+            semantic_annotation_type=PR2
+        )[0]
         end_effector = pr2.right_arm.end_effector
         with pr2_world_copy.modify_world():
             held_body = Body(
-                name=PrefixedName("held"),
+                name=PrefixedName(name="held"),
                 collision=ShapeCollection(shapes=[Sphere(radius=0.05)]),
             )
             pr2_world_copy.add_connection(
-                FixedConnection(parent=end_effector.tool_frame, child=held_body)
+                connection=FixedConnection(
+                    parent=end_effector.tool_frame, child=held_body
+                )
             )
 
         rule = AllowCollisionBetweenEndEffectorsAndHeldBodies()
-        rule.update(pr2_world_copy)
+        rule.update(world=pr2_world_copy)
 
         assert rule.allowed_collision_pairs == {
-            CollisionCheck.create_and_validate(held_body, body)
+            CollisionCheck.create_and_validate(body_a=held_body, body_b=body)
             for body in end_effector.bodies_with_collision
             if body != held_body
         }
 
-    def test_the_fingers_of_a_gripper_may_touch_each_other(self, pr2_world_copy):
+    def test_the_fingers_of_a_gripper_may_touch_each_other(self, *, pr2_world_copy):
         """
         A gripper's finger tips may touch each other, but not the palm they are mounted
         on, nor the fingers of the other gripper.
         """
-        pr2 = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
+        pr2 = pr2_world_copy.get_semantic_annotations_by_type(
+            semantic_annotation_type=PR2
+        )[0]
         rule = AllowCollisionBetweenFingers(robot=pr2)
-        rule.update(pr2_world_copy)
+        rule.update(world=pr2_world_copy)
 
         def check(name_a: str, name_b: str) -> CollisionCheck:
             return CollisionCheck.create_for_bodies_with_collision(
-                pr2_world_copy.get_body_by_name(name_a),
-                pr2_world_copy.get_body_by_name(name_b),
+                body_a=pr2_world_copy.get_body_by_name(name=name_a),
+                body_b=pr2_world_copy.get_body_by_name(name=name_b),
             )
 
         allowed = rule.allowed_collision_pairs
@@ -370,30 +425,34 @@ class TestCollisionRules:
             not in allowed
         )
         palms = {
-            pr2_world_copy.get_body_by_name(name)
+            pr2_world_copy.get_body_by_name(name=name)
             for name in ("r_gripper_palm_link", "l_gripper_palm_link")
         }
         assert not any({c.body_a, c.body_b} & palms for c in allowed)
 
-    def test_AvoidExternalCollisions_with_attached_body(self, pr2_apartment_world):
-        pr2 = pr2_apartment_world.get_semantic_annotations_by_type(PR2)[0]
+    def test_AvoidExternalCollisions_with_attached_body(self, *, pr2_apartment_world):
+        pr2 = pr2_apartment_world.get_semantic_annotations_by_type(
+            semantic_annotation_type=PR2
+        )[0]
         collision_matrix = CollisionMatrix()
         rule = AvoidExternalCollisions(
             buffer_zone_distance=1, violated_distance=0.1, robot=pr2
         )
-        rule.update(pr2_apartment_world)
+        rule.update(world=pr2_apartment_world)
         with pr2_apartment_world.modify_world():
             body = Body(
-                name=PrefixedName("muh"),
+                name=PrefixedName(name="muh"),
                 collision=ShapeCollection(shapes=[Sphere(radius=0.05)]),
             )
             connection = FixedConnection(
-                parent=pr2_apartment_world.get_body_by_name("r_gripper_tool_frame"),
+                parent=pr2_apartment_world.get_body_by_name(
+                    name="r_gripper_tool_frame"
+                ),
                 child=body,
             )
-            pr2_apartment_world.add_connection(connection)
-        rule.update(pr2_apartment_world)
-        rule.apply_to_collision_matrix(collision_matrix)
+            pr2_apartment_world.add_connection(connection=connection)
+        rule.update(world=pr2_apartment_world)
+        rule.apply_to_collision_matrix(collision_matrix=collision_matrix)
         pr2_bodies = set(pr2.bodies_with_collision)
         attached_body_present = False
         for collision_check in collision_matrix.collision_checks:
@@ -409,8 +468,10 @@ class TestCollisionRules:
                 attached_body_present = True
         assert attached_body_present
 
-    def test_pr2_collision_config(self, pr2_world_state_reset):
-        pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
+    def test_pr2_collision_config(self, *, pr2_world_state_reset):
+        pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(
+            semantic_annotation_type=PR2
+        )[0]
         collision_manager = pr2_world_state_reset.collision_manager
         collision_manager.update_collision_matrix()
         collision_matrix = collision_manager.collision_matrix
@@ -427,78 +488,88 @@ class TestCollisionRules:
         assert len(collision_matrix.collision_checks) > 0
         assert (
             collision_manager.get_max_avoided_bodies(
-                pr2_world_state_reset.get_body_by_name("base_link")
+                body=pr2_world_state_reset.get_body_by_name(name="base_link")
             )
             == 2
         )
         assert (
             collision_manager.get_max_avoided_bodies(
-                pr2_world_state_reset.get_body_by_name("torso_lift_link")
+                body=pr2_world_state_reset.get_body_by_name(name="torso_lift_link")
             )
             == 1
         )
         assert (
             collision_manager.get_max_avoided_bodies(
-                pr2_world_state_reset.get_body_by_name("r_gripper_palm_link")
+                body=pr2_world_state_reset.get_body_by_name(name="r_gripper_palm_link")
             )
             == 4
         )
 
-    def test_compute_self_collision_matrix(self, pr2_world_state_reset):
-        pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
-        base_link = pr2_world_state_reset.get_body_by_name("base_link")
-        head_pan_link = pr2_world_state_reset.get_body_by_name("head_pan_link")
+    def test_compute_self_collision_matrix(self, *, pr2_world_state_reset):
+        pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(
+            semantic_annotation_type=PR2
+        )[0]
+        base_link = pr2_world_state_reset.get_body_by_name(name="base_link")
+        head_pan_link = pr2_world_state_reset.get_body_by_name(name="head_pan_link")
         collision_checks = {
-            CollisionCheck(body_a, body_b)
+            CollisionCheck(body_a=body_a, body_b=body_b)
             for body_a, body_b in combinations(
                 pr2_world_state_reset.bodies_with_collision, 2
             )
         }
         rule = SelfCollisionMatrixRule()
-        rule.compute_self_collision_matrix(pr2, number_of_tries_never=200)
-        expected_check = CollisionCheck.create_and_validate(base_link, head_pan_link)
+        rule.compute_self_collision_matrix(robot=pr2, number_of_tries_never=200)
+        expected_check = CollisionCheck.create_and_validate(
+            body_a=base_link, body_b=head_pan_link
+        )
         assert expected_check in rule.allowed_collision_pairs
         assert 0 < len(rule.allowed_collision_pairs) < len(collision_checks)
         rule.save_self_collision_matrix(robot_name=pr2.name.name, file_name="test.srdf")
 
         rule = SelfCollisionMatrixRule()
         rule.allowed_collision_bodies = {base_link}
-        rule.compute_self_collision_matrix(pr2, number_of_tries_never=200)
+        rule.compute_self_collision_matrix(robot=pr2, number_of_tries_never=200)
         for collision_check in rule.allowed_collision_pairs:
             assert (
                 base_link != collision_check.body_a
                 and base_link != collision_check.body_b
             )
 
-    def test_AllowAlwaysInSelfCollision(self, pr2_world_state_reset):
-        robot = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
+    def test_AllowAlwaysInSelfCollision(self, *, pr2_world_state_reset):
+        robot = pr2_world_state_reset.get_semantic_annotations_by_type(
+            semantic_annotation_type=PR2
+        )[0]
         rule = AllowDefaultInCollision(
             bodies=pr2_world_state_reset.bodies_with_collision,
             robot=robot,
         )
-        rule.update(pr2_world_state_reset)
+        rule.update(world=pr2_world_state_reset)
         assert (
             0
             < len(rule.allowed_collision_pairs)
             < len(list(combinations(pr2_world_state_reset.bodies_with_collision, 2)))
         )
 
-    def test_AllowAlwaysInCollision(self, pr2_world_state_reset):
-        robot = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
+    def test_AllowAlwaysInCollision(self, *, pr2_world_state_reset):
+        robot = pr2_world_state_reset.get_semantic_annotations_by_type(
+            semantic_annotation_type=PR2
+        )[0]
         collision_checks = {
-            CollisionCheck(body_a, body_b)
+            CollisionCheck(body_a=body_a, body_b=body_b)
             for body_a, body_b in combinations(
                 pr2_world_state_reset.bodies_with_collision, 2
             )
         }
         rule = AllowAlwaysInCollision(robot=robot, collision_checks=collision_checks)
-        rule.update(pr2_world_state_reset)
+        rule.update(world=pr2_world_state_reset)
         assert 0 < len(rule.allowed_collision_pairs) < len(collision_checks)
 
-    def test_AllowNeverInCollision(self, pr2_world_state_reset):
-        robot = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
+    def test_AllowNeverInCollision(self, *, pr2_world_state_reset):
+        robot = pr2_world_state_reset.get_semantic_annotations_by_type(
+            semantic_annotation_type=PR2
+        )[0]
         collision_checks = {
-            CollisionCheck(body_a, body_b)
+            CollisionCheck(body_a=body_a, body_b=body_b)
             for body_a, body_b in combinations(
                 pr2_world_state_reset.bodies_with_collision, 2
             )
@@ -506,15 +577,17 @@ class TestCollisionRules:
         rule = AllowNeverInCollision(
             robot=robot, collision_checks=collision_checks, number_of_tries=200
         )
-        rule.update(pr2_world_state_reset)
+        rule.update(world=pr2_world_state_reset)
         assert 0 < len(rule.allowed_collision_pairs) < len(collision_checks)
 
-    def test_AllowCollisionForAdjacentPairs(self, pr2_world_copy):
-        pr2 = pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
+    def test_AllowCollisionForAdjacentPairs(self, *, pr2_world_copy):
+        pr2 = pr2_world_copy.get_semantic_annotations_by_type(
+            semantic_annotation_type=PR2
+        )[0]
         expected_collision_matrix = CollisionMatrix()
         rule = AllowCollisionForAdjacentPairs()
-        rule.update(pr2_world_copy)
-        rule.apply_to_collision_matrix(expected_collision_matrix)
+        rule.update(world=pr2_world_copy)
+        rule.apply_to_collision_matrix(collision_matrix=expected_collision_matrix)
 
         normal_allowed_pairs = len(rule.allowed_collision_pairs)
 
@@ -524,10 +597,10 @@ class TestCollisionRules:
             for dof in pr2_world_copy.degrees_of_freedom:
                 hard_ware_interface_cache[dof.name] = dof.has_hardware_interface
             pr2_world_copy.set_dofs_has_hardware_interface(
-                pr2_world_copy.degrees_of_freedom, False
+                dofs=pr2_world_copy.degrees_of_freedom, value=False
             )
 
-        rule.update(pr2_world_copy)
+        rule.update(world=pr2_world_copy)
 
         assert len(rule.allowed_collision_pairs) > normal_allowed_pairs
 
@@ -535,61 +608,67 @@ class TestCollisionRules:
         with pr2_world_copy.modify_world():
             for dof in pr2_world_copy.degrees_of_freedom:
                 pr2_world_copy.set_dofs_has_hardware_interface(
-                    [dof], hard_ware_interface_cache[dof.name]
+                    dofs=[dof], value=hard_ware_interface_cache[dof.name]
                 )
 
-        rule.update(pr2_world_copy)
+        rule.update(world=pr2_world_copy)
         assert len(rule.allowed_collision_pairs) == normal_allowed_pairs
 
         # attach an object to the robot, this object should not be checked with gripper tool frame
         with pr2_world_copy.modify_world():
             body = Body(
-                name=PrefixedName("muh"),
+                name=PrefixedName(name="muh"),
                 collision=ShapeCollection(shapes=[Sphere(radius=0.05)]),
             )
             connection = FixedConnection(
-                parent=pr2_world_copy.get_body_by_name("r_gripper_tool_frame"),
+                parent=pr2_world_copy.get_body_by_name(name="r_gripper_tool_frame"),
                 child=body,
             )
-            pr2_world_copy.add_connection(connection)
+            pr2_world_copy.add_connection(connection=connection)
 
-        rule.update(pr2_world_copy)
+        rule.update(world=pr2_world_copy)
         assert (
             CollisionCheck.create_and_validate(
-                body_a=pr2_world_copy.get_body_by_name("r_gripper_palm_link"),
+                body_a=pr2_world_copy.get_body_by_name(name="r_gripper_palm_link"),
                 body_b=body,
             )
             in rule.allowed_collision_pairs
         )
 
-    def test_double_update(self, pr2_world_state_reset):
+    def test_double_update(self, *, pr2_world_state_reset):
         rule = AllowCollisionForAdjacentPairs()
-        rule.update(pr2_world_state_reset)
+        rule.update(world=pr2_world_state_reset)
         assert len(rule.allowed_collision_pairs) > 0
-        rule.update(pr2_world_state_reset)
+        rule.update(world=pr2_world_state_reset)
         assert len(rule.allowed_collision_pairs) > 0
 
-    def test_allow_self_collision(self, pr2_apartment_world):
-        robot = pr2_apartment_world.get_semantic_annotations_by_type(PR2)[0]
+    def test_allow_self_collision(self, *, pr2_apartment_world):
+        robot = pr2_apartment_world.get_semantic_annotations_by_type(
+            semantic_annotation_type=PR2
+        )[0]
         collision_matrix = CollisionMatrix()
         rule1 = AvoidAllCollisions()
-        rule1._update(pr2_apartment_world)
-        rule1.apply_to_collision_matrix(collision_matrix)
+        rule1._update(world=pr2_apartment_world)
+        rule1.apply_to_collision_matrix(collision_matrix=collision_matrix)
         number_of_all_checks = len(collision_matrix.collision_checks)
         allow_self_collision = AllowSelfCollisions(robot=robot)
-        allow_self_collision._update(pr2_apartment_world)
+        allow_self_collision._update(world=pr2_apartment_world)
         avoid_self_collision = AvoidSelfCollisions(robot=robot)
-        avoid_self_collision._update(pr2_apartment_world)
+        avoid_self_collision._update(world=pr2_apartment_world)
 
-        allow_self_collision.apply_to_collision_matrix(collision_matrix)
+        allow_self_collision.apply_to_collision_matrix(
+            collision_matrix=collision_matrix
+        )
         number_after_allow_self_collision = len(collision_matrix.collision_checks)
         assert number_after_allow_self_collision < number_of_all_checks
-        avoid_self_collision.apply_to_collision_matrix(collision_matrix)
+        avoid_self_collision.apply_to_collision_matrix(
+            collision_matrix=collision_matrix
+        )
         assert len(collision_matrix.collision_checks) == number_of_all_checks
 
 
 class TestCollisionGroups:
-    @dataclass
+    @dataclass(kw_only=True)
     class MockCollisionGroupConsumer(CollisionGroupConsumer):
         def on_compute_collisions(self, collision_results: CollisionCheckingResult): ...
         def on_collision_matrix_update(self): ...
@@ -597,9 +676,11 @@ class TestCollisionGroups:
     @pytest.mark.parametrize(
         "fix_name", ["pr2_world_state_reset", "cylinder_bot_world", "tracy_world"]
     )
-    def test_collision_groups(self, fix_name, request):
+    def test_collision_groups(self, *, fix_name, request):
         world = request.getfixturevalue(fix_name)
-        robot = world.get_semantic_annotations_by_type(AbstractRobot)[0]
+        robot = world.get_semantic_annotations_by_type(
+            semantic_annotation_type=AbstractRobot
+        )[0]
         collision_manager = world.collision_manager
         collision_manager.collision_consumers = [
             collision_group_consumer := self.MockCollisionGroupConsumer()
@@ -632,7 +713,9 @@ class TestCollisionGroups:
 
         # the parent connection of every group is controlled, or the parent body belongs to a different AbstractRobot
         body_to_robot = {}
-        for r in world.get_semantic_annotations_by_type(AbstractRobot):
+        for r in world.get_semantic_annotations_by_type(
+            semantic_annotation_type=AbstractRobot
+        ):
             for b in r.bodies:
                 body_to_robot[b] = r
         for group in collision_group_consumer.collision_groups:
@@ -655,31 +738,33 @@ class TestCollisionGroups:
 
         # ever body with a collision should be in a group
         for body in robot.bodies_with_collision:
-            collision_group_consumer.get_collision_group(body)
+            collision_group_consumer.get_collision_group(body=body)
 
     def test_robot_base_and_external_body_connected_to_same_virtual_parent(self):
         world = World()
         with world.modify_world():
             robot_base = Body(
-                name=PrefixedName("robot_base"),
-                collision=ShapeCollection([Sphere(radius=0.3)]),
+                name=PrefixedName(name="robot_base"),
+                collision=ShapeCollection(shapes=[Sphere(radius=0.3)]),
             )
-            world.add_body(robot_base)
-            MinimalRobot.from_world(world)  # robot.root = robot_base
+            world.add_body(body=robot_base)
+            MinimalRobot.from_world(world=world)  # robot.root = robot_base
 
         with world.modify_world():
-            map_body = Body(name=PrefixedName("map"))
+            map_body = Body(name=PrefixedName(name="map"))
             obstacle = Body(
-                name=PrefixedName("obstacle"),
-                collision=ShapeCollection([Sphere(radius=0.1)]),
+                name=PrefixedName(name="obstacle"),
+                collision=ShapeCollection(shapes=[Sphere(radius=0.1)]),
             )
-            world.add_connection(FixedConnection(parent=map_body, child=robot_base))
             world.add_connection(
-                Connection6DoF.create_with_dofs(
+                connection=FixedConnection(parent=map_body, child=robot_base)
+            )
+            world.add_connection(
+                connection=Connection6DoF.create_with_dofs(
                     world=world,
                     parent=map_body,
                     child=obstacle,
-                    name=PrefixedName("obstacle_conn"),
+                    name=PrefixedName(name="obstacle_conn"),
                 )
             )
 
@@ -689,14 +774,14 @@ class TestCollisionGroups:
         ]
         world._notify_model_change()
 
-        robot_base_group = consumer.get_collision_group(robot_base)
-        obstacle_group = consumer.get_collision_group(obstacle)
+        robot_base_group = consumer.get_collision_group(body=robot_base)
+        obstacle_group = consumer.get_collision_group(body=obstacle)
 
         assert robot_base_group is not obstacle_group
         assert robot_base not in obstacle_group.bodies
         assert obstacle not in robot_base_group.bodies
 
-    def test_is_collision_groups_combination_checked(self, pr2_world_state_reset):
+    def test_is_collision_groups_combination_checked(self, *, pr2_world_state_reset):
         group_a = CollisionGroup(
             root=pr2_world_state_reset.bodies_with_collision[0],
             bodies=set(pr2_world_state_reset.bodies_with_collision[1:5]),
@@ -709,36 +794,45 @@ class TestCollisionGroups:
         # check roots
         root_matrix = CollisionMatrix(
             collision_checks={
-                CollisionCheck.create_and_validate(group_a.root, group_b.root)
+                CollisionCheck.create_and_validate(
+                    body_a=group_a.root, body_b=group_b.root
+                )
             }
         )
-        assert root_matrix.is_collision_groups_combination_checked(group_a, group_b)
+        assert root_matrix.is_collision_groups_combination_checked(
+            group_a=group_a, group_b=group_b
+        )
 
         # check empty
         empty_matrix = CollisionMatrix()
         assert not empty_matrix.is_collision_groups_combination_checked(
-            group_a, group_b
+            group_a=group_a, group_b=group_b
         )
 
         # root with non root
         root_matrix = CollisionMatrix(
             collision_checks={
                 CollisionCheck.create_and_validate(
-                    list(group_a.bodies)[1], group_b.root
+                    body_a=list(group_a.bodies)[1], body_b=group_b.root
                 )
             }
         )
-        assert root_matrix.is_collision_groups_combination_checked(group_a, group_b)
+        assert root_matrix.is_collision_groups_combination_checked(
+            group_a=group_a, group_b=group_b
+        )
 
         # root with non group body
         root_matrix = CollisionMatrix(
             collision_checks={
                 CollisionCheck.create_and_validate(
-                    pr2_world_state_reset.bodies_with_collision[-1], group_b.root
+                    body_a=pr2_world_state_reset.bodies_with_collision[-1],
+                    body_b=group_b.root,
                 )
             }
         )
-        assert not root_matrix.is_collision_groups_combination_checked(group_a, group_b)
+        assert not root_matrix.is_collision_groups_combination_checked(
+            group_a=group_a, group_b=group_b
+        )
 
     def test_hash_is_stable_under_membership_change(self):
         """
@@ -751,13 +845,13 @@ class TestCollisionGroups:
         group = CollisionGroup(root=root)
         hash_before_membership_change = hash(group)
 
-        group.add_body(create_body_with_collision("joined_later"))
+        group.add_body(body=create_body_with_collision("joined_later"))
 
         assert hash(group) == hash_before_membership_change
         assert hash(group) == hash(CollisionGroup(root=root))
         assert group == CollisionGroup(root=root)
 
-    def test_group_membership_inspects_each_body_once(self, monkeypatch):
+    def test_group_membership_inspects_each_body_once(self, *, monkeypatch):
         """
         Restricting groups to bodies with collision geometry must inspect each body
         once, not once per body already in a group.
@@ -768,18 +862,18 @@ class TestCollisionGroups:
         world = World()
         with world.modify_world():
             root = create_body_with_collision("root")
-            world.add_body(root)
+            world.add_body(body=root)
             for index in range(5):
                 world.add_connection(
-                    FixedConnection(
+                    connection=FixedConnection(
                         parent=root, child=create_body_with_collision(f"body_{index}")
                     )
                 )
         consumer = self.MockCollisionGroupConsumer()
         counter = GeometryInspectionCounter()
-        counter.install(monkeypatch)
+        counter.install(monkeypatch=monkeypatch)
 
-        consumer.update_collision_groups(world)
+        consumer.update_collision_groups(world=world)
 
         # one pass over every body, plus the root of each group as it is created
         assert counter.inspections == len(world.bodies) + len(consumer.collision_groups)
@@ -795,32 +889,38 @@ class TestCollisionGroups:
         world = World()
         with world.modify_world():
             robot_base = create_body_with_collision("robot_base")
-            world.add_body(robot_base)
-            MinimalRobot.from_world(world)
+            world.add_body(body=robot_base)
+            MinimalRobot.from_world(world=world)
 
         with world.modify_world():
-            map_body = Body(name=PrefixedName("map"))
+            map_body = Body(name=PrefixedName(name="map"))
             obstacle = create_body_with_collision("obstacle")
-            world.add_connection(FixedConnection(parent=map_body, child=robot_base))
             world.add_connection(
-                Connection6DoF.create_with_dofs(
+                connection=FixedConnection(parent=map_body, child=robot_base)
+            )
+            world.add_connection(
+                connection=Connection6DoF.create_with_dofs(
                     world=world,
                     parent=map_body,
                     child=obstacle,
-                    name=PrefixedName("obstacle_conn"),
+                    name=PrefixedName(name="obstacle_conn"),
                 )
             )
 
         collision_manager = world.collision_manager
         collision_manager.add_collision_consumer(
-            external_collisions := ExternalCollisionVariableManager(FloatVariableData())
+            consumer=(
+                external_collisions := ExternalCollisionVariableManager(
+                    float_variable_data=FloatVariableData()
+                )
+            )
         )
-        external_collisions.register_group_of_body(robot_base)
+        external_collisions.register_group_of_body(body=robot_base)
 
         with world.modify_world():
-            world.move_branch(obstacle, robot_base)
+            world.move_branch(branch_root=obstacle, new_parent=robot_base)
 
-        robot_base_group = external_collisions.get_collision_group(robot_base)
+        robot_base_group = external_collisions.get_collision_group(body=robot_base)
         assert obstacle in robot_base_group.bodies
         assert robot_base_group in external_collisions.registered_groups
 
@@ -828,7 +928,7 @@ class TestCollisionGroups:
 # %% constructing collision checks
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GeometryInspectionCounter:
     """
     Counts how often the collision geometry of a body was inspected.
@@ -842,7 +942,7 @@ class GeometryInspectionCounter:
     How often the geometry of any body was inspected since the counter was installed.
     """
 
-    def install(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def install(self, *, monkeypatch: pytest.MonkeyPatch) -> None:
         """
         Count every geometry inspection until the test ends.
         """
@@ -860,7 +960,8 @@ def create_body_with_collision(name: str) -> Body:
     A body whose collision geometry is big enough to be checked.
     """
     return Body(
-        name=PrefixedName(name), collision=ShapeCollection([Sphere(radius=0.1)])
+        name=PrefixedName(name=name),
+        collision=ShapeCollection(shapes=[Sphere(radius=0.1)]),
     )
 
 
@@ -875,7 +976,9 @@ class TestCollisionCheckConstruction:
         body_b = create_body_with_collision("b")
         first, second = sorted([body_a, body_b], key=lambda body: body.id)
 
-        check = CollisionCheck.create_for_bodies_with_collision(second, first)
+        check = CollisionCheck.create_for_bodies_with_collision(
+            body_a=second, body_b=first
+        )
 
         assert check.body_a is first
         assert check.body_b is second
@@ -884,20 +987,21 @@ class TestCollisionCheckConstruction:
         body = create_body_with_collision("a")
 
         with pytest.raises(InvalidBodiesInCollisionCheckError):
-            CollisionCheck.create_for_bodies_with_collision(body, body)
+            CollisionCheck.create_for_bodies_with_collision(body_a=body, body_b=body)
 
     def test_negative_distance_is_rejected(self):
         with pytest.raises(NegativeCollisionCheckingDistanceError):
             CollisionCheck.create_for_bodies_with_collision(
-                create_body_with_collision("a"),
-                create_body_with_collision("b"),
+                body_a=create_body_with_collision("a"),
+                body_b=create_body_with_collision("b"),
                 distance=-0.1,
             )
 
     def test_a_body_without_geometry_is_rejected_when_validated(self):
         with pytest.raises(BodyHasNoGeometryError):
             CollisionCheck.create_and_validate(
-                create_body_with_collision("a"), Body(name=PrefixedName("empty"))
+                body_a=create_body_with_collision("a"),
+                body_b=Body(name=PrefixedName(name="empty")),
             )
 
     def test_geometry_is_not_inspected_for_bodies_that_were_already_filtered(self):
@@ -906,10 +1010,10 @@ class TestCollisionCheckConstruction:
         geometry again would only repeat an answer that is already known.
         """
         body_with_collision = create_body_with_collision("a")
-        body_without_collision = Body(name=PrefixedName("empty"))
+        body_without_collision = Body(name=PrefixedName(name="empty"))
 
         check = CollisionCheck.create_for_bodies_with_collision(
-            body_with_collision, body_without_collision
+            body_a=body_with_collision, body_b=body_without_collision
         )
 
         assert set(check.bodies()) == {body_with_collision, body_without_collision}
@@ -921,18 +1025,20 @@ class TestGeometryInspectionWhileBuildingRules:
     pair, because that grows quadratically with the size of the world.
     """
 
-    def test_geometry_is_inspected_once_per_body(self, monkeypatch):
+    def test_geometry_is_inspected_once_per_body(self, *, monkeypatch):
         world = World()
         with world.modify_world():
             root = create_body_with_collision("root")
-            world.add_body(root)
+            world.add_body(body=root)
             for index in range(5):
                 body = create_body_with_collision(f"body_{index}")
-                world.add_connection(FixedConnection(parent=root, child=body))
+                world.add_connection(
+                    connection=FixedConnection(parent=root, child=body)
+                )
         counter = GeometryInspectionCounter()
-        counter.install(monkeypatch)
+        counter.install(monkeypatch=monkeypatch)
 
-        AvoidAllCollisions().update(world)
+        AvoidAllCollisions().update(world=world)
 
         assert counter.inspections == len(world.bodies)
 
@@ -972,7 +1078,9 @@ def distances_from_matrix_and_lookup(
         (
             str(check.body_a.name),
             str(check.body_b.name),
-        ): collision_manager.get_buffer_zone_distance(check.body_a, check.body_b)
+        ): collision_manager.get_buffer_zone_distance(
+            body_a=check.body_a, body_b=check.body_b
+        )
         for check in collision_checks
     }
     return matrix_distances, lookup_distances
@@ -988,14 +1096,14 @@ class TestOverlappingCollisionChecks:
         body_a = create_body_with_collision("a")
         body_b = create_body_with_collision("b")
         earlier_check = CollisionCheck.create_for_bodies_with_collision(
-            body_a, body_b, distance=0.05
+            body_a=body_a, body_b=body_b, distance=0.05
         )
         later_check = CollisionCheck.create_for_bodies_with_collision(
-            body_a, body_b, distance=0.5
+            body_a=body_a, body_b=body_b, distance=0.5
         )
-        collision_matrix = CollisionMatrix({earlier_check})
+        collision_matrix = CollisionMatrix(collision_checks={earlier_check})
 
-        collision_matrix.add_collision_checks({later_check})
+        collision_matrix.add_collision_checks(collision_checks={later_check})
 
         (check,) = collision_matrix.collision_checks
         assert check.distance == later_check.distance
@@ -1009,18 +1117,20 @@ class TestOverlappingCollisionRules:
     """
 
     def test_temporary_rule_overrides_the_distance_of_a_default_rule(
-        self, cylinder_bot_world
+        self, *, cylinder_bot_world
     ):
-        robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
-        robot_body = cylinder_bot_world.get_body_by_name("bot")
-        environment = cylinder_bot_world.get_body_by_name("environment")
+        robot = cylinder_bot_world.get_semantic_annotations_by_type(
+            semantic_annotation_type=MinimalRobot
+        )[0]
+        robot_body = cylinder_bot_world.get_body_by_name(name="bot")
+        environment = cylinder_bot_world.get_body_by_name(name="environment")
         collision_manager = cylinder_bot_world.collision_manager
         with cylinder_bot_world.modify_world():
             collision_manager.add_default_rule(
-                AvoidExternalCollisions(buffer_zone_distance=0.05, robot=robot)
+                rule=AvoidExternalCollisions(buffer_zone_distance=0.05, robot=robot)
             )
         temporary_rule = AvoidAllCollisions(buffer_zone_distance=0.5)
-        collision_manager.add_temporary_rule(temporary_rule)
+        collision_manager.add_temporary_rule(rule=temporary_rule)
 
         collision_manager.update_collision_matrix(buffer=0.0)
 
@@ -1032,22 +1142,24 @@ class TestOverlappingCollisionRules:
         )
 
     def test_specific_default_rule_overrides_an_earlier_general_one(
-        self, cylinder_bot_world
+        self, *, cylinder_bot_world
     ):
         """
         Robot configurations list a general distance for external collisions first and
         more specific ones for single bodies after it.
         """
-        robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
-        robot_body = cylinder_bot_world.get_body_by_name("bot")
-        environment = cylinder_bot_world.get_body_by_name("environment")
+        robot = cylinder_bot_world.get_semantic_annotations_by_type(
+            semantic_annotation_type=MinimalRobot
+        )[0]
+        robot_body = cylinder_bot_world.get_body_by_name(name="bot")
+        environment = cylinder_bot_world.get_body_by_name(name="environment")
         collision_manager = cylinder_bot_world.collision_manager
         specific_rule = AvoidExternalCollisions(
             buffer_zone_distance=0.2, robot=robot, body_subset={robot_body}
         )
         with cylinder_bot_world.modify_world():
             collision_manager.extend_default_rules(
-                [
+                rules=[
                     AvoidExternalCollisions(buffer_zone_distance=0.1, robot=robot),
                     specific_rule,
                 ]
@@ -1062,15 +1174,19 @@ class TestOverlappingCollisionRules:
             == specific_rule.buffer_zone_distance
         )
 
-    def test_matrix_distances_agree_with_the_distance_lookup(self, cylinder_bot_world):
-        robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
+    def test_matrix_distances_agree_with_the_distance_lookup(
+        self, *, cylinder_bot_world
+    ):
+        robot = cylinder_bot_world.get_semantic_annotations_by_type(
+            semantic_annotation_type=MinimalRobot
+        )[0]
         collision_manager = cylinder_bot_world.collision_manager
         with cylinder_bot_world.modify_world():
             collision_manager.add_default_rule(
-                AvoidExternalCollisions(buffer_zone_distance=0.05, robot=robot)
+                rule=AvoidExternalCollisions(buffer_zone_distance=0.05, robot=robot)
             )
         collision_manager.add_temporary_rule(
-            AvoidAllCollisions(buffer_zone_distance=0.5)
+            rule=AvoidAllCollisions(buffer_zone_distance=0.5)
         )
 
         collision_manager.update_collision_matrix(buffer=0.0)
@@ -1080,14 +1196,16 @@ class TestOverlappingCollisionRules:
         )
         assert matrix_distances == lookup_distances
 
-    def test_pr2_matrix_distances_agree_with_the_distance_lookup(self, pr2_world_copy):
+    def test_pr2_matrix_distances_agree_with_the_distance_lookup(
+        self, *, pr2_world_copy
+    ):
         """
         The PR2 configures a general distance for external collisions, followed by more
         specific ones for its arms and its base.
         """
         with pr2_world_copy.modify_world():
             pr2_world_copy.add_connection(
-                FixedConnection(
+                connection=FixedConnection(
                     parent=pr2_world_copy.root,
                     child=create_body_with_collision("environment"),
                 )
@@ -1138,11 +1256,13 @@ class TestCollisionRuleDistancesSurviveCopy:
             ),
         ],
     )
-    def test_default_rule_keeps_its_distances(self, cylinder_bot_world, create_rule):
-        robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
-        rule = create_rule(robot, cylinder_bot_world.get_body_by_name("bot"))
+    def test_default_rule_keeps_its_distances(self, *, cylinder_bot_world, create_rule):
+        robot = cylinder_bot_world.get_semantic_annotations_by_type(
+            semantic_annotation_type=MinimalRobot
+        )[0]
+        rule = create_rule(robot, cylinder_bot_world.get_body_by_name(name="bot"))
         with cylinder_bot_world.modify_world():
-            cylinder_bot_world.collision_manager.add_default_rule(rule)
+            cylinder_bot_world.collision_manager.add_default_rule(rule=rule)
 
         copied_world = deepcopy(cylinder_bot_world)
 
@@ -1153,7 +1273,7 @@ class TestCollisionRuleDistancesSurviveCopy:
         )
 
     def test_copied_pr2_world_keeps_its_default_rule_distances(
-        self, _pr2_world_setup, pr2_world_copy
+        self, *, _pr2_world_setup, pr2_world_copy
     ):
         def distances_of_default_rules(world: World) -> list[tuple[type, float, float]]:
             return [
@@ -1176,9 +1296,11 @@ class TestExternalCollisionsOfBodySubset:
     """
 
     def test_body_subset_is_paired_only_with_bodies_outside_its_robot(
-        self, pr2_apartment_world
+        self, *, pr2_apartment_world
     ):
-        pr2 = pr2_apartment_world.get_semantic_annotations_by_type(PR2)[0]
+        pr2 = pr2_apartment_world.get_semantic_annotations_by_type(
+            semantic_annotation_type=PR2
+        )[0]
         arm_bodies = set(pr2.right_arm.bodies_with_collision) - set(
             pr2.right_arm.end_effector.bodies_with_collision
         )
@@ -1187,25 +1309,31 @@ class TestExternalCollisionsOfBodySubset:
         )
         rule = AvoidExternalCollisions(robot=pr2, body_subset=arm_bodies)
 
-        rule.update(pr2_apartment_world)
+        rule.update(world=pr2_apartment_world)
 
         assert rule.added_collision_checks == {
-            CollisionCheck.create_for_bodies_with_collision(arm_body, external_body)
+            CollisionCheck.create_for_bodies_with_collision(
+                body_a=arm_body, body_b=external_body
+            )
             for arm_body in arm_bodies
             for external_body in external_bodies
         }
 
     def test_temporary_body_subset_rule_does_not_restore_allowed_self_collisions(
-        self, pr2_world_state_reset
+        self, *, pr2_world_state_reset
     ):
-        pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(PR2)[0]
+        pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(
+            semantic_annotation_type=PR2
+        )[0]
         collision_manager = pr2_world_state_reset.collision_manager
         collision_manager.extend_temporary_rule(
-            [
+            rules=[
                 AllowSelfCollisions(robot=pr2),
                 AvoidExternalCollisions(
                     robot=pr2,
-                    body_subset={pr2_world_state_reset.get_body_by_name("base_link")},
+                    body_subset={
+                        pr2_world_state_reset.get_body_by_name(name="base_link")
+                    },
                 ),
             ]
         )
@@ -1234,34 +1362,38 @@ class TestRolledBackCollisionRules:
         [
             pytest.param(
                 lambda collision_manager, robot: collision_manager.add_default_rule(
-                    AvoidSelfCollisions(robot=robot, buffer_zone_distance=0.3)
+                    rule=AvoidSelfCollisions(robot=robot, buffer_zone_distance=0.3)
                 ),
                 id="avoid_self",
             ),
             pytest.param(
                 lambda collision_manager, robot: collision_manager.add_default_rule(
-                    AllowSelfCollisions(robot=robot)
+                    rule=AllowSelfCollisions(robot=robot)
                 ),
                 id="allow_self",
             ),
             pytest.param(
                 lambda collision_manager, robot: collision_manager.add_default_rule(
-                    AvoidExternalCollisions(robot=robot, buffer_zone_distance=0.3)
+                    rule=AvoidExternalCollisions(robot=robot, buffer_zone_distance=0.3)
                 ),
                 id="external",
             ),
             pytest.param(
                 lambda collision_manager, robot: (
-                    collision_manager.add_ignore_collision_rule(AllowAllCollisions())
+                    collision_manager.add_ignore_collision_rule(
+                        rule=AllowAllCollisions()
+                    )
                 ),
                 id="ignore_all",
             ),
         ],
     )
     def test_rollback_removes_a_rule_the_matrix_was_computed_with(
-        self, cylinder_bot_world, add_rule
+        self, *, cylinder_bot_world, add_rule
     ):
-        robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
+        robot = cylinder_bot_world.get_semantic_annotations_by_type(
+            semantic_annotation_type=MinimalRobot
+        )[0]
         collision_manager = cylinder_bot_world.collision_manager
         rules_before = list(collision_manager.rules)
         with cylinder_bot_world.modify_world():
@@ -1297,32 +1429,36 @@ class TestCollisionRuleEquality:
         ],
     )
     def test_rule_equals_its_json_copy_after_an_update(
-        self, cylinder_bot_world, create_rule
+        self, *, cylinder_bot_world, create_rule
     ):
-        robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
+        robot = cylinder_bot_world.get_semantic_annotations_by_type(
+            semantic_annotation_type=MinimalRobot
+        )[0]
         rule = create_rule(robot)
-        rule.update(cylinder_bot_world)
-        tracker = WorldEntityWithIDKwargsTracker.from_world(cylinder_bot_world)
+        rule.update(world=cylinder_bot_world)
+        tracker = WorldEntityWithIDKwargsTracker.from_world(world=cylinder_bot_world)
 
         copied_rule = from_json(to_json(rule), **tracker.create_kwargs())
 
         assert copied_rule == rule
 
     def test_a_subset_of_bodies_without_collision_stays_empty_through_json(
-        self, cylinder_bot_world
+        self, *, cylinder_bot_world
     ):
         """
         A subset of bodies none of which can collide covers no bodies at all, which is
         not the same as no subset, covering every body of the robot.
         """
-        robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
+        robot = cylinder_bot_world.get_semantic_annotations_by_type(
+            semantic_annotation_type=MinimalRobot
+        )[0]
         with cylinder_bot_world.modify_world():
-            without_collision = Body(name=PrefixedName("no_collision"))
+            without_collision = Body(name=PrefixedName(name="no_collision"))
             cylinder_bot_world.add_connection(
-                FixedConnection(parent=robot.root, child=without_collision)
+                connection=FixedConnection(parent=robot.root, child=without_collision)
             )
         rule = AvoidExternalCollisions(robot=robot, body_subset={without_collision})
-        tracker = WorldEntityWithIDKwargsTracker.from_world(cylinder_bot_world)
+        tracker = WorldEntityWithIDKwargsTracker.from_world(world=cylinder_bot_world)
 
         copied_rule = from_json(to_json(rule), **tracker.create_kwargs())
 
@@ -1347,9 +1483,11 @@ class TestCollisionRuleEquality:
         ],
     )
     def test_rules_with_different_distances_are_not_equal(
-        self, cylinder_bot_world, create_rule
+        self, *, cylinder_bot_world, create_rule
     ):
-        robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
+        robot = cylinder_bot_world.get_semantic_annotations_by_type(
+            semantic_annotation_type=MinimalRobot
+        )[0]
 
         assert create_rule(robot, 0.3) != create_rule(robot, 0.2)
 
@@ -1362,11 +1500,13 @@ def add_self_collision_rules(world: World, buffer_zone_distances: list[float]):
     Adds one default self-collision rule per distance, each in its own modification
     block.
     """
-    robot = world.get_semantic_annotations_by_type(MinimalRobot)[0]
+    robot = world.get_semantic_annotations_by_type(
+        semantic_annotation_type=MinimalRobot
+    )[0]
     for buffer_zone_distance in buffer_zone_distances:
         with world.modify_world():
             world.collision_manager.add_default_rule(
-                AvoidSelfCollisions(
+                rule=AvoidSelfCollisions(
                     robot=robot, buffer_zone_distance=buffer_zone_distance
                 )
             )
@@ -1385,7 +1525,7 @@ class TestRuleListedAgain:
     rolling it back removes that last listing only.
     """
 
-    def test_copied_world_keeps_a_rule_listed_again(self, cylinder_bot_world):
+    def test_copied_world_keeps_a_rule_listed_again(self, *, cylinder_bot_world):
         add_self_collision_rules(cylinder_bot_world, [0.3, 0.2, 0.3])
 
         copied_world = deepcopy(cylinder_bot_world)
@@ -1394,7 +1534,7 @@ class TestRuleListedAgain:
             cylinder_bot_world
         )
 
-    def test_rollback_removes_only_the_rule_listed_last(self, cylinder_bot_world):
+    def test_rollback_removes_only_the_rule_listed_last(self, *, cylinder_bot_world):
         add_self_collision_rules(cylinder_bot_world, [0.3, 0.2])
         distances_before = default_rule_distances(cylinder_bot_world)
         add_self_collision_rules(cylinder_bot_world, [0.3])

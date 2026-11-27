@@ -58,7 +58,7 @@ except ImportError:
     world_rdr = None
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class TestSemanticAnnotation(SemanticAnnotation):
     """
     A Generic semantic annotation for multiple bodies.
@@ -141,7 +141,7 @@ def test_aggregate_bodies(kitchen_world):
 def test_has_root_kinematic_structure_entity_aggregate_bodies(kitchen_world):
     annotation = SemanticEnvironmentAnnotation(root=kitchen_world.root)
     with kitchen_world.modify_world():
-        kitchen_world.add_semantic_annotation(annotation)
+        kitchen_world.add_semantic_annotation(semantic_annotation=annotation)
 
     assert (
         annotation.kinematic_structure_entities
@@ -155,13 +155,13 @@ def test_build_bloated_obstacle_collection_includes_bloated_walls():
     to the result, bloated by ``bloat_walls``, in addition to the plain obstacles.
     """
     world = World()
-    root = Body(name=PrefixedName("root"))
-    obstacle_body = Body(name=PrefixedName("obstacle"))
-    wall_body = Body(name=PrefixedName("wall"))
+    root = Body(name=PrefixedName(name="root"))
+    obstacle_body = Body(name=PrefixedName(name="obstacle"))
+    wall_body = Body(name=PrefixedName(name="wall"))
     with world.modify_world():
-        world.add_kinematic_structure_entity(root)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=root)
         world.add_connection(
-            FixedConnection.create_with_dofs(
+            connection=FixedConnection.create_with_dofs(
                 world=world,
                 parent=root,
                 child=obstacle_body,
@@ -171,7 +171,7 @@ def test_build_bloated_obstacle_collection_includes_bloated_walls():
             )
         )
         world.add_connection(
-            FixedConnection.create_with_dofs(
+            connection=FixedConnection.create_with_dofs(
                 world=world,
                 parent=root,
                 child=wall_body,
@@ -180,12 +180,17 @@ def test_build_bloated_obstacle_collection_includes_bloated_walls():
                 ),
             )
         )
-        obstacle_body.collision.append(Box(scale=Scale(0.2, 0.2, 0.2)))
-        wall_body.collision.append(Box(scale=Scale(0.2, 2.0, 0.2)))
+        obstacle_body.collision.append(shape=Box(scale=Scale(x=0.2, y=0.2, z=0.2)))
+        wall_body.collision.append(shape=Box(scale=Scale(x=0.2, y=2.0, z=0.2)))
 
     origin = HomogeneousTransformationMatrix(reference_frame=root)
     search_space = BoundingBoxCollection(
-        [VolumetricBoundingBox(-5, -5, -5, 5, 5, 5, origin)], root
+        shapes=[
+            VolumetricBoundingBox(
+                min_x=-5, min_y=-5, min_z=-5, max_x=5, max_y=5, max_z=5, origin=origin
+            )
+        ],
+        reference_frame=root,
     )
 
     obstacle_annotation = SemanticEnvironmentAnnotation(
@@ -206,8 +211,12 @@ def test_semantic_annotation_hash(apartment_world_copy):
     semantic_annotation1 = Handle(root=apartment_world_copy.bodies[0])
     semantic_annotation2 = Handle(root=apartment_world_copy.bodies[0])
     with apartment_world_copy.modify_world():
-        apartment_world_copy.add_semantic_annotation(semantic_annotation1)
-        apartment_world_copy.add_semantic_annotation(semantic_annotation2)
+        apartment_world_copy.add_semantic_annotation(
+            semantic_annotation=semantic_annotation1
+        )
+        apartment_world_copy.add_semantic_annotation(
+            semantic_annotation=semantic_annotation2
+        )
 
     # hash of semantic annotations should be based on their properties, not ids
     assert id(semantic_annotation1) != id(semantic_annotation2)
@@ -225,10 +234,13 @@ def test_the_world_finds_the_annotation_equal_to_a_freshly_built_one(
     body = apartment_world_copy.bodies[0]
     held = Handle(root=body)
     with apartment_world_copy.modify_world():
-        apartment_world_copy.add_semantic_annotation(held)
+        apartment_world_copy.add_semantic_annotation(semantic_annotation=held)
 
     assert (
-        apartment_world_copy.get_semantic_annotation_equal_to(Handle(root=body)) is held
+        apartment_world_copy.get_semantic_annotation_equal_to(
+            semantic_annotation=Handle(root=body)
+        )
+        is held
     )
 
 
@@ -240,7 +252,7 @@ def test_the_world_finds_no_annotation_equal_to_one_it_does_not_hold(
     """
     assert (
         apartment_world_copy.get_semantic_annotation_equal_to(
-            Handle(root=apartment_world_copy.bodies[1])
+            semantic_annotation=Handle(root=apartment_world_copy.bodies[1])
         )
         is None
     )
@@ -285,7 +297,7 @@ def inferred_handled_drawer(world) -> Drawer:
     """
     return next(
         annotation
-        for annotation in WorldReasoner(world).infer_semantic_annotations()
+        for annotation in WorldReasoner(world=world).infer_semantic_annotations()
         if isinstance(annotation, Drawer)
         and annotation.root.name.name == HANDLED_DRAWER_BODY_NAME
     )
@@ -358,15 +370,15 @@ def test_semantic_annotation_serialization_deserialization_once(apartment_world_
     handle = Handle(root=handle_body)
     door = Door(root=door_body, handle=handle)
     with apartment_world_copy.modify_world():
-        apartment_world_copy.add_semantic_annotation(handle)
-        apartment_world_copy.add_semantic_annotation(door)
+        apartment_world_copy.add_semantic_annotation(semantic_annotation=handle)
+        apartment_world_copy.add_semantic_annotation(semantic_annotation=door)
 
     door_se = door.to_json()
 
     with apartment_world_copy.modify_world():
-        apartment_world_copy.remove_semantic_annotation(door)
+        apartment_world_copy.remove_semantic_annotation(semantic_annotation=door)
 
-    tracker = WorldEntityWithIDKwargsTracker.from_world(apartment_world_copy)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world=apartment_world_copy)
     kwargs = tracker.create_kwargs()
 
     door_de = Door.from_json(data=door_se, **kwargs)
@@ -377,19 +389,25 @@ def test_semantic_annotation_serialization_deserialization_once(apartment_world_
 
 def test_minimal_robot_annotation(pr2_world_state_reset):
     urdf_path = "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
-    world_copy = URDFParser.from_xacro(urdf_path).create_world()
+    world_copy = URDFParser.from_xacro(xacro_path=urdf_path).create_world()
     with world_copy.modify_world():
-        MinimalRobot.from_world(world_copy)
+        MinimalRobot.from_world(world=world_copy)
         pr2_root = world_copy.root
-        localization_body = Body(name=PrefixedName("odom_combined"))
-        world_copy.add_kinematic_structure_entity(localization_body)
+        localization_body = Body(name=PrefixedName(name="odom_combined"))
+        world_copy.add_kinematic_structure_entity(
+            kinematic_structure_entity=localization_body
+        )
         c_root_bf = OmniDrive.create_with_dofs(
             parent=localization_body, child=pr2_root, world=world_copy
         )
-        world_copy.add_connection(c_root_bf)
+        world_copy.add_connection(connection=c_root_bf)
 
-    robot = world_copy.get_semantic_annotations_by_type(AbstractRobot)[0]
-    pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(AbstractRobot)[0]
+    robot = world_copy.get_semantic_annotations_by_type(
+        semantic_annotation_type=AbstractRobot
+    )[0]
+    pr2 = pr2_world_state_reset.get_semantic_annotations_by_type(
+        semantic_annotation_type=AbstractRobot
+    )[0]
     assert len(robot.bodies) == len(pr2.bodies)
     assert len(robot.connections) == len(pr2.connections)
 
@@ -399,7 +417,7 @@ def test_kinematic_chain_with_root_equal_tip_has_no_connections():
     A kinematic chain whose root is its tip has no connections.
     """
 
-    @dataclass(eq=False)
+    @dataclass(eq=False, kw_only=True)
     class ReviewKinematicChain(RobotKinematicChain):
         """
         Minimal concrete RobotKinematicChain for chain tests.
@@ -418,16 +436,16 @@ def test_kinematic_chain_with_root_equal_tip_has_no_connections():
             raise NotImplementedError
 
     world = World()
-    root = Body(name=PrefixedName("root", prefix="review"))
-    link = Body(name=PrefixedName("link", prefix="review"))
+    root = Body(name=PrefixedName(name="root", prefix="review"))
+    link = Body(name=PrefixedName(name="link", prefix="review"))
     collision = Box(
         scale=Scale(),
         origin=HomogeneousTransformationMatrix.from_xyz_rpy(reference_frame=link),
     )
-    link.collision = ShapeCollection([collision], reference_frame=link)
+    link.collision = ShapeCollection(shapes=[collision], reference_frame=link)
     with world.modify_world():
-        world.add_kinematic_structure_entity(root)
-        world.add_kinematic_structure_entity(link)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=root)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=link)
         joint = ScrewAxisConnection.create_with_dofs(
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
                 axis=Vector3.Z(reference_frame=root)
@@ -436,28 +454,28 @@ def test_kinematic_chain_with_root_equal_tip_has_no_connections():
             parent=root,
             child=link,
         )
-        world.add_connection(joint)
+        world.add_connection(connection=joint)
         chain = ReviewKinematicChain(
-            name=PrefixedName("chain", prefix="review"), root=link, tip=link
+            name=PrefixedName(name="chain", prefix="review"), root=link, tip=link
         )
-        world.add_semantic_annotation(chain)
+        world.add_semantic_annotation(semantic_annotation=chain)
 
     assert chain.connections == []
 
 
 # %% combined mesh
 
-CASE_SCALE = Scale(0.4, 0.6, 0.2)
+CASE_SCALE = Scale(x=0.4, y=0.6, z=0.2)
 """
 Extents of the drawer case used by the combined mesh tests.
 """
 
-HANDLE_SCALE = Scale(0.02, 0.1, 0.02)
+HANDLE_SCALE = Scale(x=0.02, y=0.1, z=0.02)
 """
 Extents of the drawer handle used by the combined mesh tests.
 """
 
-NEGLIGIBLE_SCALE = Scale(0.01, 0.01, 0.01)
+NEGLIGIBLE_SCALE = Scale(x=0.01, y=0.01, z=0.01)
 """
 Extents of a box that stays below both thresholds of :meth:`Body.has_collision`.
 """
@@ -473,7 +491,7 @@ Distance the handle is slid along the case's x axis.
 """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DrawerWithSlidingHandle:
     """
     A drawer whose handle slides along the case's x axis, together with the world
@@ -502,31 +520,32 @@ class DrawerWithSlidingHandle:
 
     @classmethod
     def build(
-        cls, case_collision: ShapeCollection, handle_collision: ShapeCollection
+        cls, *, case_collision: ShapeCollection, handle_collision: ShapeCollection
     ) -> Self:
         """
         :param case_collision: Collision geometry of the drawer case.
         :param handle_collision: Collision geometry of the handle.
         """
         world = World()
-        root = Body(name=PrefixedName("root", prefix="combined_mesh"))
+        root = Body(name=PrefixedName(name="root", prefix="combined_mesh"))
         case = Body(
-            name=PrefixedName("case", prefix="combined_mesh"), collision=case_collision
+            name=PrefixedName(name="case", prefix="combined_mesh"),
+            collision=case_collision,
         )
         handle_body = Body(
-            name=PrefixedName("handle", prefix="combined_mesh"),
+            name=PrefixedName(name="handle", prefix="combined_mesh"),
             collision=handle_collision,
         )
         handle = Handle(root=handle_body)
         drawer = Drawer(root=case, handle=handle)
         with world.modify_world():
-            world.add_kinematic_structure_entity(root)
-            world.add_kinematic_structure_entity(case)
-            world.add_kinematic_structure_entity(handle_body)
+            world.add_kinematic_structure_entity(kinematic_structure_entity=root)
+            world.add_kinematic_structure_entity(kinematic_structure_entity=case)
+            world.add_kinematic_structure_entity(kinematic_structure_entity=handle_body)
             base_connection = Connection6DoF.create_with_dofs(
                 world=world, parent=root, child=case
             )
-            world.add_connection(base_connection)
+            world.add_connection(connection=base_connection)
             handle_connection = ScrewAxisConnection.create_with_dofs(
                 screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
                     axis=Vector3.X(reference_frame=case)
@@ -538,10 +557,15 @@ class DrawerWithSlidingHandle:
                     x=HANDLE_OFFSET_X, reference_frame=case
                 ),
             )
-            world.add_connection(handle_connection)
-            world.add_semantic_annotation(handle)
-            world.add_semantic_annotation(drawer)
-        return cls(world, drawer, base_connection, handle_connection)
+            world.add_connection(connection=handle_connection)
+            world.add_semantic_annotation(semantic_annotation=handle)
+            world.add_semantic_annotation(semantic_annotation=drawer)
+        return cls(
+            world=world,
+            drawer=drawer,
+            base_connection=base_connection,
+            handle_connection=handle_connection,
+        )
 
     @classmethod
     def with_boxes(cls) -> Self:
@@ -549,11 +573,11 @@ class DrawerWithSlidingHandle:
         Builds the drawer with a case and a handle that both count as collidable.
         """
         return cls.build(
-            ShapeCollection([Box(scale=CASE_SCALE)]),
-            ShapeCollection([Box(scale=HANDLE_SCALE)]),
+            case_collision=ShapeCollection(shapes=[Box(scale=CASE_SCALE)]),
+            handle_collision=ShapeCollection(shapes=[Box(scale=HANDLE_SCALE)]),
         )
 
-    def expected_bounds(self, handle_position: float) -> np.ndarray:
+    def expected_bounds(self, *, handle_position: float) -> np.ndarray:
         """
         The bounds the combined mesh has while the handle joint sits at
         ``handle_position``, given that the case dominates the drawer in every direction
@@ -570,14 +594,14 @@ class DrawerWithSlidingHandle:
             ]
         )
 
-    def move_drawer(self, position: float):
+    def move_drawer(self, *, position: float):
         """
         Moves the whole drawer along the world root's x axis.
         """
         self.world.state[self.base_connection.x.id].position = position
         self.world.notify_state_change()
 
-    def move_handle(self, position: float):
+    def move_handle(self, *, position: float):
         """
         Slides the handle along the case's x axis.
         """
@@ -603,7 +627,7 @@ def test_combined_mesh_is_expressed_in_the_root_frame():
     """
     setup = DrawerWithSlidingHandle.with_boxes()
 
-    setup.move_drawer(5.0)
+    setup.move_drawer(position=5.0)
 
     np.testing.assert_allclose(
         setup.drawer.combined_mesh.bounds, setup.expected_bounds(handle_position=0.0)
@@ -618,7 +642,7 @@ def test_combined_mesh_follows_the_bodies_of_the_annotation():
     setup = DrawerWithSlidingHandle.with_boxes()
     bounds_before = setup.drawer.combined_mesh.bounds
 
-    setup.move_handle(HANDLE_TRAVEL)
+    setup.move_handle(position=HANDLE_TRAVEL)
 
     bounds_after = setup.drawer.combined_mesh.bounds
     np.testing.assert_allclose(bounds_after[0], bounds_before[0])
@@ -630,8 +654,8 @@ def test_combined_mesh_skips_bodies_without_collision():
     A body too small to count as collidable contributes nothing to the mesh.
     """
     setup = DrawerWithSlidingHandle.build(
-        ShapeCollection([Box(scale=CASE_SCALE)]),
-        ShapeCollection([Box(scale=NEGLIGIBLE_SCALE)]),
+        case_collision=ShapeCollection(shapes=[Box(scale=CASE_SCALE)]),
+        handle_collision=ShapeCollection(shapes=[Box(scale=NEGLIGIBLE_SCALE)]),
     )
     assert not setup.drawer.handle.root.has_collision()
 
@@ -645,7 +669,9 @@ def test_combined_mesh_is_empty_without_collision_geometry():
     An annotation without any collidable body yields an empty mesh, as an empty
     :class:`ShapeCollection` does.
     """
-    setup = DrawerWithSlidingHandle.build(ShapeCollection(), ShapeCollection())
+    setup = DrawerWithSlidingHandle.build(
+        case_collision=ShapeCollection(), handle_collision=ShapeCollection()
+    )
 
     assert len(setup.drawer.combined_mesh.vertices) == 0
 
@@ -664,10 +690,10 @@ def test_door_joint_is_the_revolute_connection_it_hangs_from_its_whole_on(
     kitchen_environment_world,
 ):
     refrigerator = kitchen_environment_world.get_semantic_annotation_by_name(
-        "refrigerator"
+        name="refrigerator"
     )
     fridge_door = kitchen_environment_world.get_semantic_annotation_by_name(
-        "fridge_door"
+        name="fridge_door"
     )
 
     assert fridge_door.movable_joint is fridge_door.root.parent_connection
@@ -679,7 +705,7 @@ def test_drawer_joint_is_the_prismatic_connection_it_hangs_from_its_whole_on(
     kitchen_environment_world,
 ):
     drawer = kitchen_environment_world.get_semantic_annotation_by_name(
-        "counter_drawer_0"
+        name="counter_drawer_0"
     )
 
     assert drawer.movable_joint is drawer.root.parent_connection
@@ -690,7 +716,7 @@ def test_a_drawer_built_with_rails_reports_how_far_it_stands_open(
     kitchen_environment_world,
 ):
     drawer = kitchen_environment_world.get_semantic_annotation_by_name(
-        "counter_drawer_0"
+        name="counter_drawer_0"
     )
     limits = drawer.movable_joint.dof.limits
 
@@ -706,7 +732,9 @@ def test_a_drawer_built_with_rails_reports_how_far_it_stands_open(
 def test_every_kitchen_drawer_stands_closed_at_the_lower_limit_of_its_rails(
     kitchen_environment_world,
 ):
-    drawers = kitchen_environment_world.get_semantic_annotations_by_type(Drawer)
+    drawers = kitchen_environment_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=Drawer
+    )
     assert drawers
 
     for drawer in drawers:
@@ -724,12 +752,12 @@ def test_unknown_object_keeps_its_class_label_when_sent_to_another_process():
     A perceived object keeps its class label through serialization to another process.
     """
     world = World()
-    body = Body(name=PrefixedName("unknown_object"))
+    body = Body(name=PrefixedName(name="unknown_object"))
     with world.modify_world():
-        world.add_body(body)
+        world.add_body(body=body)
         unknown_object = UnknownObject(root=body, class_label="fork")
-        world.add_semantic_annotation(unknown_object)
-    tracker = WorldEntityWithIDKwargsTracker.from_world(world)
+        world.add_semantic_annotation(semantic_annotation=unknown_object)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world=world)
 
     received = from_json(to_json(unknown_object), **tracker.create_kwargs())
 
@@ -743,11 +771,13 @@ def test_human_is_found_among_the_perceivable_objects_with_its_class_label():
     A human is a perceivable object and keeps its class label.
     """
     world = World()
-    body = Body(name=PrefixedName("human"))
+    body = Body(name=PrefixedName(name="human"))
     with world.modify_world():
-        world.add_body(body)
+        world.add_body(body=body)
         human = Human(root=body, class_label="person")
-        world.add_semantic_annotation(human)
+        world.add_semantic_annotation(semantic_annotation=human)
 
-    assert world.get_semantic_annotations_by_type(IsPerceivable) == [human]
+    assert world.get_semantic_annotations_by_type(
+        semantic_annotation_type=IsPerceivable
+    ) == [human]
     assert human.class_label == "person"

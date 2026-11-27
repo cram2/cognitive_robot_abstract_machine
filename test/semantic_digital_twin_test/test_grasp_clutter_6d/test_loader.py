@@ -64,7 +64,7 @@ def test_object_ids_for_scene(loader):
         )
     )
     object_ids = _skip_on_network_error(
-        lambda: loader.object_ids_for_scene(scene_ids[0])
+        lambda: loader.object_ids_for_scene(scene_id=scene_ids[0])
     )
     assert len(object_ids) > 0
     assert all(isinstance(object_id, int) for object_id in object_ids)
@@ -72,7 +72,7 @@ def test_object_ids_for_scene(loader):
 
 def test_download_models_eval(loader):
     models_directory = _skip_on_network_error(
-        lambda: loader.download_models(GraspClutter6DModelVariant.EVAL)
+        lambda: loader.download_models(variant=GraspClutter6DModelVariant.EVAL)
     )
     assert (models_directory / "models_info.json").is_file()
     mesh_files = list(models_directory.glob("obj_*.ply"))

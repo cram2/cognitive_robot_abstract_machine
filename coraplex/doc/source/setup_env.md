@@ -155,8 +155,8 @@ from semantic_digital_twin.robots.pr2 import PR2
 from coraplex.testing import setup_world
 
 world = setup_world()
-robot = PR2.from_world(world)
+robot = PR2.from_world(world=world)
 
-milk_body = world.get_body_by_name("milk.stl")
-cereal_body = world.get_body_by_name("breakfast_cereal.stl")
+milk_body = world.get_body_by_name(name="milk.stl")
+cereal_body = world.get_body_by_name(name="breakfast_cereal.stl")
 ```

@@ -59,24 +59,24 @@ root_C_slider: ScrewAxisConnection = ...
 ```{code-cell} ipython3
 :tags: [example-solution]
 world = World()
-red_box = ShapeCollection([Box(
-    scale=Scale(0.1, 0.1, 0.1),
+red_box = ShapeCollection(shapes=[Box(
+    scale=Scale(x=0.1, y=0.1, z=0.1),
     color=Color.from_rgba(red=1.0, green=0.0, blue=0.0),
 )])
-green_box = ShapeCollection([Box(
-    scale=Scale(0.1, 0.1, 0.1),
+green_box = ShapeCollection(shapes=[Box(
+    scale=Scale(x=0.1, y=0.1, z=0.1),
     color=Color.from_rgba(red=0.0, green=1.0, blue=0.0),
 )])
-root = Body(name=PrefixedName("root"), visual=red_box, collision=red_box)
-slider = Body(name=PrefixedName("slider"), visual=green_box, collision=green_box)
+root = Body(name=PrefixedName(name="root"), visual=red_box, collision=red_box)
+slider = Body(name=PrefixedName(name="slider"), visual=green_box, collision=green_box)
 with world.modify_world():
     root_C_slider: ScrewAxisConnection = ScrewAxisConnection.create_with_dofs(
         screw_axis=ScrewAxis(translation_per_unit_position=Vector3.X(reference_frame=root)), parent=root,
         child=slider,
         world=world,
     )
-    world.add_connection(root_C_slider)
-rt = RayTracer(world); rt.update_scene(); rt.scene.show("jupyter")
+    world.add_connection(connection=root_C_slider)
+rt = RayTracer(world=world); rt.update_scene(); rt.scene.show("jupyter")
 ```
 ```{code-cell} ipython3
 :tags: [example-solution]
@@ -85,13 +85,13 @@ root_C_slider.position = 0.2
 
 ```{code-cell} ipython3
 :tags: [verify-solution, remove-input]
-if world is ...: raise ExerciseVerificationFailed("The world should be created.")
-if root is ...: raise ExerciseVerificationFailed("The root body should be created.")
-if slider is ...: raise ExerciseVerificationFailed("The slider body should be created.")
-if root_C_slider is ...: raise ExerciseVerificationFailed("The prismatic connection should be created.")
-if not isinstance(root, Body): raise ExerciseVerificationFailed("`root` must be a Body.")
-if not isinstance(slider, Body): raise ExerciseVerificationFailed("`slider` must be a Body.")
-if not (isinstance(root_C_slider, ScrewAxisConnection) and root_C_slider.behaves_like_a_prismatic_connection): raise ExerciseVerificationFailed("`root_C_slider` must be a prismatic ScrewAxisConnection.")
-if not abs(root_C_slider.position - 0.2) < 1e-6: raise ExerciseVerificationFailed("The slider should be at position 0.1 along X.")
-rt = RayTracer(world); rt.update_scene(); rt.scene.show("jupyter")
+if world is ...: raise ExerciseVerificationFailed(requirement="The world should be created.")
+if root is ...: raise ExerciseVerificationFailed(requirement="The root body should be created.")
+if slider is ...: raise ExerciseVerificationFailed(requirement="The slider body should be created.")
+if root_C_slider is ...: raise ExerciseVerificationFailed(requirement="The prismatic connection should be created.")
+if not isinstance(root, Body): raise ExerciseVerificationFailed(requirement="`root` must be a Body.")
+if not isinstance(slider, Body): raise ExerciseVerificationFailed(requirement="`slider` must be a Body.")
+if not (isinstance(root_C_slider, ScrewAxisConnection) and root_C_slider.behaves_like_a_prismatic_connection): raise ExerciseVerificationFailed(requirement="`root_C_slider` must be a prismatic ScrewAxisConnection.")
+if not abs(root_C_slider.position - 0.2) < 1e-6: raise ExerciseVerificationFailed(requirement="The slider should be at position 0.1 along X.")
+rt = RayTracer(world=world); rt.update_scene(); rt.scene.show("jupyter")
 ```

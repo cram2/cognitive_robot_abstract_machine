@@ -191,19 +191,21 @@ class StorageReaderInterface(CameraInterface):
             if observation.pose_child is not observation.camera.root:
                 recorded_entities.append(observation.pose_child)
         if any(
-            reasoning_world.find_world_entity_with_id(entity.id) is not None
+            reasoning_world.find_world_entity_with_id(entity_id=entity.id) is not None
             for entity in recorded_entities
         ):
             raise InvalidCameraObservation(
                 reason="recorded sensor entity already exists in the reasoning world"
             )
         if any(
-            reasoning_world.get_bodies_by_name(entity.name)
+            reasoning_world.get_bodies_by_name(name=entity.name)
             for entity in recorded_entities
             if entity is not observation.camera
         ) or any(
             camera.name == observation.camera.name
-            for camera in reasoning_world.get_semantic_annotations_by_type(Camera)
+            for camera in reasoning_world.get_semantic_annotations_by_type(
+                semantic_annotation_type=Camera
+            )
         ):
             raise InvalidCameraObservation(
                 reason="recorded sensor name already exists in the reasoning world"
@@ -219,9 +221,11 @@ class StorageReaderInterface(CameraInterface):
         :return: Entity tracker and elapsed duration of the restoration.
         """
         started = perf_counter()
-        tracker = WorldEntityWithIDKwargsTracker.from_world(target_world)
+        tracker = WorldEntityWithIDKwargsTracker.from_world(world=target_world)
         WorldModelSnapshot.apply_to_json_snapshot_to_world(
-            target_world, json.loads(snapshot), **tracker.create_kwargs()
+            world=target_world,
+            json_data=json.loads(snapshot),
+            **tracker.create_kwargs(),
         )
         return RestoredWorld(
             tracker=tracker, duration=timedelta(seconds=perf_counter() - started)
@@ -268,7 +272,7 @@ class StorageReaderInterface(CameraInterface):
             replayed into
         :raises ReplayWorldShared: If other processes share ``world``.
         """
-        if WorldSynchronizer.all_callbacks_of_this_type_from_world(world):
+        if WorldSynchronizer.all_callbacks_of_this_type_from_world(world=world):
             raise ReplayWorldShared()
         cas_frame = self.reader.get_next_frame()
         if cas_frame is None:

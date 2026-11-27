@@ -73,13 +73,14 @@ moments_and_axes_values = [
 class TestComponentsAndAssembly:
     def test_principal_moments_properties(self):
         for moments_values, _ in moments_and_axes_values:
-            m = PrincipalMoments.from_values(*moments_values)
+            i1, i2, i3 = moments_values
+            m = PrincipalMoments.from_values(i1=i1, i2=i2, i3=i3)
             assert_allclose(m.data, moments_values, atol=1e-12)
 
     def test_principal_axes_properties(self):
         for _, axes_values in moments_and_axes_values:
             rotation_matrix = RotationMatrix(axes_values)
-            axes_1 = PrincipalAxes.from_rotation_matrix(rotation_matrix)
+            axes_1 = PrincipalAxes.from_rotation_matrix(rotation_matrix=rotation_matrix)
             axes_2 = PrincipalAxes(data=axes_values)
             axes_3 = axes_2.to_rotation_matrix().to_np()[:3, :3]
             assert_allclose(axes_1.data, axes_values, atol=1e-12)
@@ -96,7 +97,8 @@ class TestComponentsAndAssembly:
             ixz = expected_tensor[0, 2]
             iyz = expected_tensor[1, 2]
 
-            moments = PrincipalMoments.from_values(*moments_values)
+            i1, i2, i3 = moments_values
+            moments = PrincipalMoments.from_values(i1=i1, i2=i2, i3=i3)
             axes = PrincipalAxes(data=axes_values)
             tensor_from_principal = InertiaTensor.from_principal_moments_and_axes(
                 moments=moments, axes=axes
@@ -134,7 +136,7 @@ def test_a_body_whose_inertia_nobody_described_has_no_inertial():
     A placeholder mass would be taken for a real one, for instance by a physical
     simulation that would otherwise work it out from the body's shapes.
     """
-    assert Body(name=PrefixedName("undescribed")).inertial is None
+    assert Body(name=PrefixedName(name="undescribed")).inertial is None
 
 
 # %% data the inertial properties reject

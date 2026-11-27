@@ -39,23 +39,23 @@ from semantic_digital_twin.spatial_computations.raytracer import RayTracer
 
 world = World()
 
-root = Body(name=PrefixedName("root"))
+root = Body(name=PrefixedName(name="root"))
 
-table_leg = Body(name=PrefixedName("leg"))
+table_leg = Body(name=PrefixedName(name="leg"))
 leg_shapes = [
     Box(
         origin=HomogeneousTransformationMatrix(reference_frame=table_leg),
-        scale=Scale(0.1, 0.1, 0.6),
+        scale=Scale(x=0.1, y=0.1, z=0.6),
     )
 ]
 table_leg.collision = leg_shapes
 table_leg.visual = leg_shapes
 
-table_top = Body(name=PrefixedName("top"))
+table_top = Body(name=PrefixedName(name="top"))
 table_top_shapes = [
     Box(
         origin=HomogeneousTransformationMatrix(reference_frame=table_top),
-        scale=Scale(1, 1, 0.05),
+        scale=Scale(x=1, y=1, z=0.05),
     )
 ]
 table_top.collision = table_top_shapes
@@ -63,7 +63,7 @@ table_top.visual = table_top_shapes
 
 with world.modify_world():
     root_to_leg = Connection6DoF.create_with_dofs(parent=root, child=table_leg, world=world)
-    world.add_connection(root_to_leg)
+    world.add_connection(connection=root_to_leg)
 
     leg_to_top = FixedConnection(
         parent=table_leg,
@@ -72,19 +72,19 @@ with world.modify_world():
             z=0.3, reference_frame=table_leg
         ),
     )
-    world.add_connection(leg_to_top)
+    world.add_connection(connection=leg_to_top)
 ```
 
 Next, we create a region describing the top of the table. We declare that the region is a very thin box that sits on top of the table-top.
 
 ```{code-cell} ipython3
 table_surface = Region(
-    name=PrefixedName("supporting surface of table"),
+    name=PrefixedName(name="supporting surface of table"),
 )
 
 surface = Box(
     origin=HomogeneousTransformationMatrix.from_xyz_rpy(z=0.05 / 2, reference_frame=table_surface),
-    scale=Scale(1, 1, 0.001),
+    scale=Scale(x=1, y=1, z=0.001),
 )
 table_surface.area = [surface]
 ```
@@ -95,9 +95,9 @@ We will now say the the region moves exactly as the table top moves.
 
 ```{code-cell} ipython3
 with world.modify_world():
-    world.add_kinematic_structure_entity(table_surface)
-    connection = FixedConnection(table_top, table_surface)
-    world.add_connection(connection)
+    world.add_kinematic_structure_entity(kinematic_structure_entity=table_surface)
+    connection = FixedConnection(parent=table_top, child=table_surface)
+    world.add_connection(connection=connection)
 print(world.regions)
 ```
 

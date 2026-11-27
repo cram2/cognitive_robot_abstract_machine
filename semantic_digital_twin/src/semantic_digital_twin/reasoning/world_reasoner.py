@@ -8,7 +8,7 @@ from semantic_digital_twin.world_description.world_entity import SemanticAnnotat
 from semantic_digital_twin.reasoning.reasoner import CaseReasoner
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldReasoner:
     """
     A utility class that uses CaseReasoner for reasoning on the world concepts.
@@ -18,6 +18,7 @@ class WorldReasoner:
     """
     The world instance to reason on.
     """
+
     _last_world_model_version: int | None = field(init=False, default=None)
     """
     The last world model version of the world used when :py:meth:`reason` was last
@@ -35,7 +36,9 @@ class WorldReasoner:
     """
 
     def __post_init__(self):
-        self.reasoner = CaseReasoner(self.world, model_directory=self.model_directory)
+        self.reasoner = CaseReasoner(
+            case=self.world, model_directory=self.model_directory
+        )
 
     def infer_semantic_annotations(self) -> list[SemanticAnnotation]:
         """
@@ -80,9 +83,9 @@ class WorldReasoner:
                 setattr(self.world, attr_name, attr_value)
             else:
                 for semantic_annotation in attr_value:
-                    self._hold_in_world(semantic_annotation)
+                    self._hold_in_world(semantic_annotation=semantic_annotation)
 
-    def _hold_in_world(self, semantic_annotation: SemanticAnnotation) -> None:
+    def _hold_in_world(self, *, semantic_annotation: SemanticAnnotation) -> None:
         """
         Give the world the inferred annotation.
 
@@ -92,5 +95,12 @@ class WorldReasoner:
 
         :param semantic_annotation: The annotation a rule inferred.
         """
-        if self.world.get_semantic_annotation_equal_to(semantic_annotation) is None:
-            self.world.add_semantic_annotation_recursively(semantic_annotation)
+        if (
+            self.world.get_semantic_annotation_equal_to(
+                semantic_annotation=semantic_annotation
+            )
+            is None
+        ):
+            self.world.add_semantic_annotation_recursively(
+                semantic_annotation=semantic_annotation
+            )

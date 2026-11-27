@@ -159,7 +159,7 @@ class ToolMotionAction(
         target = self._alignment_target
         if target is None:
             return []
-        return self.tool.tool_alignment(target)
+        return self.tool.tool_alignment(target=target)
 
     def create_temporary_collision_rules(self) -> list[CollisionRule]:
         """
@@ -479,11 +479,11 @@ class PouringAction(
         """
         tool_frame = self.arm.end_effector.tool_frame
         tool_frame_T_source = self.world.compute_forward_kinematics_np(
-            tool_frame, self.source_container.root
+            root=tool_frame, tip=self.source_container.root
         )
         bounding_box = (
             self.source_container.root.visual.as_bounding_box_collection_in_frame(
-                self.source_container.root
+                reference_frame=self.source_container.root
             ).bounding_box()
         )
         mouth_in_source = np.array(

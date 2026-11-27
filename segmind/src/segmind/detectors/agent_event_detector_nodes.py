@@ -76,7 +76,7 @@ class GraspDetector(AbstractDetector):
         """
         holding: IndexedBodyPairs = {}
         for end_effector in self.context.world.get_semantic_annotations_by_type(
-            EndEffector
+            semantic_annotation_type=EndEffector
         ):
             for tracked_object in tracked_objects:
                 bodies_touching = segmind_context.latest_contact_bodies.get(

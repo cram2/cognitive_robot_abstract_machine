@@ -19,19 +19,19 @@ class PackageLocator(ABC):
     """
 
     @abstractmethod
-    def resolve(self, package_name: str) -> str:
+    def resolve(self, *, package_name: str) -> str:
         """
         Resolves a package name to its local filesystem path.
         """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AmentPackageLocator(PackageLocator):
     """
     Resolves packages using ament.
     """
 
-    def resolve(self, package_name: str) -> str:
+    def resolve(self, *, package_name: str) -> str:
         try:
             from ament_index_python.packages import get_package_share_directory
 
@@ -42,13 +42,13 @@ class AmentPackageLocator(PackageLocator):
             )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ROSPackagePathLocator(PackageLocator):
     """
     Resolves packages using ROS_PACKAGE_PATH.
     """
 
-    def resolve(self, package_name: str) -> str:
+    def resolve(self, *, package_name: str) -> str:
         for root in os.environ.get("ROS_PACKAGE_PATH", "").split(":"):
             if not root:
                 continue
@@ -60,7 +60,7 @@ class ROSPackagePathLocator(PackageLocator):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PrefixPathPackageLocator(PackageLocator):
     """
     Resolves packages by searching install prefixes directly on disk, without any ROS
@@ -105,7 +105,7 @@ class PrefixPathPackageLocator(PackageLocator):
             *self._workspace_prefixes(),
         ]
 
-    def resolve(self, package_name: str) -> str:
+    def resolve(self, *, package_name: str) -> str:
         prefixes = self.search_prefixes()
         for prefix in prefixes:
             for candidate in (
@@ -121,7 +121,7 @@ class PrefixPathPackageLocator(PackageLocator):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ROSPackageLocator(PackageLocator):
     """
     Tries multiple package locators in order.
@@ -135,11 +135,11 @@ class ROSPackageLocator(PackageLocator):
         ]
     )
 
-    def resolve(self, package_name: str) -> str:
+    def resolve(self, *, package_name: str) -> str:
         errors = []
         for locator in self.locators:
             try:
-                return locator.resolve(package_name)
+                return locator.resolve(package_name=package_name)
             except ParsingError as error:
                 errors.append(str(error))
         raise PackageResolutionError(
@@ -153,19 +153,19 @@ class PathResolver(ABC):
     """
 
     @abstractmethod
-    def supports(self, uri: str) -> bool:
+    def supports(self, *, uri: str) -> bool:
         """
         Checks if the URI is supported by this resolver.
         """
 
     @abstractmethod
-    def resolve(self, uri: str) -> str:
+    def resolve(self, *, uri: str) -> str:
         """
         Resolves a URI to an absolute local file path.
         """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PackageUriResolver(PathResolver):
     """
     Resolves package:// URIs.
@@ -173,20 +173,20 @@ class PackageUriResolver(PathResolver):
 
     locator: PackageLocator = field(default_factory=ROSPackageLocator)
 
-    def supports(self, uri: str) -> bool:
+    def supports(self, *, uri: str) -> bool:
         return uri.startswith("package://")
 
-    def resolve(self, uri: str) -> str:
+    def resolve(self, *, uri: str) -> str:
         rest = uri[len("package://") :]
         if "/" not in rest:
             package_name, relative_path = rest, ""
         else:
             package_name, relative_path = rest.split("/", 1)
-        base = self.locator.resolve(package_name)
+        base = self.locator.resolve(package_name=package_name)
         return os.path.join(base, relative_path)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FileUriResolver(PathResolver):
     """
     Resolves file:// URIs and plain filesystem paths.
@@ -197,10 +197,10 @@ class FileUriResolver(PathResolver):
     The base directory to resolve relative paths from.
     """
 
-    def supports(self, uri: str) -> bool:
+    def supports(self, *, uri: str) -> bool:
         return uri.startswith("file://") or uri.startswith("/") or "://" not in uri
 
-    def resolve(self, uri: str) -> str:
+    def resolve(self, *, uri: str) -> str:
         if uri.startswith("file://"):
             if uri.startswith("file:///"):
                 path = uri[len("file://") :]  # absolute
@@ -215,7 +215,7 @@ class FileUriResolver(PathResolver):
         return os.path.abspath(path)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SearchPathFileResolver(PathResolver):
     """
     Resolves relative paths and relative ``file://`` URIs against several root
@@ -231,10 +231,10 @@ class SearchPathFileResolver(PathResolver):
     The directories that relative paths are resolved against, in order of precedence.
     """
 
-    def supports(self, uri: str) -> bool:
+    def supports(self, *, uri: str) -> bool:
         return uri.startswith("file://") or "://" not in uri
 
-    def resolve(self, uri: str) -> str:
+    def resolve(self, *, uri: str) -> str:
         path = uri[len("file://") :] if uri.startswith("file://") else uri
         if os.path.isabs(path):
             return os.path.abspath(path)
@@ -250,7 +250,7 @@ class SearchPathFileResolver(PathResolver):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ModelUriResolver(PathResolver):
     """
     Resolves ``model://`` URIs against Gazebo model directories.
@@ -264,7 +264,7 @@ class ModelUriResolver(PathResolver):
     Directories that are searched for models before the environment is consulted.
     """
 
-    def supports(self, uri: str) -> bool:
+    def supports(self, *, uri: str) -> bool:
         return uri.startswith("model://")
 
     def search_directories(self) -> list[str]:
@@ -279,7 +279,7 @@ class ModelUriResolver(PathResolver):
         default_directory = os.path.join(os.path.expanduser("~"), ".gazebo", "models")
         return [*self.model_directories, *environment_directories, default_directory]
 
-    def resolve(self, uri: str) -> str:
+    def resolve(self, *, uri: str) -> str:
         rest = uri[len("model://") :]
         model_name, _, relative_path = rest.partition("/")
         search_directories = self.search_directories()
@@ -295,7 +295,7 @@ class ModelUriResolver(PathResolver):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CompositePathResolver(PathResolver):
     """
     Tries multiple path resolvers in order.
@@ -308,22 +308,22 @@ class CompositePathResolver(PathResolver):
         ]
     )
 
-    def supports(self, uri: str) -> bool:
+    def supports(self, *, uri: str) -> bool:
         """
         Checks if the URI is supported by any of the resolvers.
         """
-        return any(resolver.supports(uri) for resolver in self.resolvers)
+        return any(resolver.supports(uri=uri) for resolver in self.resolvers)
 
-    def resolve(self, uri: str) -> str:
+    def resolve(self, *, uri: str) -> str:
         """
         Resolves a URI to an absolute local file path.
         """
         errors = []
         for resolver in self.resolvers:
-            if not resolver.supports(uri):
+            if not resolver.supports(uri=uri):
                 continue
             try:
-                return resolver.resolve(uri)
+                return resolver.resolve(uri=uri)
             except ParsingError as error:
                 errors.append(str(error))
 

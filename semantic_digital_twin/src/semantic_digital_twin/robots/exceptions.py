@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 # %% assumptions a robot part makes about what is attached to it
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RobotPartValidationError(UsageError):
     """
     Raised when a robot part does not carry what one of its mixins assumes.
@@ -36,7 +36,7 @@ class RobotPartValidationError(UsageError):
 # %% a required child that is not attached
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MissingEndEffectorError(RobotPartValidationError):
     """
     Raised when a robot part has no end effector attached.
@@ -46,7 +46,7 @@ class MissingEndEffectorError(RobotPartValidationError):
         return f"{type(self.robot_part).__name__} has no end effector."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MissingMobileBaseError(RobotPartValidationError):
     """
     Raised when a robot part has no mobile base attached.
@@ -56,7 +56,7 @@ class MissingMobileBaseError(RobotPartValidationError):
         return f"{type(self.robot_part).__name__} has no mobile base."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MissingTorsoError(RobotPartValidationError):
     """
     Raised when a robot part has no torso attached.
@@ -66,7 +66,7 @@ class MissingTorsoError(RobotPartValidationError):
         return f"{type(self.robot_part).__name__} has no torso."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MissingNeckError(RobotPartValidationError):
     """
     Raised when a robot part has no neck attached.
@@ -76,7 +76,7 @@ class MissingNeckError(RobotPartValidationError):
         return f"{type(self.robot_part).__name__} has no neck."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MissingLidarError(RobotPartValidationError):
     """
     Raised when a robot part has no lidar attached.
@@ -86,7 +86,7 @@ class MissingLidarError(RobotPartValidationError):
         return f"{type(self.robot_part).__name__} has no lidar."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MissingSensorsError(RobotPartValidationError):
     """
     Raised when a robot part has no sensors attached.
@@ -99,7 +99,7 @@ class MissingSensorsError(RobotPartValidationError):
 # %% a number of children the mixin does not allow
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TooFewFingersError(RobotPartValidationError):
     """
     Raised when a robot part has fewer fingers than its mixin allows.
@@ -125,7 +125,7 @@ class TooFewFingersError(RobotPartValidationError):
         return "use HasTwoFingers if this part is supposed to have exactly two fingers."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnexpectedFingerCountError(RobotPartValidationError):
     """
     Raised when a robot part has a different number of fingers than its mixin allows.
@@ -148,7 +148,7 @@ class UnexpectedFingerCountError(RobotPartValidationError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TooFewArmsError(RobotPartValidationError):
     """
     Raised when a robot part has fewer arms than its mixin allows.
@@ -177,7 +177,7 @@ class TooFewArmsError(RobotPartValidationError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnexpectedArmCountError(RobotPartValidationError):
     """
     Raised when a robot part has a different number of arms than its mixin allows.
@@ -203,7 +203,7 @@ class UnexpectedArmCountError(RobotPartValidationError):
 # %% where a part is read from
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MissingInputSourceError(RobotPartValidationError):
     """
     Raised when nothing says where a robot part is read from.
@@ -219,7 +219,7 @@ class MissingInputSourceError(RobotPartValidationError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnexpectedInputSourceError(RobotPartValidationError):
     """
     Raised when a robot part is handed a source of a kind it cannot be read from.
@@ -243,7 +243,7 @@ class UnexpectedInputSourceError(RobotPartValidationError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UndeclaredTopicError(RobotPartValidationError):
     """
     Raised when a robot part is switched onto its robot without naming a topic, and its
@@ -263,7 +263,7 @@ class UndeclaredTopicError(RobotPartValidationError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MissingDriveConnectionError(RobotPartValidationError):
     """
     Raised when the drive of a mobile base is needed, but its robot is not attached to
@@ -275,7 +275,7 @@ class MissingDriveConnectionError(RobotPartValidationError):
 
 
 # %% Robot annotation consistency
-@dataclass
+@dataclass(kw_only=True)
 class InvalidRobotAnnotation(UsageError):
     """
     A robot annotation violates a world or part ownership constraint.
@@ -296,7 +296,7 @@ class InvalidRobotAnnotation(UsageError):
 # %% a robot without a description
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RobotDescriptionMissingError(UsageError):
     """
     Raised when a robot is read from its description, but its class declares no
@@ -318,7 +318,7 @@ class RobotDescriptionMissingError(UsageError):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class StartPoseWithoutMobileBaseError(UsageError):
     """
     Raised when a robot without a mobile base is given a start pose relative to an

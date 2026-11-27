@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 # %% world source
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldSource(ABC):
     """
     A description of a world that can be created anew whenever it is needed, such as a
@@ -38,7 +38,7 @@ class WorldSource(ABC):
 # %% world model parser
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldModelParser(WorldSource, ABC):
     """
     Base for every parser that turns a world description format into a
@@ -59,16 +59,13 @@ class WorldModelParser(WorldSource, ABC):
 
     @classmethod
     @abstractmethod
-    def from_file(
-        cls, file_path: str, prefix: str | None = None, *args, **kwargs
-    ) -> Self:
+    def from_file(cls, *, file_path: str, prefix: str | None = None, **kwargs) -> Self:
         """
         Create a parser for the world described by a file.
 
         :param file_path: The path or resource URI (such as ``package://``) of the file
             to parse.
         :param prefix: The prefix for every name used in the parsed world.
-        :param args: Further parameters for the aspects the format supports.
         :param kwargs: Further keyword parameters for the aspects the format supports.
         :return: The parser for the described world.
         """

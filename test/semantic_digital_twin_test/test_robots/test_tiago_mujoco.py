@@ -46,8 +46,10 @@ pytestmark = pytest.mark.skipif(
 def mounted_tiago() -> TiagoMujoco:
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName("floor")))
-    return RobotSpecification(TiagoMujoco).spawn(world)
+        world.add_kinematic_structure_entity(
+            kinematic_structure_entity=Body(name=PrefixedName(name="floor"))
+        )
+    return RobotSpecification(semantic_annotation_type=TiagoMujoco).spawn(world=world)
 
 
 # %% reading the description
@@ -107,12 +109,12 @@ def test_a_servo_keeps_the_joint_dynamics_its_description_states(mounted_tiago):
     An MJCF states each joint's own damping and friction, so declaring a servo on that
     joint leaves them alone rather than replacing them with the servo's own.
     """
-    as_described = MJCFParser(TiagoMujoco.get_ros_file_path()).create_world()
+    as_described = MJCFParser(file_path=TiagoMujoco.get_ros_file_path()).create_world()
 
     for connection in mounted_tiago.connections:
         if not isinstance(connection, ActiveConnection1DOF):
             continue
-        described = as_described.get_connection_by_name(connection.name.name)
+        described = as_described.get_connection_by_name(name=connection.name.name)
         assert connection.dynamics == described.dynamics
 
 
@@ -124,7 +126,8 @@ def test_a_servoed_robot_does_not_hold_up_its_own_weight(mounted_tiago):
     uncompensated = [
         body.name.name
         for body in mounted_tiago.mobile_base.torso.bodies
-        if body.get_simulator_property_of_type(GravityCompensation) is None
+        if body.get_simulator_property_of_type(property_type=GravityCompensation)
+        is None
     ]
 
     assert uncompensated == []
@@ -150,8 +153,8 @@ def test_opening_the_hand_frees_the_whole_stroke_of_both_fingers(mounted_tiago):
     """
     for arm in mounted_tiago.all_arms:
         gripper = arm.end_effector
-        closed = gripper.get_joint_state_by_type(GripperState.CLOSE)
-        opened = gripper.get_joint_state_by_type(GripperState.OPEN)
+        closed = gripper.get_joint_state_by_type(state_type=GripperState.CLOSE)
+        opened = gripper.get_joint_state_by_type(state_type=GripperState.OPEN)
         stroke = sum(
             abs(open_value - closed_value)
             for open_value, closed_value in zip(
@@ -159,9 +162,9 @@ def test_opening_the_hand_frees_the_whole_stroke_of_both_fingers(mounted_tiago):
             )
         )
 
-        closed.apply_to(mounted_tiago._world)
+        closed.apply_to(world=mounted_tiago._world)
         when_closed = gripper.fingertips.separation
-        opened.apply_to(mounted_tiago._world)
+        opened.apply_to(world=mounted_tiago._world)
 
         # a micrometre, which is the single-precision the collision mesh is read at
         assert gripper.fingertips.separation == pytest.approx(
@@ -194,11 +197,11 @@ def _drive_at(
             world.state[drive.x_velocity.id].velocity = forward_velocity
             world.state[drive.yaw.id].velocity = angular_velocity
             world.notify_state_change()
-            simulation.step_simulation(tick)
+            simulation.step_simulation(duration=tick)
         world.state[drive.x_velocity.id].velocity = 0.0
         world.state[drive.yaw.id].velocity = 0.0
         world.notify_state_change()
-        simulation.step_simulation(timedelta(seconds=0.5))
+        simulation.step_simulation(duration=timedelta(seconds=0.5))
         simulator = simulation.simulator
         x, y, _ = simulator.get_body_position(body_name=tiago.root.name.name).result
         w, i, j, k = simulator.get_body_quaternion(
@@ -216,21 +219,23 @@ def _drive_at(
 def test_the_servos_hold_the_parked_arms_and_the_raised_torso_up(mounted_tiago):
     world = mounted_tiago._world
     for arm in mounted_tiago.all_arms:
-        arm.get_joint_state_by_type(StaticJointState.PARK).apply_to(world)
-    mounted_tiago.mobile_base.torso.get_joint_state_by_type(TorsoState.HIGH).apply_to(
-        world
-    )
+        arm.get_joint_state_by_type(state_type=StaticJointState.PARK).apply_to(
+            world=world
+        )
+    mounted_tiago.mobile_base.torso.get_joint_state_by_type(
+        state_type=TorsoState.HIGH
+    ).apply_to(world=world)
     world.notify_state_change()
     tool_frames = [arm.end_effector.tool_frame for arm in mounted_tiago.all_arms]
     parked = [
-        world.compute_forward_kinematics_np(world.root, tool_frame)[:3, 3]
+        world.compute_forward_kinematics_np(root=world.root, tip=tool_frame)[:3, 3]
         for tool_frame in tool_frames
     ]
 
     simulation = MujocoSim(world=world, headless=True)
     simulation.start_stepped_simulation()
     try:
-        simulation.step_simulation(timedelta(seconds=1))
+        simulation.step_simulation(duration=timedelta(seconds=1))
         simulated = [
             simulation.simulator.get_body_position(
                 body_name=tool_frame.name.name
@@ -252,16 +257,18 @@ def test_the_servos_hold_the_parked_arms_and_the_raised_torso_up(mounted_tiago):
 def test_the_finger_servos_close_the_gripper(mounted_tiago):
     world = mounted_tiago._world
     gripper = mounted_tiago.mobile_base.torso.right_arm.end_effector
-    gripper.get_joint_state_by_type(GripperState.OPEN).apply_to(world)
+    gripper.get_joint_state_by_type(state_type=GripperState.OPEN).apply_to(world=world)
     world.notify_state_change()
     finger_joint = gripper.thumb.root.parent_connection
 
     simulation = MujocoSim(world=world, headless=True)
     simulation.start_stepped_simulation()
     try:
-        gripper.get_joint_state_by_type(GripperState.CLOSE).apply_to(world)
+        gripper.get_joint_state_by_type(state_type=GripperState.CLOSE).apply_to(
+            world=world
+        )
         world.notify_state_change()
-        simulation.step_simulation(timedelta(seconds=1))
+        simulation.step_simulation(duration=timedelta(seconds=1))
         reached = simulation.simulator.get_joint_value(finger_joint.name.name).result
     finally:
         simulation.stop_simulation()
@@ -302,7 +309,9 @@ def test_the_floor_the_wheels_stand_on_does_not_hold_the_turning_base_back(
     """
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName("map")))
+        world.add_kinematic_structure_entity(
+            kinematic_structure_entity=Body(name=PrefixedName(name="map"))
+        )
     with world.modify_world():
         Floor.create_with_new_body_from_polytope_in_world(
             name="floor",
@@ -314,7 +323,9 @@ def test_the_floor_the_wheels_stand_on_does_not_hold_the_turning_base_back(
                 Point3(-3, 3, 0),
             ],
         )
-    tiago_on_the_floor = RobotSpecification(TiagoMujoco).spawn(world)
+    tiago_on_the_floor = RobotSpecification(semantic_annotation_type=TiagoMujoco).spawn(
+        world=world
+    )
 
     reached_without_a_floor = _drive_at(mounted_tiago, 0.0, 0.3, timedelta(seconds=2))
     reached_on_the_floor = _drive_at(tiago_on_the_floor, 0.0, 0.3, timedelta(seconds=2))

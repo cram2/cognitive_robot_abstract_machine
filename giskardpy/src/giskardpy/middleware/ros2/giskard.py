@@ -393,11 +393,13 @@ class Giskard:
 
     @property
     def robots(self) -> list[AbstractRobot]:
-        return self.world.get_semantic_annotations_by_type(AbstractRobot)
+        return self.world.get_semantic_annotations_by_type(
+            semantic_annotation_type=AbstractRobot
+        )
 
     def _controlled_joints_sanity_check(self):
         world = self.world
-        movable_joints = world.get_connections_by_type(ActiveConnection)
+        movable_joints = world.get_connections_by_type(connection_type=ActiveConnection)
         controlled_joints = [joint for joint in movable_joints if joint.is_controlled]
         non_controlled_joints = set(movable_joints).difference(set(controlled_joints))
         if len(controlled_joints) == 0 and len(world.connections) > 0:

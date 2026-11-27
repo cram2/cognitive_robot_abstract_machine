@@ -173,7 +173,9 @@ class SteppedSimulationPacer(Pacer):
     """
 
     def sleep(self) -> None:
-        self.simulation.step_simulation(timedelta(seconds=1 / self.target_frequency))
+        self.simulation.step_simulation(
+            duration=timedelta(seconds=1 / self.target_frequency)
+        )
 
     def wait_for_standstill(self) -> None:
         """

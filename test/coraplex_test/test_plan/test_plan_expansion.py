@@ -251,13 +251,15 @@ def test_a_reach_runs_to_its_target(pr2_apartment_context, rclpy_node) -> None:
     """
     world, view, extensions = pr2_apartment_context
 
-    milk_connection = world.get_body_by_name("milk.stl").parent_connection
+    milk_connection = world.get_body_by_name(name="milk.stl").parent_connection
     milk_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         2, 1.5, 0.7, 0, 0, 0, reference_frame=milk_connection.parent
     )
     reach = ReachAction(
         grasp_candidate=GraspCandidate.from_body_origin(
-            graspable=world.get_semantic_annotations_by_type(Milk)[0]
+            graspable=world.get_semantic_annotations_by_type(
+                semantic_annotation_type=Milk
+            )[0]
         ),
         arm=view.right_arm,
     )
@@ -278,9 +280,9 @@ def test_a_pick_up_moves_the_object_to_the_gripper_between_closing_and_lifting(
 
     root = expand(
         PickUpAction(
-            grasp_candidate=world.get_semantic_annotations_by_type(Milk)[
-                0
-            ].grasp_candidates()[0],
+            grasp_candidate=world.get_semantic_annotations_by_type(
+                semantic_annotation_type=Milk
+            )[0].grasp_candidates()[0],
             arm=view.right_arm,
         ),
         extensions,
@@ -314,7 +316,9 @@ def test_a_transport_runs_with_its_underspecified_steps(
             MoveTorsoAction(torso_state=TorsoState.HIGH),
             ParkArmsAction(arms=view.all_arms),
             TransportAction.from_graspable_by_closest_grasps(
-                graspable=world.get_semantic_annotations_by_type(Milk)[0],
+                graspable=world.get_semantic_annotations_by_type(
+                    semantic_annotation_type=Milk
+                )[0],
                 goal_pose=Pose.from_xyz_rpy(
                     2.37, 2.5, 1.05, reference_frame=world.root
                 ),
@@ -422,7 +426,7 @@ def test_a_reach_does_not_perceive_by_default(pr2_apartment_context) -> None:
     the caller did not ask for.
     """
     world, view, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
 
     plan = reach_action(milk, view)
 
@@ -443,7 +447,7 @@ def test_pick_up_motions_follow_the_object_moved_after_expansion(
     Keeping the motion targets in the object's own frame is what lets them follow it.
     """
     world, view, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     milk_body = milk.root
 
     plan = PickUpAction(grasp_candidate=milk.grasp_candidates()[0], arm=view.right_arm)
@@ -453,7 +457,9 @@ def test_pick_up_motions_follow_the_object_moved_after_expansion(
         if isinstance(node, CartesianPose)
     ]
     positions_before = [
-        world.transform(target, world.root).position.to_np().flatten()[:3]
+        world.transform(spatial_object=target, target_frame=world.root)
+        .position.to_np()
+        .flatten()[:3]
         for target in targets
     ]
 
@@ -467,7 +473,9 @@ def test_pick_up_motions_follow_the_object_moved_after_expansion(
     assert all(target.reference_frame is milk_body for target in targets)
     for target, position_before in zip(targets, positions_before):
         np.testing.assert_allclose(
-            world.transform(target, world.root).position.to_np().flatten()[:3],
+            world.transform(spatial_object=target, target_frame=world.root)
+            .position.to_np()
+            .flatten()[:3],
             position_before + displacement,
             atol=1e-9,
         )

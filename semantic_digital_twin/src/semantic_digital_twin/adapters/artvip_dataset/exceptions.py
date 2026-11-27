@@ -6,14 +6,16 @@ from krrood.exceptions import DataclassException
 from semantic_digital_twin.adapters.artvip_dataset.schema import ArtVipCategory
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ArtVipObjectNotFoundError(DataclassException, LookupError):
     """
     Raised when no ArtVIP dataset entry matches a requested category and object name.
     """
 
     category: ArtVipCategory
-    """The category that was searched."""
+    """
+    The category that was searched.
+    """
 
     name: str
     """
@@ -30,7 +32,7 @@ class ArtVipObjectNotFoundError(DataclassException, LookupError):
         return "Call ArtVipDatasetLoader.available_objects(category) for the names available in that category."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ArtVipMainStageFileAmbiguousError(DataclassException, LookupError):
     """
     Raised when an ArtVIP object's directory does not contain exactly one top-level USD
@@ -40,7 +42,9 @@ class ArtVipMainStageFileAmbiguousError(DataclassException, LookupError):
     """
 
     category: ArtVipCategory
-    """The object's category."""
+    """
+    The object's category.
+    """
 
     name: str
     """
@@ -48,7 +52,9 @@ class ArtVipMainStageFileAmbiguousError(DataclassException, LookupError):
     """
 
     candidates: tuple[str, ...]
-    """The top-level ``.usd`` file paths found directly in the object's directory."""
+    """
+    The top-level ``.usd`` file paths found directly in the object's directory.
+    """
 
     def error_message(self) -> str:
         return (

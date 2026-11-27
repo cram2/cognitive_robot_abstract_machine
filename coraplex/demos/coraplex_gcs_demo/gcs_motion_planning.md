@@ -102,7 +102,7 @@ goal_orientation = quaternion_from_matrix([[0, -1, 0, 0],
                                            [1, 0, 0, 0],
                                            [0, 0, 1, 0],
                                            [0, 0, 0, 1]])
-path = cg.path_from_to(start, goal_position)
+path = cg.path_from_to(start=start, goal=goal_position)
 path[-1].pose.orientation = Quaternion(*goal_orientation)
 print('done')
 ```

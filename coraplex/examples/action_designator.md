@@ -63,7 +63,7 @@ from krrood_spatial_math.spatial_types import (
 from coraplex.testing import setup_world
 
 world = setup_world()
-pr2 = PR2.from_world(world)
+pr2 = PR2.from_world(world=world)
 
 # A location samples its candidates from a costmap with the seed of the plan's
 # context, so this example runs the same way twice.
@@ -147,7 +147,7 @@ The procedure is similar to the last time, but this time we will shorten it a bi
 from coraplex.robot_plans.actions.core.robot_body import SetGripperAction
 from semantic_digital_twin.datastructures.definitions import GripperState
 
-configuration = pr2.left_arm.end_effector.default_configuration(GripperState.OPEN)
+configuration = pr2.left_arm.end_effector.default_configuration(state_type=GripperState.OPEN)
 
 run(SetGripperAction(gripper_configuration=configuration))
 ```
@@ -185,7 +185,7 @@ from semantic_digital_twin.adapters.ros.visualization.viz_marker import VizMarke
 from cramph.composites import Sequence
 
 arm = pr2.right_arm
-milk = world.get_semantic_annotations_by_type(Milk)[0]
+milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
 
 run(Sequence(nodes=[ParkArmsAction(arms=pr2.all_arms),
      MoveTorsoAction(torso_state=TorsoState.HIGH),
@@ -228,7 +228,7 @@ from coraplex.robot_plans.actions.core.robot_body import ParkArmsAction
 from cramph.composites import Sequence
 from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 
-milk = world.get_semantic_annotations_by_type(Milk)[0]
+milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
 
 run(Sequence(nodes=[
     ParkArmsAction(arms=pr2.all_arms),
@@ -252,7 +252,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import Milk
 from cramph.composites import Sequence
 
 description = TransportAction.from_graspable_by_closest_grasps(
-    graspable=world.get_semantic_annotations_by_type(Milk)[0],
+    graspable=world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0],
     goal_pose=Pose.from_xyz_quaternion(3.0, 2.2, 1.04, 0.0, 0.0, 1.0, 0.0, reference_frame=world.root),
     arm=pr2.left_arm,
     context=context,
@@ -280,7 +280,7 @@ from semantic_digital_twin.semantic_annotations.semantic_annotations import Hand
 # one works. The apartment carries no annotation, so we register one for the drawer.
 with world.modify_world():
     world.add_semantic_annotation_recursively(
-        handle := Handle(root=world.get_body_by_name("handle_cab10_t"))
+        semantic_annotation=(handle := Handle(root=world.get_body_by_name(name="handle_cab10_t")))
     )
 
 run(Sequence(nodes=[

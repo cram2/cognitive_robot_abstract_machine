@@ -38,17 +38,17 @@ def described_joint() -> ScrewAxisConnection:
     """
     world = World()
     with world.modify_world():
-        parent = Body(name=PrefixedName("parent"))
-        child = Body(name=PrefixedName("child"))
-        world.add_kinematic_structure_entity(parent)
-        world.add_kinematic_structure_entity(child)
+        parent = Body(name=PrefixedName(name="parent"))
+        child = Body(name=PrefixedName(name="child"))
+        world.add_kinematic_structure_entity(kinematic_structure_entity=parent)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=child)
         joint = ScrewAxisConnection.create_with_dofs(
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
             world=world,
             parent=parent,
             child=child,
         )
-        world.add_connection(joint)
+        world.add_connection(connection=joint)
     joint.dynamics = JointDynamics(armature=0.2, damping=3.0, dry_friction=0.5)
     return joint
 
@@ -56,7 +56,9 @@ def described_joint() -> ScrewAxisConnection:
 def test_a_drive_that_overrides_nothing_keeps_the_described_dynamics(described_joint):
     drive = JointDrive(gains=ServoGains(stiffness=1.0, damping=1.0, torque_limit=1.0))
 
-    assert drive.servo_for(described_joint).dynamics == described_joint.dynamics
+    assert (
+        drive.servo_for(connection=described_joint).dynamics == described_joint.dynamics
+    )
 
 
 def test_a_drive_overrides_only_the_armature_and_joint_damping_it_states(
@@ -68,7 +70,7 @@ def test_a_drive_overrides_only_the_armature_and_joint_damping_it_states(
         joint_damping=9.0,
     )
 
-    assert drive.servo_for(described_joint).dynamics == JointDynamics(
+    assert drive.servo_for(connection=described_joint).dynamics == JointDynamics(
         armature=drive.armature,
         damping=drive.joint_damping,
         dry_friction=described_joint.dynamics.dry_friction,
@@ -82,14 +84,14 @@ def _parse_urdf(robot_type: type[AbstractRobot]) -> World:
     """
     :return: The world ``robot_type``'s URDF describes, without any servo declared.
     """
-    return URDFParser.from_file(robot_type.get_ros_file_path()).create_world()
+    return URDFParser.from_file(file_path=robot_type.get_ros_file_path()).create_world()
 
 
 def _parse_mjcf(robot_type: type[AbstractRobot]) -> World:
     """
     :return: The world ``robot_type``'s MJCF describes, without any servo declared.
     """
-    return MJCFParser(robot_type.get_ros_file_path()).create_world()
+    return MJCFParser(file_path=robot_type.get_ros_file_path()).create_world()
 
 
 @pytest.mark.parametrize(
@@ -120,8 +122,10 @@ def test_every_position_servo_of_a_robot_is_the_drive_of_one_of_its_parts(
     """
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName("floor")))
-    RobotSpecification(robot_type).spawn(world)
+        world.add_kinematic_structure_entity(
+            kinematic_structure_entity=Body(name=PrefixedName(name="floor"))
+        )
+    RobotSpecification(semantic_annotation_type=robot_type).spawn(world=world)
     description = parse_description(robot_type)
     gains_by_degree_of_freedom: dict[DegreeOfFreedom, ServoGains] = {
         degree_of_freedom: actuator.gains
@@ -131,12 +135,14 @@ def test_every_position_servo_of_a_robot_is_the_drive_of_one_of_its_parts(
     }
 
     driven: set[DegreeOfFreedom] = set()
-    for part in world.get_semantic_annotations_by_type(ServoedRobotPart):
+    for part in world.get_semantic_annotations_by_type(
+        semantic_annotation_type=ServoedRobotPart
+    ):
         for joint_name, drive in part.drive_of_each_joint.items():
-            connection = world.get_connection_by_name(joint_name)
-            described = description.get_connection_by_name(joint_name)
+            connection = world.get_connection_by_name(name=joint_name)
+            described = description.get_connection_by_name(name=joint_name)
             assert gains_by_degree_of_freedom[connection.raw_dof] == drive.gains
-            assert connection.dynamics == drive.servo_for(described).dynamics
+            assert connection.dynamics == drive.servo_for(connection=described).dynamics
             driven.add(connection.raw_dof)
 
     assert driven == set(gains_by_degree_of_freedom)

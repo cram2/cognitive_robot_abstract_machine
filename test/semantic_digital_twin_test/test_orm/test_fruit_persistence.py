@@ -43,7 +43,9 @@ def stored_and_loaded_apple(
         session.commit()
         session.expunge_all()
         loaded_world = session.scalar(select(type(stored_world))).from_dao()
-    [apple] = loaded_world.get_semantic_annotations_by_type(Apple)
+    [apple] = loaded_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=Apple
+    )
     return apple
 
 
@@ -53,7 +55,7 @@ def test_apple_keeps_its_ripeness_stage(
     """
     An apple's ripeness stage survives storing its world and loading it back.
     """
-    world = World.create_with_root_body("root")
+    world = World.create_with_root_body(root_body_name="root")
     with world.modify_world():
         apple = Apple.create_with_new_body_in_world(name="apple", world=world)
         apple.set_quality(quality=Ripeness.from_stage(stage=RipenessStage.RIPE))
@@ -69,7 +71,7 @@ def test_apple_keeps_its_parts(
     """
     An apple's parts survive storing its world and loading it back.
     """
-    world = World.create_with_root_body("root")
+    world = World.create_with_root_body(root_body_name="root")
     with world.modify_world():
         apple = Apple.create_with_new_body_in_world(name="apple", world=world)
         peel = Peel.create_with_new_body_in_world(name="peel", world=world)
@@ -90,7 +92,7 @@ def test_apple_peel_keeps_its_density_and_elasticity(
     The density and elasticity of an apple's peel survive storing its world and loading
     it back, up to the single precision the interval ends are stored in.
     """
-    world = World.create_with_root_body("root")
+    world = World.create_with_root_body(root_body_name="root")
     with world.modify_world():
         apple = Apple.create_with_new_body_in_world(name="apple", world=world)
         peel = Peel.create_with_new_body_in_world(name="peel", world=world)

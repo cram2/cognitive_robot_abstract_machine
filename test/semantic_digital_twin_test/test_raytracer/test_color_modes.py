@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 
 
 # %% Custom color rendering
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class ForegroundColorRenderingMode(ColorRenderingMode):
     """
     Color foreground pixels green and background pixels black.
@@ -59,7 +59,7 @@ def test_custom_color_mode_controls_rendered_colors(
     """
     fixture = camera_intersections
     frame = fixture.ray_tracer.render(
-        fixture.camera, rgb_mode=ForegroundColorRenderingMode()
+        camera=fixture.camera, rgb_mode=ForegroundColorRenderingMode()
     )
     expected = np.zeros(
         (fixture.resolution.width, fixture.resolution.height, 3), dtype=np.uint8

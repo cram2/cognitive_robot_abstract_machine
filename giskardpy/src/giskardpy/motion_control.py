@@ -118,9 +118,9 @@ class MotionControl(TickingExecutorExtension):
             float_variables=executor.context.float_variable_data.data,
         )
         world.apply_control_commands(
-            next_command,
-            self.qp_controller.config.control_time_step.total_seconds(),
-            self.qp_controller.config.max_derivative,
+            commands=next_command,
+            dt=self.qp_controller.config.control_time_step.total_seconds(),
+            derivative=self.qp_controller.config.max_derivative,
         )
 
     def _life_cycle_state_followed(self, *, executor: StatechartExecutor) -> np.ndarray:
@@ -246,7 +246,9 @@ class WorldStateTrajectoryRecording(TickingExecutorExtension):
         Drops the recorded trajectory and starts a new one with the current world state,
         whether or not :attr:`appends_every_tick` is on.
         """
-        self.plotter.reset(executor.context.world.state, executor.time)
+        self.plotter.reset(
+            initial_state=executor.context.world.state, time=executor.time
+        )
 
     def after_compile(self, *, executor: StatechartExecutor) -> None:
         """
@@ -270,8 +272,8 @@ class WorldStateTrajectoryRecording(TickingExecutorExtension):
             return
         state = executor.context.world.state
         trajectory = self.plotter.world_state_trajectory
-        if not trajectory.records_degrees_of_freedom_of(state):
-            self.plotter.reset(state, executor.time)
+        if not trajectory.records_degrees_of_freedom_of(state=state):
+            self.plotter.reset(initial_state=state, time=executor.time)
             return
-        trajectory.adopt_world_model_of(state)
-        trajectory.append(state, executor.time)
+        trajectory.adopt_world_model_of(state=state)
+        trajectory.append(state=state, time=executor.time)

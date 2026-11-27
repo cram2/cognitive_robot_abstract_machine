@@ -29,14 +29,14 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SingleDoorRoom:
     """
     World-independent description of a room: a floor with four walls, one of which
     carries a hinged door with a handle, whose entry way cuts a doorway into that wall.
     """
 
-    scale: Scale = field(default_factory=lambda: Scale(2, 2, 2))
+    scale: Scale = field(default_factory=lambda: Scale(x=2, y=2, z=2))
     """
     Floor extents and wall height.
     """
@@ -46,7 +46,7 @@ class SingleDoorRoom:
     Thickness of each wall.
     """
 
-    door_scale: Scale = field(default_factory=lambda: Scale(0.05, 1, 1.8))
+    door_scale: Scale = field(default_factory=lambda: Scale(x=0.05, y=1, z=1.8))
     """
     Extents of the door mounted into the room's last wall.
     """
@@ -58,6 +58,7 @@ class SingleDoorRoom:
 
     def spawn(
         self,
+        *,
         world: World,
         name: str,
         parent: KinematicStructureEntity | None = None,
@@ -76,11 +77,11 @@ class SingleDoorRoom:
         :return: The room's floor annotation.
         """
         floor = Floor.get_annotation_specification(
-            f"{name}_floor",
-            Floor.get_default_root_kinematic_structure_entity_specification(
+            name=f"{name}_floor",
+            root_specification=Floor.get_default_root_kinematic_structure_entity_specification(
                 scale=self.scale.xy
             ),
-        ).spawn(world, parent=parent, parent_T_self=parent_T_self)
+        ).spawn(world=world, parent=parent, parent_T_self=parent_T_self)
 
         wall = None
         for i in range(4):
@@ -94,11 +95,11 @@ class SingleDoorRoom:
                 yaw,
             )
             wall = Wall.get_annotation_specification(
-                f"{name}_wall_{i}",
-                Wall.get_default_root_kinematic_structure_entity_specification(
-                    scale=Scale(self.wall_thickness, self.scale.x, self.scale.z)
+                name=f"{name}_wall_{i}",
+                root_specification=Wall.get_default_root_kinematic_structure_entity_specification(
+                    scale=Scale(x=self.wall_thickness, y=self.scale.x, z=self.scale.z)
                 ),
-            ).spawn(world, parent=floor.root, parent_T_self=wall_pose)
+            ).spawn(world=world, parent=floor.root, parent_T_self=wall_pose)
 
         handle_root_specification = (
             Handle.get_default_root_kinematic_structure_entity_specification()
@@ -109,8 +110,8 @@ class SingleDoorRoom:
             )
         )
         door = Door.get_annotation_specification(
-            f"{name}_door",
-            Door.get_default_root_kinematic_structure_entity_specification(
+            name=f"{name}_door",
+            root_specification=Door.get_default_root_kinematic_structure_entity_specification(
                 scale=self.door_scale,
                 connection_specification=ScrewAxisConnectionSpecification(
                     screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
@@ -120,11 +121,11 @@ class SingleDoorRoom:
             ),
             part_specifications={
                 "handle": Handle.get_annotation_specification(
-                    f"{name}_handle", handle_root_specification
+                    name=f"{name}_handle", root_specification=handle_root_specification
                 )
             },
         ).spawn(
-            world,
+            world=world,
             parent=wall.root,
             parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
                 z=self.door_scale.z / 2
@@ -137,14 +138,14 @@ class SingleDoorRoom:
         return floor
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BuildingFloor:
     """
     World-independent description of a building floor: a floor slab carrying a room in
     each of its four corners.
     """
 
-    floor_scale: Scale = field(default_factory=lambda: Scale(8, 8, 0))
+    floor_scale: Scale = field(default_factory=lambda: Scale(x=8, y=8, z=0))
     """
     Extents of the floor slab.
     """
@@ -156,6 +157,7 @@ class BuildingFloor:
 
     def spawn(
         self,
+        *,
         world: World,
         name: str,
         parent: KinematicStructureEntity | None = None,
@@ -174,11 +176,11 @@ class BuildingFloor:
         :return: The floor slab's annotation.
         """
         floor = Floor.get_annotation_specification(
-            f"{name}_floor",
-            Floor.get_default_root_kinematic_structure_entity_specification(
+            name=f"{name}_floor",
+            root_specification=Floor.get_default_root_kinematic_structure_entity_specification(
                 scale=self.floor_scale
             ),
-        ).spawn(world, parent=parent, parent_T_self=parent_T_self)
+        ).spawn(world=world, parent=parent, parent_T_self=parent_T_self)
 
         room_poses = [
             HomogeneousTransformationMatrix.from_xyz_rpy(-1.0, 2.5, 0),
@@ -188,7 +190,10 @@ class BuildingFloor:
         ]
         for i, room_pose in enumerate(room_poses):
             self.room.spawn(
-                world, f"{name}_room_{i}", parent=floor.root, parent_T_self=room_pose
+                world=world,
+                name=f"{name}_room_{i}",
+                parent=floor.root,
+                parent_T_self=room_pose,
             )
 
         return floor

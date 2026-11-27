@@ -64,7 +64,8 @@ def _pose_in_front_of_the_robot(world, robot) -> Pose2D:
     """
     return Pose2D.from_pose(
         world.transform(
-            Pose.from_xyz_rpy(x=0.05, reference_frame=robot.root), world.root
+            spatial_object=Pose.from_xyz_rpy(x=0.05, reference_frame=robot.root),
+            target_frame=world.root,
         )
     )
 
@@ -92,7 +93,9 @@ class RecordingLocationInFrontOfTheRobot(Location):
     """
 
     def candidates(self) -> Iterator[Pose2D]:
-        torso_high = self.robot.get_torso().get_joint_state_by_type(TorsoState.HIGH)
+        torso_high = self.robot.get_torso().get_joint_state_by_type(
+            state_type=TorsoState.HIGH
+        )
         self.torso_high_when_sampled.append(torso_high.is_achieved())
         yield _pose_in_front_of_the_robot(self.world, self.robot)
 
@@ -141,7 +144,7 @@ def test_an_underspecified_action_is_grounded_against_the_world_the_steps_before
     not as it was when the plan was built.
     """
     world, robot, extensions = pr2_apartment_context
-    torso_high = robot.get_torso().get_joint_state_by_type(TorsoState.HIGH)
+    torso_high = robot.get_torso().get_joint_state_by_type(state_type=TorsoState.HIGH)
     assert not torso_high.is_achieved()
     location = RecordingLocationInFrontOfTheRobot(world=world, robot=robot)
 
@@ -163,7 +166,7 @@ def test_an_underspecified_action_is_grounded_against_the_world_the_steps_before
 
 def test_a_branch_moved_mid_plan_follows_its_new_parent(pr2_apartment_context) -> None:
     world, robot, extensions = pr2_apartment_context
-    milk = world.get_body_by_name("milk.stl")
+    milk = world.get_body_by_name(name="milk.stl")
     tool_frame = robot.left_arm.end_effector.tool_frame
     height_before = milk.global_pose.z
 
@@ -197,7 +200,7 @@ def test_a_place_finds_the_grasp_of_the_pick_up_before_it(
     The pick-up to the left of a place in a sequence is the one preceding it.
     """
     world, robot, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     pick_up = PickUpAction(
         grasp_candidate=milk.grasp_candidates()[0], arm=robot.left_arm
     )
@@ -224,7 +227,7 @@ def test_a_place_below_a_pausing_composite_finds_the_pick_up_before_that(
     counts as preceding it.
     """
     world, robot, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     pick_up = PickUpAction(
         grasp_candidate=milk.grasp_candidates()[0], arm=robot.left_arm
     )
@@ -296,7 +299,7 @@ def test_a_sent_plan_compiles_without_what_its_actions_read_to_expand(
     motions need and nothing of what the actions read while the client expanded them.
     """
     world, robot, extensions = pr2_apartment_context
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     client = robot_executor(extensions)
     sent = statechart_of(
         client,
@@ -523,7 +526,7 @@ def test_an_expanded_action_is_received_with_the_goal_it_reaches(
         node=(
             action := SetGripperAction(
                 gripper_configuration=robot.left_arm.end_effector.default_configuration(
-                    GripperState.OPEN
+                    state_type=GripperState.OPEN
                 )
             )
         )
@@ -532,7 +535,7 @@ def test_an_expanded_action_is_received_with_the_goal_it_reaches(
     received = Statechart.from_json(
         data=json.loads(json.dumps(sent.to_json())),
         context=simulated_executor(extensions).context,
-        **WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs(),
+        **WorldEntityWithIDKwargsTracker.from_world(world=world).create_kwargs(),
     )
 
     received_action = received.get_node_by_index(index=action.index)
@@ -561,7 +564,7 @@ def test_an_expanded_action_is_received_with_the_steps_it_runs(
     received = Statechart.from_json(
         data=json.loads(json.dumps(sent.to_json())),
         context=simulated_executor(extensions).context,
-        **WorldEntityWithIDKwargsTracker.from_world(world).create_kwargs(),
+        **WorldEntityWithIDKwargsTracker.from_world(world=world).create_kwargs(),
     )
 
     received_action = received.get_node_by_index(index=action.index)

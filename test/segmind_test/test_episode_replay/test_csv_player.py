@@ -19,7 +19,7 @@ def test_csv_player_context():
     world = World()
     root = Body(name=PrefixedName(name="root", prefix="world"))
     with world.modify_world():
-        world.add_kinematic_structure_entity(root)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=root)
 
     multiverse_episodes_dir = (
         f"{Path(segmind.__file__).parent.parent.parent}/resources/multiverse_episodes"

@@ -142,7 +142,9 @@ class MotionViolatedCollisionAvoidance(PlanFailure):
             degrees_of_freedom_moving_colliding_bodies=frozenset(
                 degree_of_freedom
                 for body in bodies
-                for connection in world.compute_chain_of_connections(world.root, body)
+                for connection in world.compute_chain_of_connections(
+                    root=world.root, tip=body
+                )
                 for degree_of_freedom in connection.dofs
             ),
         )

@@ -46,7 +46,7 @@ def world() -> World:
     """
     An empty world with a root body to spawn fruit parts into.
     """
-    return World.create_with_root_body("root")
+    return World.create_with_root_body(root_body_name="root")
 
 
 def point(value: float) -> SimpleInterval:

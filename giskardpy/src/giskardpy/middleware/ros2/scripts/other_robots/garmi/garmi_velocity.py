@@ -40,7 +40,7 @@ class GarmiGiskard(Giskard):
         freedom exist only once the world is built.
         """
         super().setup()
-        drive = self.world.get_connections_by_type(OmniDrive)[0]
+        drive = self.world.get_connections_by_type(connection_type=OmniDrive)[0]
         for degree_of_freedom in drive.active_dofs:
             self.qp_controller_config.set_dof_weight(
                 dof_name=degree_of_freedom.name,
@@ -63,7 +63,9 @@ def main() -> None:
 
     giskard = GarmiGiskard(
         world_source=WorldSpecification(
-            robots=[RobotSpecification.specify_real_robot(Garmi)]
+            robots=[
+                RobotSpecification.specify_real_robot(semantic_annotation_type=Garmi)
+            ]
         ),
         robot_interface_config=GarmiVelocityInterface(),
         server_config=GiskardServerConfig(),

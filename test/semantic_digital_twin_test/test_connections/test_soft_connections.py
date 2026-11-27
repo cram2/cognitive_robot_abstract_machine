@@ -34,7 +34,9 @@ class TestSoftTrunk:
         # Create a uniform robot
         sections = [SoftTrunkSection(length=0.3, radius=0.02, resolution=5)] * 3
 
-        trunk = SoftTrunk.build_piecewise_constant_curvature(world, sections)
+        trunk = SoftTrunk.build_piecewise_constant_curvature(
+            world=world, sections=sections
+        )
 
         # Verify robot parts
         assert len(trunk.arms) == 1
@@ -50,7 +52,7 @@ class TestSoftTrunk:
         world = World()
         sections = [SoftTrunkSection(length=0.5, radius=0.02, resolution=10)] * 2
 
-        trunk = SoftTrunk.build_cosserat(world, sections)
+        trunk = SoftTrunk.build_cosserat(world=world, sections=sections)
 
         # Verify one section per requested section, each carrying its 4 strain DOFs
         assert len(trunk.cosserat_sections) == 2
@@ -65,7 +67,9 @@ class TestSoftTrunk:
         world = World()
         # 1 section, 1.0 meters
         sections = [SoftTrunkSection(length=1.0, radius=0.02, resolution=10)]
-        trunk = SoftTrunk.build_piecewise_constant_curvature(world, sections)
+        trunk = SoftTrunk.build_piecewise_constant_curvature(
+            world=world, sections=sections
+        )
 
         # Set curvature for a 90 degree bend (r = 2/pi)
         curvature = trunk.piecewise_constant_curvature_sections[0].curvature
@@ -73,7 +77,7 @@ class TestSoftTrunk:
         world.notify_state_change()
 
         # Get FK from root to tip of the arm
-        fk = world.compute_forward_kinematics_np(world.root, trunk.arms[0].tip)
+        fk = world.compute_forward_kinematics_np(root=world.root, tip=trunk.arms[0].tip)
 
         # For 90 deg bend: x = radius, z = radius. radius = 1/kappa = 2/pi
         expected_val = 2 / np.pi
@@ -86,13 +90,13 @@ class TestSoftTrunk:
         """
         world = World()
         sections = [SoftTrunkSection(length=1.0, radius=0.02, resolution=10)]
-        trunk = SoftTrunk.build_cosserat(world, sections)
+        trunk = SoftTrunk.build_cosserat(world=world, sections=sections)
 
         # Stretch to 1.5m
         world.state[trunk.cosserat_sections[0].extension.id].position = 1.5
         world.notify_state_change()
 
-        fk = world.compute_forward_kinematics_np(world.root, trunk.arms[0].tip)
+        fk = world.compute_forward_kinematics_np(root=world.root, tip=trunk.arms[0].tip)
         np.testing.assert_allclose(fk[2, 3], 1.5, atol=1e-5)
 
     def test_soft_trunk_semantic_annotation(self):
@@ -100,11 +104,13 @@ class TestSoftTrunk:
         Ensures SoftTrunk is correctly registered as a SemanticAnnotation.
         """
         world = World()
-        sections = [SoftTrunkSection(0.5, 0.02, 5)]
-        SoftTrunk.build_piecewise_constant_curvature(world, sections)
+        sections = [SoftTrunkSection(length=0.5, radius=0.02, resolution=5)]
+        SoftTrunk.build_piecewise_constant_curvature(world=world, sections=sections)
 
         # Find by type in the world
-        annotations = world.get_semantic_annotations_by_type(SoftTrunk)
+        annotations = world.get_semantic_annotations_by_type(
+            semantic_annotation_type=SoftTrunk
+        )
         assert len(annotations) == 1
         # Check internal arm registration
         assert len(annotations[0].arms) == 1
@@ -121,18 +127,18 @@ class TestSoftConnectionFactories:
     """
 
     def test_piecewise_constant_curvature_factory_applies_placement(self):
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
         limits = DegreeOfFreedomLimits.from_position_range_and_speed(
             lower_position=-10.0, upper_position=10.0, maximum_speed=10.0
         )
-        kappa = DegreeOfFreedom(name=PrefixedName("kappa"), limits=limits)
-        phi = DegreeOfFreedom(name=PrefixedName("phi"), limits=limits)
-        tip = Body(name=PrefixedName("tip"))
+        kappa = DegreeOfFreedom(name=PrefixedName(name="kappa"), limits=limits)
+        phi = DegreeOfFreedom(name=PrefixedName(name="phi"), limits=limits)
+        tip = Body(name=PrefixedName(name="tip"))
 
         with world.modify_world():
-            world.add_degree_of_freedom(kappa)
-            world.add_degree_of_freedom(phi)
-            world.add_body(tip)
+            world.add_degree_of_freedom(dof=kappa)
+            world.add_degree_of_freedom(dof=phi)
+            world.add_body(body=tip)
             connection = PiecewiseConstantCurvatureConnection.create_with_dofs(
                 world=world,
                 parent=world.root,
@@ -144,28 +150,28 @@ class TestSoftConnectionFactories:
                 phi_dof_id=phi.id,
                 segment_length=1.0,
             )
-            world.add_connection(connection)
+            world.add_connection(connection=connection)
 
         # A straight segment of length 1 offset by x=0.4 puts the tip at (0.4, 0, 1).
-        root_T_tip = world.compute_forward_kinematics_np(world.root, tip)
+        root_T_tip = world.compute_forward_kinematics_np(root=world.root, tip=tip)
         np.testing.assert_allclose(root_T_tip[:3, 3], [0.4, 0.0, 1.0], atol=1e-5)
         assert connection.active_dofs == [kappa, phi]
 
     def test_cosserat_rod_factory_applies_placement(self):
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
         limits = DegreeOfFreedomLimits.from_position_range_and_speed(
             lower_position=-10.0, upper_position=10.0, maximum_speed=10.0
         )
         strain_dofs = {
-            name: DegreeOfFreedom(name=PrefixedName(name), limits=limits)
+            name: DegreeOfFreedom(name=PrefixedName(name=name), limits=limits)
             for name in ("bending_x", "bending_y", "torsion", "extension")
         }
-        tip = Body(name=PrefixedName("tip"))
+        tip = Body(name=PrefixedName(name="tip"))
 
         with world.modify_world():
             for dof in strain_dofs.values():
-                world.add_degree_of_freedom(dof)
-            world.add_body(tip)
+                world.add_degree_of_freedom(dof=dof)
+            world.add_body(body=tip)
             connection = CosseratRodConnection.create_with_dofs(
                 world=world,
                 parent=world.root,
@@ -179,12 +185,12 @@ class TestSoftConnectionFactories:
                 extension_dof_id=strain_dofs["extension"].id,
                 segment_length=1.0,
             )
-            world.add_connection(connection)
+            world.add_connection(connection=connection)
 
         world.state[strain_dofs["extension"].id].position = 1.0
         world.notify_state_change()
 
-        root_T_tip = world.compute_forward_kinematics_np(world.root, tip)
+        root_T_tip = world.compute_forward_kinematics_np(root=world.root, tip=tip)
         np.testing.assert_allclose(root_T_tip[:3, 3], [0.4, 0.0, 1.0], atol=1e-5)
 
 
@@ -206,7 +212,8 @@ class TestSoftConnectionRebuilding:
         """
         world = World()
         SoftTrunk.build_piecewise_constant_curvature(
-            world, [SoftTrunkSection(length=0.3, radius=0.02, resolution=2)] * 2
+            world=world,
+            sections=[SoftTrunkSection(length=0.3, radius=0.02, resolution=2)] * 2,
         )
         world.notify_state_change()
         return world
@@ -217,45 +224,58 @@ class TestSoftConnectionRebuilding:
         """
         world = World()
         SoftTrunk.build_cosserat(
-            world, [SoftTrunkSection(length=0.3, radius=0.02, resolution=2)] * 2
+            world=world,
+            sections=[SoftTrunkSection(length=0.3, radius=0.02, resolution=2)] * 2,
         )
         world.notify_state_change()
         return world
 
     def test_a_re_parented_piecewise_constant_curvature_segment_keeps_its_name(self):
         world = self.build_piecewise_constant_curvature_world()
-        segment = world.get_connections_by_type(PiecewiseConstantCurvatureConnection)[0]
+        segment = world.get_connections_by_type(
+            connection_type=PiecewiseConstantCurvatureConnection
+        )[0]
 
         copied_segment = segment.copy_with_new_parent(
-            Body(name=PrefixedName("new_parent")), HomogeneousTransformationMatrix()
+            new_parent=Body(name=PrefixedName(name="new_parent")),
+            parent_T_connection_expression=HomogeneousTransformationMatrix(),
         )
 
         assert copied_segment.name == segment.name
 
     def test_a_re_parented_cosserat_rod_segment_keeps_its_name(self):
         world = self.build_cosserat_world()
-        segment = world.get_connections_by_type(CosseratRodConnection)[0]
+        segment = world.get_connections_by_type(connection_type=CosseratRodConnection)[
+            0
+        ]
 
         copied_segment = segment.copy_with_new_parent(
-            Body(name=PrefixedName("new_parent")), HomogeneousTransformationMatrix()
+            new_parent=Body(name=PrefixedName(name="new_parent")),
+            parent_T_connection_expression=HomogeneousTransformationMatrix(),
         )
 
         assert copied_segment.name == segment.name
 
     def test_a_copied_piecewise_constant_curvature_world_bends_the_same_way(self):
         world = self.build_piecewise_constant_curvature_world()
-        trunk = world.get_semantic_annotations_by_type(SoftTrunk)[0]
+        trunk = world.get_semantic_annotations_by_type(
+            semantic_annotation_type=SoftTrunk
+        )[0]
         for section in trunk.piecewise_constant_curvature_sections:
             world.state[section.curvature.id].position = 0.8
         world.notify_state_change()
-        expected = world.compute_forward_kinematics_np(world.root, trunk.arms[0].tip)
+        expected = world.compute_forward_kinematics_np(
+            root=world.root, tip=trunk.arms[0].tip
+        )
 
         copied_world = deepcopy(world)
 
-        copied_trunk = copied_world.get_semantic_annotations_by_type(SoftTrunk)[0]
+        copied_trunk = copied_world.get_semantic_annotations_by_type(
+            semantic_annotation_type=SoftTrunk
+        )[0]
         np.testing.assert_allclose(
             copied_world.compute_forward_kinematics_np(
-                copied_world.root, copied_trunk.arms[0].tip
+                root=copied_world.root, tip=copied_trunk.arms[0].tip
             ),
             expected,
             atol=1e-9,
@@ -263,18 +283,24 @@ class TestSoftConnectionRebuilding:
 
     def test_a_copied_cosserat_world_deforms_the_same_way(self):
         world = self.build_cosserat_world()
-        trunk = world.get_semantic_annotations_by_type(SoftTrunk)[0]
+        trunk = world.get_semantic_annotations_by_type(
+            semantic_annotation_type=SoftTrunk
+        )[0]
         for section in trunk.cosserat_sections:
             world.state[section.bending_x.id].position = 0.5
         world.notify_state_change()
-        expected = world.compute_forward_kinematics_np(world.root, trunk.arms[0].tip)
+        expected = world.compute_forward_kinematics_np(
+            root=world.root, tip=trunk.arms[0].tip
+        )
 
         copied_world = deepcopy(world)
 
-        copied_trunk = copied_world.get_semantic_annotations_by_type(SoftTrunk)[0]
+        copied_trunk = copied_world.get_semantic_annotations_by_type(
+            semantic_annotation_type=SoftTrunk
+        )[0]
         np.testing.assert_allclose(
             copied_world.compute_forward_kinematics_np(
-                copied_world.root, copied_trunk.arms[0].tip
+                root=copied_world.root, tip=copied_trunk.arms[0].tip
             ),
             expected,
             atol=1e-9,
@@ -282,8 +308,10 @@ class TestSoftConnectionRebuilding:
 
     def test_a_piecewise_constant_curvature_segment_survives_a_json_round_trip(self):
         world = self.build_piecewise_constant_curvature_world()
-        segment = world.get_connections_by_type(PiecewiseConstantCurvatureConnection)[0]
-        tracker = WorldEntityWithIDKwargsTracker.from_world(world)
+        segment = world.get_connections_by_type(
+            connection_type=PiecewiseConstantCurvatureConnection
+        )[0]
+        tracker = WorldEntityWithIDKwargsTracker.from_world(world=world)
 
         restored = Connection.from_json(
             data=segment.to_json(), **tracker.create_kwargs()
@@ -296,8 +324,10 @@ class TestSoftConnectionRebuilding:
 
     def test_a_cosserat_rod_segment_survives_a_json_round_trip(self):
         world = self.build_cosserat_world()
-        segment = world.get_connections_by_type(CosseratRodConnection)[0]
-        tracker = WorldEntityWithIDKwargsTracker.from_world(world)
+        segment = world.get_connections_by_type(connection_type=CosseratRodConnection)[
+            0
+        ]
+        tracker = WorldEntityWithIDKwargsTracker.from_world(world=world)
 
         restored = Connection.from_json(
             data=segment.to_json(), **tracker.create_kwargs()
@@ -316,9 +346,14 @@ class TestSoftConnectionRebuilding:
         does not hold cannot be resolved when the world is rebuilt.
         """
         world = self.build_piecewise_constant_curvature_world()
-        trunk = world.get_semantic_annotations_by_type(SoftTrunk)[0]
+        trunk = world.get_semantic_annotations_by_type(
+            semantic_annotation_type=SoftTrunk
+        )[0]
 
-        assert world.get_semantic_annotations_by_type(SoftArm) == trunk.arms
-        assert world.get_semantic_annotations_by_type(SoftEndEffector) == [
-            arm.end_effector for arm in trunk.arms
-        ]
+        assert (
+            world.get_semantic_annotations_by_type(semantic_annotation_type=SoftArm)
+            == trunk.arms
+        )
+        assert world.get_semantic_annotations_by_type(
+            semantic_annotation_type=SoftEndEffector
+        ) == [arm.end_effector for arm in trunk.arms]

@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from semantic_digital_twin.world_description.world_entity import Body
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ContactFriction:
     """
     The friction a shape's surface offers in a contact, in the three coefficients a
@@ -48,7 +48,7 @@ class ContactFriction:
         return [self.sliding, self.torsional, self.rolling]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ContactStiffness:
     """
     How stiff and how damped a contact is, as the time it takes to resolve a penetration
@@ -73,7 +73,7 @@ class ContactStiffness:
         return [self.time_constant.total_seconds(), self.damping_ratio]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ContactImpedance:
     """
     How hard a contact pushes back as it is penetrated: the impedance rises from a
@@ -112,7 +112,7 @@ class ContactImpedance:
         return [self.minimum, self.maximum, self.width, self.midpoint, self.power]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ContactParameters(UniqueSimulatorProperty):
     """
     The contact parameters a shape carries for a physical simulation: its friction and,
@@ -148,6 +148,7 @@ class ContactParameters(UniqueSimulatorProperty):
     @classmethod
     def create_for_grasped_object(
         cls,
+        *,
         sliding_friction: float = 0.3,
         torsional_friction: float = 0.05,
         rolling_friction: float = 0.001,
@@ -188,7 +189,7 @@ class ContactParameters(UniqueSimulatorProperty):
         )
 
     @classmethod
-    def create_for_surface(cls, sliding_friction: float = 0.3) -> ContactParameters:
+    def create_for_surface(cls, *, sliding_friction: float = 0.3) -> ContactParameters:
         """
         The friction of a surface loose objects rest on, with the default torsional and
         rolling friction, since a surface is never pinched between fingers.
@@ -198,7 +199,7 @@ class ContactParameters(UniqueSimulatorProperty):
         """
         return cls(friction=ContactFriction(sliding=sliding_friction))
 
-    def apply_to(self, bodies: Iterable[Body]) -> None:
+    def apply_to(self, *, bodies: Iterable[Body]) -> None:
         """
         Declare these parameters on every collision geometry of every body that has
         collision geometry, in place: a geometry without contact parameters gets a copy
@@ -211,9 +212,11 @@ class ContactParameters(UniqueSimulatorProperty):
             if not body.has_collision():
                 continue
             for geometry in body.collision:
-                existing = geometry.get_simulator_property_of_type(ContactParameters)
+                existing = geometry.get_simulator_property_of_type(
+                    property_type=ContactParameters
+                )
                 if existing is None:
-                    geometry.add_simulator_property(replace(self))
+                    geometry.add_simulator_property(simulator_property=replace(self))
                     continue
                 existing.friction = self.friction
                 if self.stiffness is not None:

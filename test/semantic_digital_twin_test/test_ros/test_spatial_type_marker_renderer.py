@@ -56,7 +56,7 @@ def render(spatial_type: SpatialType, **kwargs) -> list[Marker]:
 
 
 def test_point_renders_single_sphere():
-    frame = Body(name=PrefixedName("frame"))
+    frame = Body(name=PrefixedName(name="frame"))
     point = Point3(1, 2, 3, reference_frame=frame)
 
     markers = render(point)
@@ -80,8 +80,8 @@ def test_point_without_reference_frame_uses_root():
 
 
 def test_vector_renders_arrow_anchored_at_visualisation_frame():
-    reference = Body(name=PrefixedName("reference"))
-    visualisation = Body(name=PrefixedName("visualisation"))
+    reference = Body(name=PrefixedName(name="reference"))
+    visualisation = Body(name=PrefixedName(name="visualisation"))
     vector = Vector3(
         x=1, y=0, z=0, reference_frame=reference, visualisation_frame=visualisation
     )
@@ -97,7 +97,7 @@ def test_vector_renders_arrow_anchored_at_visualisation_frame():
 
 
 def test_homogeneous_matrix_renders_axis_triad():
-    frame = Body(name=PrefixedName("frame"))
+    frame = Body(name=PrefixedName(name="frame"))
     pose = HomogeneousTransformationMatrix.from_xyz_rpy(1, 1, 1, reference_frame=frame)
 
     markers = render(pose)

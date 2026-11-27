@@ -42,9 +42,9 @@ def add_body(world: World, name: str) -> None:
     Add a body named ``name`` to ``world``, fixed to its root, in one modification.
     """
     with world.modify_world():
-        body = Body(name=PrefixedName(name))
-        world.add_body(body)
-        world.add_connection(FixedConnection(parent=world.root, child=body))
+        body = Body(name=PrefixedName(name=name))
+        world.add_body(body=body)
+        world.add_connection(connection=FixedConnection(parent=world.root, child=body))
 
 
 def remove_body(world: World, name: str) -> None:
@@ -53,9 +53,9 @@ def remove_body(world: World, name: str) -> None:
     one modification.
     """
     with world.modify_world():
-        body = world.get_body_by_name(name)
-        world.remove_connection(body.parent_connection)
-        world.remove_kinematic_structure_entity(body)
+        body = world.get_body_by_name(name=name)
+        world.remove_connection(connection=body.parent_connection)
+        world.remove_kinematic_structure_entity(kinematic_structure_entity=body)
 
 
 def served_world() -> World:
@@ -65,12 +65,14 @@ def served_world() -> World:
     """
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("root"))
-        child = Body(name=PrefixedName("child"))
-        world.add_body(root)
-        world.add_body(child)
+        root = Body(name=PrefixedName(name="root"))
+        child = Body(name=PrefixedName(name="child"))
+        world.add_body(body=root)
+        world.add_body(body=child)
         world.add_connection(
-            Connection6DoF.create_with_dofs(parent=root, child=child, world=world)
+            connection=Connection6DoF.create_with_dofs(
+                parent=root, child=child, world=world
+            )
         )
     add_body(world, "removable")
     return world
@@ -172,7 +174,7 @@ def caught_up(joined_world: World, serving_process: ServingProcess) -> bool:
     """
     :return: Whether ``joined_world`` applied everything the serving process published.
     """
-    return WorldSynchronizer.of_world(joined_world).has_applied(
+    return WorldSynchronizer.of_world(world=joined_world).has_applied(
         position=serving_process.synchronizer.latest_published_position
     )
 
@@ -201,7 +203,7 @@ class TestJoiningAServedWorld:
             joined_world.state.to_uuid_position_dict()
             == serving.world.state.to_uuid_position_dict()
         )
-        WorldSynchronizer.of_world(joined_world).close()
+        WorldSynchronizer.of_world(world=joined_world).close()
 
     def test_joining_publishes_nothing(
         self, *, rclpy_node: Node, serving: ServingProcess
@@ -211,8 +213,11 @@ class TestJoiningAServedWorld:
         """
         joined_world = join_shared_world(rclpy_node)
 
-        assert WorldSynchronizer.of_world(joined_world).published_sequence_number == 0
-        WorldSynchronizer.of_world(joined_world).close()
+        assert (
+            WorldSynchronizer.of_world(world=joined_world).published_sequence_number
+            == 0
+        )
+        WorldSynchronizer.of_world(world=joined_world).close()
 
     def test_change_after_joining_reaches_the_joined_world(
         self, *, rclpy_node: Node, serving: ServingProcess
@@ -226,7 +231,7 @@ class TestJoiningAServedWorld:
 
         assert wait_for_condition(lambda: caught_up(joined_world, serving))
         assert body_names(joined_world) == body_names(serving.world)
-        WorldSynchronizer.of_world(joined_world).close()
+        WorldSynchronizer.of_world(world=joined_world).close()
 
 
 # %% updates published while the world is fetched
@@ -251,7 +256,7 @@ class TestUpdatesPublishedWhileFetching:
 
         assert wait_for_condition(lambda: caught_up(joined_world, serving_process))
         assert body_names(joined_world) == body_names(serving_process.world)
-        WorldSynchronizer.of_world(joined_world).close()
+        WorldSynchronizer.of_world(world=joined_world).close()
         serving_process.close()
 
     def test_update_published_after_the_snapshot_reaches_the_joined_world(
@@ -267,7 +272,7 @@ class TestUpdatesPublishedWhileFetching:
 
         assert wait_for_condition(lambda: caught_up(joined_world, serving_process))
         assert body_names(joined_world) == body_names(serving_process.world)
-        WorldSynchronizer.of_world(joined_world).close()
+        WorldSynchronizer.of_world(world=joined_world).close()
         serving_process.close()
 
 

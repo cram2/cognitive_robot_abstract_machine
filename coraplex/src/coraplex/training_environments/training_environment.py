@@ -187,32 +187,36 @@ class MoveToReachTrainingEnvironment(TrainingEnvironment[MoveToReach]):
 
         urdf_parser = URDFParser.from_file(file_path=pr2_file)
         world_with_urdf = urdf_parser.create_world()
-        pr2 = PR2.from_world(world_with_urdf)
+        pr2 = PR2.from_world(world=world_with_urdf)
 
         with world_with_urdf.modify_world():
             old_root = world_with_urdf.root
-            map = Body(name=PrefixedName("map"))
-            localization_body = Body(name=PrefixedName("odom_combined"))
+            map = Body(name=PrefixedName(name="map"))
+            localization_body = Body(name=PrefixedName(name="odom_combined"))
 
             map_C_localization = Connection6DoF.create_with_dofs(
                 world=world_with_urdf, parent=map, child=localization_body
             )
-            world_with_urdf.add_connection(map_C_localization)
+            world_with_urdf.add_connection(connection=map_C_localization)
 
             c_root_bf = OmniDrive.create_with_dofs(
                 parent=localization_body,
                 child=old_root,
                 world=world_with_urdf,
             )
-            world_with_urdf.add_connection(c_root_bf)
-            world_with_urdf.set_dofs_has_hardware_interface(c_root_bf.active_dofs, True)
+            world_with_urdf.add_connection(connection=c_root_bf)
+            world_with_urdf.set_dofs_has_hardware_interface(
+                dofs=c_root_bf.active_dofs, value=True
+            )
 
         return world_with_urdf
 
     def setup_episode(self, *, limit: int = 10, **kwargs: Any) -> TrainingEpisode:
 
         world = self.setup_world()
-        [robot] = world.get_semantic_annotations_by_type(AbstractRobot)
+        [robot] = world.get_semantic_annotations_by_type(
+            semantic_annotation_type=AbstractRobot
+        )
         target_pose = Pose.from_xyz_rpy(
             x=0,
             y=0,

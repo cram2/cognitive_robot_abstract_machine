@@ -38,7 +38,7 @@ from semantic_digital_twin.world_source import WorldSource
 # %% apartment
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ApartmentEnvironment(WorldSource):
     """
     The furniture of the apartment: a shelf, a wall, a bedside table, a sofa, the
@@ -54,38 +54,38 @@ class ApartmentEnvironment(WorldSource):
     """
 
     def create_world(self) -> World:
-        world = World.create_with_root_body("root")
-        self._build_shelf(world)
-        self._build_wall_next_to_shelf(world)
-        self._build_bedside_table(world)
-        self._build_sofa(world)
-        self._build_wall_meshes(world)
-        self._build_wardrobe(world)
+        world = World.create_with_root_body(root_body_name="root")
+        self._build_shelf(world=world)
+        self._build_wall_next_to_shelf(world=world)
+        self._build_bedside_table(world=world)
+        self._build_sofa(world=world)
+        self._build_wall_meshes(world=world)
+        self._build_wardrobe(world=world)
         return world
 
     @staticmethod
-    def mesh_path(mesh_file_name: str) -> str:
+    def mesh_path(*, mesh_file_name: str) -> str:
         """
         Resolve one of the apartment's visual meshes to a local file path.
         """
         return CompositePathResolver().resolve(
-            f"package://iai_apartment/meshes/visual/{mesh_file_name}"
+            uri=f"package://iai_apartment/meshes/visual/{mesh_file_name}"
         )
 
     # %% shelf
 
-    def _build_shelf(self, world: World) -> None:
+    def _build_shelf(self, *, world: World) -> None:
         """
         Spawn the shelf with its four layers.
         """
         with world.modify_world():
             shelf = Shelf.get_annotation_specification(
-                "shelf",
-                Shelf.get_default_root_kinematic_structure_entity_specification(
-                    scale=Scale(0.305, 0.85, 1.9), wall_thickness=0.035
+                name="shelf",
+                root_specification=Shelf.get_default_root_kinematic_structure_entity_specification(
+                    scale=Scale(x=0.305, y=0.85, z=1.9), wall_thickness=0.035
                 ),
             ).spawn(
-                world,
+                world=world,
                 parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
                     0.455 + (0.85 / 2),
                     -0.15,
@@ -111,13 +111,13 @@ class ApartmentEnvironment(WorldSource):
                             yaw=-np.pi / 2,
                             reference_frame=world.root,
                         ),
-                        scale=Scale(0.305, 0.85, 0.018),
+                        scale=Scale(x=0.305, y=0.85, z=0.018),
                     )
                 )
 
     # %% wall next to the shelf
 
-    def _build_wall_next_to_shelf(self, world: World) -> None:
+    def _build_wall_next_to_shelf(self, *, world: World) -> None:
         """
         Spawn the box-shaped wall segment the shelf stands next to.
         """
@@ -128,39 +128,41 @@ class ApartmentEnvironment(WorldSource):
                 world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
                     0, (2.81 / 2), 0, reference_frame=world.root
                 ),
-                scale=Scale(0.03, 2.81, 0.265),
+                scale=Scale(x=0.03, y=2.81, z=0.265),
             )
 
     # %% bedside table
 
-    def _build_bedside_table(self, world: World) -> None:
+    def _build_bedside_table(self, *, world: World) -> None:
         """
         Spawn the bedside table.
         """
         SideTable.get_annotation_specification(
-            "bedside_table.dae",
-            BodySpecification.mesh(
-                "bedside_table.dae",
-                self.mesh_path("bedside_table.dae"),
+            name="bedside_table.dae",
+            root_specification=BodySpecification.mesh(
+                name="bedside_table.dae",
+                filename=self.mesh_path(mesh_file_name="bedside_table.dae"),
                 parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=1.92, y=2.68, yaw=17.8 * (-np.pi / 32)
                 ),
             ),
-        ).spawn(world)
+        ).spawn(world=world)
 
     # %% sofa
 
-    def _build_sofa(self, world: World) -> None:
+    def _build_sofa(self, *, world: World) -> None:
         """
         Spawn the sofa bed.
         """
         # The sofa rests on the floor, so its placement needs the height of its own
         # geometry, which only the specification can measure.
         sofa_body = BodySpecification.mesh(
-            "sofa_bed.obj", self.mesh_path("sofa_bed.obj")
+            name="sofa_bed.obj", filename=self.mesh_path(mesh_file_name="sofa_bed.obj")
         )
-        Sofa.get_annotation_specification("sofa_bed.obj", sofa_body).spawn(
-            world,
+        Sofa.get_annotation_specification(
+            name="sofa_bed.obj", root_specification=sofa_body
+        ).spawn(
+            world=world,
             parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
                 x=1.0, y=3.15, z=sofa_body.scale.z / 2, yaw=17.75 * (-np.pi / 32)
             ),
@@ -168,24 +170,24 @@ class ApartmentEnvironment(WorldSource):
 
     # %% walls
 
-    def _build_wall_meshes(self, world: World) -> None:
+    def _build_wall_meshes(self, *, world: World) -> None:
         """
         Spawn the apartment's walls as one mesh.
         """
         Wall.get_annotation_specification(
-            "walls.dae",
-            BodySpecification.mesh(
-                "walls.dae",
-                self.mesh_path("walls.dae"),
+            name="walls.dae",
+            root_specification=BodySpecification.mesh(
+                name="walls.dae",
+                filename=self.mesh_path(mesh_file_name="walls.dae"),
                 parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=-7.34, y=1.43, z=-0.2, yaw=0
                 ),
             ),
-        ).spawn(world)
+        ).spawn(world=world)
 
     # %% wardrobe
 
-    def _build_wardrobe(self, world: World) -> None:
+    def _build_wardrobe(self, *, world: World) -> None:
         """
         Spawn the wardrobe with its two hinged doors and their handles.
         """
@@ -195,10 +197,10 @@ class ApartmentEnvironment(WorldSource):
         # vertical axis in opposite directions.
         doors = [
             Door.get_annotation_specification(
-                door_mesh,
-                BodySpecification.mesh(
-                    door_mesh,
-                    self.mesh_path(door_mesh),
+                name=door_mesh,
+                root_specification=BodySpecification.mesh(
+                    name=door_mesh,
+                    filename=self.mesh_path(mesh_file_name=door_mesh),
                     parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
                         -0.3246, door_y
                     ),
@@ -215,10 +217,12 @@ class ApartmentEnvironment(WorldSource):
                 ),
                 part_specifications={
                     "handle": Handle.get_annotation_specification(
-                        f"wardrobe_door_handle_{side}",
-                        BodySpecification.mesh(
-                            f"wardrobe_door_handle_{side}",
-                            self.mesh_path("wardrobe_door_handle.dae"),
+                        name=f"wardrobe_door_handle_{side}",
+                        root_specification=BodySpecification.mesh(
+                            name=f"wardrobe_door_handle_{side}",
+                            filename=self.mesh_path(
+                                mesh_file_name="wardrobe_door_handle.dae"
+                            ),
                             parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
                                 -0.032089, handle_y, 0.973703
                             ),
@@ -233,13 +237,13 @@ class ApartmentEnvironment(WorldSource):
         ]
 
         Wardrobe.get_annotation_specification(
-            "wardrobe.dae",
-            BodySpecification.mesh(
-                "wardrobe.dae",
-                self.mesh_path("wardrobe.dae"),
+            name="wardrobe.dae",
+            root_specification=BodySpecification.mesh(
+                name="wardrobe.dae",
+                filename=self.mesh_path(mesh_file_name="wardrobe.dae"),
                 parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=2, y=-0.15, yaw=-np.pi / 2
                 ),
             ),
             part_specifications={"doors": doors},
-        ).spawn(world)
+        ).spawn(world=world)

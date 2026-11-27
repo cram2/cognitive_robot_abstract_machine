@@ -129,7 +129,9 @@ class ActionRoundTripCase(NodeRoundTripCase):
 
 
 def _robot(world: World) -> AbstractRobot:
-    return world.get_semantic_annotations_by_type(AbstractRobot)[0]
+    return world.get_semantic_annotations_by_type(
+        semantic_annotation_type=AbstractRobot
+    )[0]
 
 
 def _arm(world: World) -> Arm:
@@ -137,7 +139,7 @@ def _arm(world: World) -> Arm:
 
 
 def _milk(world: World) -> Milk:
-    return world.get_semantic_annotations_by_type(Milk)[0]
+    return world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
 
 
 def _pose(world: World) -> Pose:
@@ -165,7 +167,7 @@ def _tool(world: World, tool_type: type[Tool]) -> Tool:
     """
     tool = tool_type(root=_tool_body(world))
     with world.modify_world():
-        world.add_semantic_annotation(tool)
+        world.add_semantic_annotation(semantic_annotation=tool)
     return tool
 
 
@@ -248,7 +250,7 @@ def _elevator_navigation(world: World) -> list[StatechartNode]:
         elevator = Elevator.create_with_new_body_in_world(
             name="elevator",
             world=world,
-            scale=Scale(2, 2, 2),
+            scale=Scale(x=2, y=2, z=2),
             parent_connection_specification=ScrewAxisConnectionSpecification(
                 screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
                     axis=Vector3.Z()
@@ -261,7 +263,7 @@ def _elevator_navigation(world: World) -> list[StatechartNode]:
         door = Door.create_with_new_body_in_world(
             name="door",
             world=world,
-            scale=Scale(0.05, 1, 2),
+            scale=Scale(x=0.05, y=1, z=2),
             parent_connection_specification=ScrewAxisConnectionSpecification(
                 screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
                     axis=Vector3.Y()
@@ -273,7 +275,7 @@ def _elevator_navigation(world: World) -> list[StatechartNode]:
         )
         elevator.add(part=door)
         ground_floor = GroundFloor.create_with_new_region_in_world(
-            name="ground_floor", world=world, scale=Scale(40, 40, 6)
+            name="ground_floor", world=world, scale=Scale(x=40, y=40, z=6)
         )
     return [ElevatorNavigation(elevator=elevator, target_floor=ground_floor)]
 
@@ -293,7 +295,7 @@ def _robot_body_cases() -> list[ActionRoundTripCase]:
                 SetGripperAction(
                     gripper_configuration=_arm(
                         world
-                    ).end_effector.default_configuration(GripperState.OPEN)
+                    ).end_effector.default_configuration(state_type=GripperState.OPEN)
                 )
             ],
         ),

@@ -40,7 +40,7 @@ Your goal:
 ```{code-cell} ipython3
 :tags: [exercise]
 table_urdf = "package://iai_objects/urdf/table.urdf"
-world = URDFParser.from_file(table_urdf).create_world()
+world = URDFParser.from_file(file_path=table_urdf).create_world()
 
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import VizMarkerPublisher
 import threading
@@ -53,7 +53,7 @@ viz = ...
 ```{code-cell} ipython3
 :tags: [example-solution]
 table_urdf = "package://iai_objects/urdf/table.urdf"
-world = URDFParser.from_file(table_urdf).create_world()
+world = URDFParser.from_file(file_path=table_urdf).create_world()
 
 from semantic_digital_twin.adapters.ros.tf_publisher import TFPublisher
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import VizMarkerPublisher
@@ -72,7 +72,7 @@ viz = VizMarkerPublisher(_world=world, node=node)
 ```{code-cell} ipython3
 :tags: [verify-solution, remove-input]
 
-if viz is ...: raise ExerciseVerificationFailed("Instantiate a VizMarkerPublisher and assign it to `viz`.")
-if not isinstance(tf_publisher, TFPublisher): raise ExerciseVerificationFailed("Make sure you are using the TFPublisher")
-if not isinstance(viz, VizMarkerPublisher): raise ExerciseVerificationFailed("Make sure you are using the VizMarkerPublisher")
+if viz is ...: raise ExerciseVerificationFailed(requirement="Instantiate a VizMarkerPublisher and assign it to `viz`.")
+if not isinstance(tf_publisher, TFPublisher): raise ExerciseVerificationFailed(requirement="Make sure you are using the TFPublisher")
+if not isinstance(viz, VizMarkerPublisher): raise ExerciseVerificationFailed(requirement="Make sure you are using the VizMarkerPublisher")
 ```

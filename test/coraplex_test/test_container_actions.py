@@ -45,15 +45,19 @@ def pr2_at_drawer(pr2_apartment_context):
     A PR2 in the apartment, with the drawer handle it works on annotated as such.
     """
     world, robot, extensions = pr2_apartment_context
-    body = world.get_body_by_name(ApartmentBody.DRAWER_HANDLE)
+    body = world.get_body_by_name(name=ApartmentBody.DRAWER_HANDLE)
     annotated = [
         handle
-        for handle in world.get_semantic_annotations_by_type(Handle)
+        for handle in world.get_semantic_annotations_by_type(
+            semantic_annotation_type=Handle
+        )
         if handle.root is body
     ]
     if not annotated:
         with world.modify_world():
-            world.add_semantic_annotation_recursively(handle := Handle(root=body))
+            world.add_semantic_annotation_recursively(
+                semantic_annotation=(handle := Handle(root=body))
+            )
         annotated = [handle]
     return world, robot, extensions, annotated[0]
 
@@ -85,7 +89,7 @@ def test_gripper_backs_off_the_handle_after_letting_go(pr2_at_drawer, action_typ
 
     assert [
         node.width for node in goals_of(letting_go) if isinstance(node, MoveGripper)
-    ] == [arm.end_effector.separation_in(GripperState.OPEN)]
+    ] == [arm.end_effector.separation_in(state_type=GripperState.OPEN)]
     [back_off_goal] = [
         node for node in goals_of(back_off) if isinstance(node, CartesianPose)
     ]
@@ -111,7 +115,7 @@ def test_back_off_pose_clears_the_grasp_by_the_release_clearance(pr2_at_drawer):
     )
     grasp_pose = Pose(reference_frame=handle.root)
 
-    tool_goal = end_effector.tool_frame_goal_for_grasp(grasp_pose)
+    tool_goal = end_effector.tool_frame_goal_for_grasp(grasp_pose=grasp_pose)
     back_off = action.back_off_pose(grasp_pose=grasp_pose, end_effector=end_effector)
 
     np.testing.assert_allclose(
@@ -132,29 +136,38 @@ def test_back_off_pose_clears_the_drawer_of_a_grasp_from_above(pr2_at_drawer):
     """
     world, robot, extensions, handle = pr2_at_drawer
     arm = left_or_only_arm(robot)
-    world_T_handle = world.transform(Pose(reference_frame=handle.root), world.root)
+    world_T_handle = world.transform(
+        spatial_object=Pose(reference_frame=handle.root), target_frame=world.root
+    )
     downward = Vector3(0, 0, -1, reference_frame=world.root)
     pull_axis = Vector3(1, 0, 0, reference_frame=world.root)
     grasp_pose = world.transform(
-        Pose(
+        spatial_object=Pose(
             position=world_T_handle.position,
             orientation=RotationMatrix.from_vectors(x=downward, y=pull_axis).quaternion,
             reference_frame=world.root,
         ),
-        handle.root,
+        target_frame=handle.root,
     )
-    action = OpenAction(grasp_candidate=GraspCandidate(handle, grasp_pose), arm=arm)
+    action = OpenAction(
+        grasp_candidate=GraspCandidate(graspable=handle, grasp_pose=grasp_pose), arm=arm
+    )
 
     tool_goal = world.transform(
-        arm.end_effector.tool_frame_goal_for_grasp(grasp_pose), world.root
+        spatial_object=arm.end_effector.tool_frame_goal_for_grasp(
+            grasp_pose=grasp_pose
+        ),
+        target_frame=world.root,
     )
     back_off = world.transform(
-        action.back_off_pose(grasp_pose=grasp_pose, end_effector=arm.end_effector),
-        world.root,
+        spatial_object=action.back_off_pose(
+            grasp_pose=grasp_pose, end_effector=arm.end_effector
+        ),
+        target_frame=world.root,
     )
-    drawer = world.get_body_by_name(ApartmentBody.DRAWER)
+    drawer = world.get_body_by_name(name=ApartmentBody.DRAWER)
     drawer_top = (
-        drawer.collision.as_bounding_box_collection_in_frame(world.root)
+        drawer.collision.as_bounding_box_collection_in_frame(reference_frame=world.root)
         .bounding_box()
         .z_interval.upper
     )

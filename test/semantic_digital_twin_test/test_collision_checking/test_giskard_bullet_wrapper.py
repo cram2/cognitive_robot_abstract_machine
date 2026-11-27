@@ -60,7 +60,7 @@ def non_convex_mesh():
     :return: The collision mesh of the jeroen cup.
     """
     stl_path = "package://iai_objects/objects/jeroen_cup.stl"
-    world_with_stl = STLParser(stl_path).create_world()
+    world_with_stl = STLParser(file_path=stl_path).create_world()
     body: Body = world_with_stl.root
     return body.collision[0]
 
@@ -173,9 +173,9 @@ def test_create_shape_from_geometry_reuses_shape_for_repeated_geometry(
     load_calls = []
     original_load_in_meters = Mesh._load_in_meters
 
-    def counting_load_in_meters(filename, process=True):
+    def counting_load_in_meters(*, filename, process=True):
         load_calls.append(filename)
-        return original_load_in_meters(filename, process=process)
+        return original_load_in_meters(filename=filename, process=process)
 
     monkeypatch.setattr(Mesh, "_load_in_meters", staticmethod(counting_load_in_meters))
 
@@ -197,14 +197,14 @@ def test_create_shape_from_geometry_shared_shape_does_not_leak_pose_between_worl
     """
     world_a, box_a, cylinder_a, sphere_a, mesh_a, compound_a = world_setup_simple
     world_b = copy.deepcopy(world_a)
-    box_b = world_b.get_kinematic_structure_entity_by_id(box_a.id)
-    cylinder_b = world_b.get_kinematic_structure_entity_by_id(cylinder_a.id)
+    box_b = world_b.get_kinematic_structure_entity_by_id(id=box_a.id)
+    cylinder_b = world_b.get_kinematic_structure_entity_by_id(id=cylinder_a.id)
 
     detector_a = BulletCollisionDetector(_world=world_a)
     detector_b = BulletCollisionDetector(_world=world_b)
 
     baseline_collision_b = detector_b.check_collision_between_bodies(
-        box_b, cylinder_b, distance=10
+        body_a=box_b, body_b=cylinder_b, distance=10
     )
     baseline_distance_b = baseline_collision_b.distance
 
@@ -214,7 +214,7 @@ def test_create_shape_from_geometry_shared_shape_does_not_leak_pose_between_worl
     world_a.notify_state_change()
 
     collision_b_after = detector_b.check_collision_between_bodies(
-        box_b, cylinder_b, distance=10
+        body_a=box_b, body_b=cylinder_b, distance=10
     )
 
     assert collision_b_after.distance == pytest.approx(baseline_distance_b)
@@ -223,7 +223,7 @@ def test_create_shape_from_geometry_shared_shape_does_not_leak_pose_between_worl
 # %% reading the cache while a mesh is decomposed
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DecomposerWatchingTheCache(MeshDecomposer):
     """
     A decomposer that notes, whenever it decomposes, whether the decomposition's cache
@@ -240,12 +240,12 @@ class DecomposerWatchingTheCache(MeshDecomposer):
     Whether :attr:`cache_file` existed, at each decomposition.
     """
 
-    def apply_to_mesh(self, mesh: Mesh) -> list[Shape]:
+    def apply_to_mesh(self, *, mesh: Mesh) -> list[Shape]:
         return [Mesh.box(extents=(1, 1, 1)), Mesh.box(extents=(2, 1, 1))]
 
-    def apply_to_mesh_and_save(self, mesh: Mesh, output_path: str) -> str:
+    def apply_to_mesh_and_save(self, *, mesh: Mesh, output_path: str) -> str:
         self.cache_file_existed.append(self.cache_file.exists())
-        trimesh.Scene([part.mesh for part in self.apply_to_mesh(mesh)]).export(
+        trimesh.Scene([part.mesh for part in self.apply_to_mesh(mesh=mesh)]).export(
             output_path, file_type="obj"
         )
         return output_path
@@ -269,7 +269,7 @@ def test_a_decomposition_appears_in_the_cache_only_once_it_is_finished(
     assert decomposer.cache_file_existed == [False]
     assert cached == str(decomposer.cache_file)
     assert sum(1 for line in open(cached) if line.startswith("o ")) == len(
-        decomposer.apply_to_mesh(non_convex_mesh)
+        decomposer.apply_to_mesh(mesh=non_convex_mesh)
     )
 
 
@@ -292,7 +292,9 @@ def test_mesh_in_a_file_bullet_cannot_read_collides_like_the_same_mesh_in_obj(
     monkeypatch.setattr(pybullet_collision_detector, "_shape_cache", {})
     box = trimesh.creation.box(extents=(1.0, 2.0, 3.0))
     meshes = [
-        Mesh.from_trimesh(mesh=box, scale=Scale(2.0, 1.0, 1.0), file_type=file_format)
+        Mesh.from_trimesh(
+            mesh=box, scale=Scale(x=2.0, y=1.0, z=1.0), file_type=file_format
+        )
         for file_format in (MeshFileFormat.GLB, MeshFileFormat.OBJ)
     ]
 
@@ -316,7 +318,7 @@ def test_a_cached_copy_of_a_mesh_is_not_taken_for_its_decomposition(
     )
 
     assert sum(1 for line in open(decomposition) if line.startswith("o ")) == len(
-        decomposer.apply_to_mesh(non_convex_mesh)
+        decomposer.apply_to_mesh(mesh=non_convex_mesh)
     )
 
 
@@ -349,7 +351,7 @@ def test_a_mesh_turned_within_its_file_collides_like_its_turned_vertices(monkeyp
     monkeypatch.setattr(pybullet_collision_detector, "_shape_cache", {})
     unturned = Mesh.from_trimesh(
         mesh=trimesh.creation.box(extents=(1.0, 2.0, 3.0)),
-        scale=Scale(0.5, 0.5, 0.5),
+        scale=Scale(x=0.5, y=0.5, z=0.5),
         file_type=MeshFileFormat.OBJ,
     )
     turned = replace(

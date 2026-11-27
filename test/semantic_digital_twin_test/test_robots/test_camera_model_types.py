@@ -42,21 +42,21 @@ if TYPE_CHECKING:
 
 
 # %% Projection model bindings
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PinholeProjection(Camera[PinholeCameraModel]):
     """
     A standalone camera with a pinhole projection contract.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class AngularProjection(Camera[FieldOfViewCameraModel]):
     """
     A standalone camera with an angular projection contract.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class RobotPinholeProjection(RobotCamera[PinholeCameraModel]):
     """
     A robot camera with a pinhole projection contract.
@@ -137,10 +137,12 @@ def test_robot_projection_field_matches_default_model(
     Each robot camera narrows its projection field to its default model's type.
     """
     monkeypatch.setattr(
-        table_world, "get_body_in_branch_by_name", lambda root, name: table_world.root
+        table_world,
+        "get_body_in_branch_by_name",
+        lambda *, branch_root, name: table_world.root,
     )
     camera = camera_type.setup_default_configuration_in_world_below_robot_root(
-        table_world.root
+        robot_root=table_world.root
     )
     model_field = next(
         camera_field

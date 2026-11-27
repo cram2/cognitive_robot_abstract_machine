@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from semantic_digital_twin.world import World
 
 
-@dataclass(repr=False, eq=False)
+@dataclass(repr=False, eq=False, kw_only=True)
 class CollisionGroup:
     """
     Bodies in this group are viewed as a single entity for collision checking purposes.
@@ -48,7 +48,7 @@ class CollisionGroup:
     """
 
     def __post_init__(self):
-        self.add_body(self.root)
+        self.add_body(body=self.root)
 
     def __repr__(self) -> str:
         return f"CollisionGroup(root={self.root.name}, bodies={[b.name for b in self.bodies]})"
@@ -67,11 +67,11 @@ class CollisionGroup:
     def __hash__(self):
         return hash(self.root)
 
-    def add_body(self, body: Body):
+    def add_body(self, *, body: Body):
         if body.has_collision():
             self.bodies.add(body)
 
-    def get_max_avoided_bodies(self, collision_manager: CollisionManager) -> int:
+    def get_max_avoided_bodies(self, *, collision_manager: CollisionManager) -> int:
         """
         Returns the maximum number of collisions `self` should avoid.
 
@@ -82,15 +82,15 @@ class CollisionGroup:
         max_avoided_bodies = []
         if isinstance(self.root, Body):
             max_avoided_bodies.append(
-                collision_manager.get_max_avoided_bodies(self.root)
+                collision_manager.get_max_avoided_bodies(body=self.root)
             )
         max_avoided_bodies.extend(
-            collision_manager.get_max_avoided_bodies(b) for b in self.bodies
+            collision_manager.get_max_avoided_bodies(body=b) for b in self.bodies
         )
         return max(max_avoided_bodies, default=1)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class CollisionGroupCombination:
     """
     Two collision groups whose contacts with each other are considered together, in a
@@ -108,7 +108,7 @@ class CollisionGroupCombination:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CollisionGroupConsumer(CollisionConsumer, ABC):
     """
     A collision consumer that keeps track of collision groups instead of individual
@@ -123,10 +123,10 @@ class CollisionGroupConsumer(CollisionConsumer, ABC):
     Collision groups defined by this post processor.
     """
 
-    def on_world_model_update(self, world: World):
-        self.update_collision_groups(world)
+    def on_world_model_update(self, *, world: World):
+        self.update_collision_groups(world=world)
 
-    def update_collision_groups(self, world: World):
+    def update_collision_groups(self, *, world: World):
         """
         Updates the collision groups based on the kinematic structure of the world.
 
@@ -134,18 +134,18 @@ class CollisionGroupConsumer(CollisionConsumer, ABC):
         """
         body_to_robot = world.robot_body_to_robot_mapping
 
-        self.collision_groups = [CollisionGroup(world.root)]
+        self.collision_groups = [CollisionGroup(root=world.root)]
         for parent, children in rustworkx.bfs_successors(
             world.kinematic_structure, world.root.index
         ):
             for child in children:
-                parent_C_child = world.get_connection(parent, child)
+                parent_C_child = world.get_connection(parent=parent, child=child)
                 if parent_C_child.is_controlled or body_to_robot.get(
                     parent
                 ) != body_to_robot.get(child):
-                    self.collision_groups.append(CollisionGroup(child))
+                    self.collision_groups.append(CollisionGroup(root=child))
                 else:
-                    collision_group = self.get_collision_group(parent)
+                    collision_group = self.get_collision_group(body=parent)
                     collision_group.bodies.add(child)
 
         # Inspecting a body's geometry is expensive, so ask the world once.
@@ -157,7 +157,7 @@ class CollisionGroupConsumer(CollisionConsumer, ABC):
             group for group in self.collision_groups if len(group.bodies) > 0
         ]
 
-    def get_collision_group(self, body: KinematicStructureEntity) -> CollisionGroup:
+    def get_collision_group(self, *, body: KinematicStructureEntity) -> CollisionGroup:
         """
         Ever body belongs to at most one collision group.
 

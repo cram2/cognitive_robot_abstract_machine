@@ -110,7 +110,7 @@ def test_motion_nodes_and_nodes_of_other_modules_run_in_one_statechart(
     the executor ticks, with a controller built for the motion node.
     """
     root = cylinder_bot_world.root
-    tip = cylinder_bot_world.get_kinematic_structure_entity_by_name("bot")
+    tip = cylinder_bot_world.get_kinematic_structure_entity_by_name(name="bot")
     goal = CartesianPosition(
         kinematic_chain=KinematicChain(root=root, tip=tip),
         goal_point=Point3(x=0.1, reference_frame=root),
@@ -215,8 +215,12 @@ def test_a_joint_at_its_limit_stays_put_until_its_node_runs(
     moved_first, waiting = prismatic_bot2.controlled_connections
     lower_limit = waiting.raw_dof.limits.lower.position
     waiting.position = lower_limit
-    first = JointPositionList(goal_state=JointState.from_mapping({moved_first: 0.8}))
-    second = JointPositionList(goal_state=JointState.from_mapping({waiting: 0.0}))
+    first = JointPositionList(
+        goal_state=JointState.from_mapping(mapping={moved_first: 0.8})
+    )
+    second = JointPositionList(
+        goal_state=JointState.from_mapping(mapping={waiting: 0.0})
+    )
 
     recording = run_one_joint_goal_after_another(
         prismatic_bot2, first, second, recorded=waiting, while_running=first
@@ -229,9 +233,11 @@ def test_a_joint_is_at_rest_once_its_node_ended(prismatic_bot2: World) -> None:
     moved_second, moved_first = prismatic_bot2.controlled_connections
     upper_limit = moved_first.raw_dof.limits.upper.position
     first = JointPositionList(
-        goal_state=JointState.from_mapping({moved_first: upper_limit})
+        goal_state=JointState.from_mapping(mapping={moved_first: upper_limit})
     )
-    second = JointPositionList(goal_state=JointState.from_mapping({moved_second: 0.8}))
+    second = JointPositionList(
+        goal_state=JointState.from_mapping(mapping={moved_second: 0.8})
+    )
 
     recording = run_one_joint_goal_after_another(
         prismatic_bot2, first, second, recorded=moved_first, while_running=second

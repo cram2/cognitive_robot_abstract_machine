@@ -111,8 +111,8 @@ class TestEntryIsCopiedWhole:
     the whole directory is what has to arrive.
     """
 
-    def test_every_file_of_the_entry_is_copied(self, dataset_server, served_dataset):
-        answered = Path(dataset_server.resolve(REFERENCE))
+    def test_every_file_of_the_entry_is_copied(self, *, dataset_server, served_dataset):
+        answered = Path(dataset_server.resolve(uri=REFERENCE))
 
         copied = {
             item.name
@@ -121,14 +121,14 @@ class TestEntryIsCopiedWhole:
         }
         assert copied == {item.name for item in (served_dataset / ENTRY).iterdir()}
 
-    def test_answer_is_the_copy_and_not_the_reference(self, dataset_server):
-        answered = Path(dataset_server.resolve(REFERENCE))
+    def test_answer_is_the_copy_and_not_the_reference(self, *, dataset_server):
+        answered = Path(dataset_server.resolve(uri=REFERENCE))
 
         assert answered == dataset_server.cache / ENTRY / MESH_NAME
         assert answered.is_file()
 
-    def test_directories_in_a_listing_are_not_copied(self, dataset_server):
-        listing = dataset_server.list_directory(ENTRY)
+    def test_directories_in_a_listing_are_not_copied(self, *, dataset_server):
+        listing = dataset_server.list_directory(relative_directory=ENTRY)
 
         assert {item.kind for item in listing} == {ListedItemKind.FILE}
 
@@ -142,16 +142,16 @@ class TestCopiedMeshLoads:
     resolve against the copy.
     """
 
-    def test_texture_resolves_from_the_copied_entry(self, dataset_server):
-        mesh = trimesh.load_mesh(dataset_server.resolve(REFERENCE), process=False)
+    def test_texture_resolves_from_the_copied_entry(self, *, dataset_server):
+        mesh = trimesh.load_mesh(dataset_server.resolve(uri=REFERENCE), process=False)
 
         with Image.open(PLY_RESOURCES / "chair_texture.png") as expected:
             assert mesh.visual.material.image.size == expected.size
 
     def test_reading_through_the_server_matches_reading_the_file(
-        self, dataset_server, served_dataset
+        self, *, dataset_server, served_dataset
     ):
-        MeshFileSources().use(dataset_server)
+        MeshFileSources().use(source=dataset_server)
 
         through_server = Mesh(filename=REFERENCE).mesh
         directly = Mesh(filename=str(served_dataset / ENTRY / MESH_NAME)).mesh
@@ -169,20 +169,22 @@ class TestCachedEntryIsNotFetchedAgain:
     good.
     """
 
-    def test_second_resolution_makes_no_request(self, dataset_server, file_server):
-        dataset_server.resolve(REFERENCE)
+    def test_second_resolution_makes_no_request(self, *, dataset_server, file_server):
+        dataset_server.resolve(uri=REFERENCE)
         after_first = list(file_server.requested_paths)
 
-        dataset_server.resolve(REFERENCE)
+        dataset_server.resolve(uri=REFERENCE)
 
         assert file_server.requested_paths == after_first
 
-    def test_copy_without_its_marker_is_made_again(self, dataset_server, file_server):
-        answered = Path(dataset_server.resolve(REFERENCE))
+    def test_copy_without_its_marker_is_made_again(
+        self, *, dataset_server, file_server
+    ):
+        answered = Path(dataset_server.resolve(uri=REFERENCE))
         (answered.parent / dataset_server.completion_marker).unlink()
         after_first = len(file_server.requested_paths)
 
-        dataset_server.resolve(REFERENCE)
+        dataset_server.resolve(uri=REFERENCE)
 
         assert len(file_server.requested_paths) > after_first
 
@@ -196,20 +198,20 @@ class TestOnlyReferencesBelowTheRootAreClaimed:
     everything would take files it has no copy of.
     """
 
-    def test_path_outside_the_root_is_not_claimed(self, dataset_server):
-        assert not dataset_server.supports("/home/somebody/local.obj")
+    def test_path_outside_the_root_is_not_claimed(self, *, dataset_server):
+        assert not dataset_server.supports(uri="/home/somebody/local.obj")
 
-    def test_resolving_an_unclaimed_path_is_refused(self, dataset_server):
+    def test_resolving_an_unclaimed_path_is_refused(self, *, dataset_server):
         with pytest.raises(PathResolutionError):
-            dataset_server.resolve("/home/somebody/local.obj")
+            dataset_server.resolve(uri="/home/somebody/local.obj")
 
     def test_local_path_falls_through_to_the_file_resolver(
-        self, dataset_server, tmp_path
+        self, *, dataset_server, tmp_path
     ):
         composite = CompositePathResolver(resolvers=[dataset_server, FileUriResolver()])
         local_file = str(tmp_path / "local.obj")
 
-        assert composite.resolve(local_file) == os.path.abspath(local_file)
+        assert composite.resolve(uri=local_file) == os.path.abspath(local_file)
 
 
 # %% when the server has nothing to answer with
@@ -221,11 +223,11 @@ class TestMissingEntryIsReported:
     transport failure, and says so.
     """
 
-    def test_missing_entry_raises_with_the_status(self, dataset_server):
+    def test_missing_entry_raises_with_the_status(self, *, dataset_server):
         missing = str(DATASET_ROOT / "mesh_store/zz/absent/thing.obj")
 
         with pytest.raises(DatasetServerError) as raised:
-            dataset_server.resolve(missing)
+            dataset_server.resolve(uri=missing)
 
         assert raised.value.status_code == HTTPStatus.NOT_FOUND
 
@@ -240,10 +242,10 @@ class TestMeshReadsThroughRegisteredSources:
     """
 
     def test_reference_is_answered_with_itself_when_nothing_claims_it(self):
-        assert MeshFileSources().resolve(REFERENCE) == Path(REFERENCE)
+        assert MeshFileSources().resolve(uri=REFERENCE) == Path(REFERENCE)
 
-    def test_registered_source_answers_the_reference(self, dataset_server):
-        MeshFileSources().use(dataset_server)
+    def test_registered_source_answers_the_reference(self, *, dataset_server):
+        MeshFileSources().use(source=dataset_server)
 
         assert Mesh(filename=REFERENCE).local_file == (
             dataset_server.cache / ENTRY / MESH_NAME
@@ -259,13 +261,13 @@ class TestServerIsDescribedByTheEnvironment:
     all the configuration there is.
     """
 
-    def test_no_server_without_an_address(self, monkeypatch):
+    def test_no_server_without_an_address(self, *, monkeypatch):
         monkeypatch.delenv(DatasetServerVariable.BASE_URL, raising=False)
 
         assert DatasetServer.from_environment() is None
 
     def test_address_and_cache_are_read_from_the_environment(
-        self, monkeypatch, tmp_path
+        self, *, monkeypatch, tmp_path
     ):
         monkeypatch.setenv(DatasetServerVariable.BASE_URL, "http://host:18080/datasets")
         monkeypatch.setenv(DatasetServerVariable.DATASET_ROOT, str(DATASET_ROOT))
@@ -278,7 +280,7 @@ class TestServerIsDescribedByTheEnvironment:
         assert server.cache == tmp_path
 
     def test_cache_defaults_to_the_directory_the_package_downloads_into(
-        self, monkeypatch
+        self, *, monkeypatch
     ):
         monkeypatch.setenv(DatasetServerVariable.BASE_URL, "http://host:18080/datasets")
         monkeypatch.delenv(DatasetServerVariable.CACHE_DIRECTORY, raising=False)

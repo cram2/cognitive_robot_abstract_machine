@@ -56,7 +56,7 @@ def test_looking_for_the_publisher_of_a_type_nobody_publishes_raises(
     init_background_node,
 ) -> None:
     with pytest.raises(TopicNotFoundError) as raised:
-        RosGraph().unique_publisher_of_type(FloatingPointRange)
+        RosGraph().unique_publisher_of_type(topic_type=FloatingPointRange)
 
     assert raised.value.message_type_name == "rcl_interfaces/msg/FloatingPointRange"
 
@@ -65,7 +65,7 @@ def test_looking_for_the_publisher_of_a_type_two_topics_carry_raises(
     two_topics_of_one_type: list[str],
 ) -> None:
     with pytest.raises(AmbiguousTopicError) as raised:
-        RosGraph().unique_publisher_of_type(FloatingPointRange)
+        RosGraph().unique_publisher_of_type(topic_type=FloatingPointRange)
 
     assert sorted(raised.value.topic_names) == two_topics_of_one_type
 
@@ -83,7 +83,7 @@ def test_a_latched_robot_description_is_received(init_background_node) -> None:
     )
     publisher.publish(String(data="<robot/>"))
 
-    description = RosGraph().robot_description(topic)
+    description = RosGraph().robot_description(topic=topic)
     node.destroy_publisher(publisher)
 
     assert description == "<robot/>"
@@ -92,7 +92,9 @@ def test_a_latched_robot_description_is_received(init_background_node) -> None:
 def test_waiting_for_a_message_nobody_publishes_raises(init_background_node) -> None:
     with pytest.raises(NoMessageReceivedError) as raised:
         RosGraph().wait_for_message(
-            String, "/topic_nobody_publishes_on", timeout=timedelta(seconds=0.1)
+            message_type=String,
+            topic="/topic_nobody_publishes_on",
+            timeout=timedelta(seconds=0.1),
         )
 
     assert raised.value.topic == "/topic_nobody_publishes_on"
@@ -117,7 +119,9 @@ def test_calling_a_service_returns_its_response(init_background_node) -> None:
         Trigger, "service_offered_by_the_test", respond_called
     )
     response = RosGraph().call_service(
-        Trigger, "service_offered_by_the_test", Trigger.Request()
+        service_type=Trigger,
+        service_name="service_offered_by_the_test",
+        request=Trigger.Request(),
     )
     node.destroy_service(service)
 
@@ -127,8 +131,8 @@ def test_calling_a_service_returns_its_response(init_background_node) -> None:
 def test_calling_a_service_that_nobody_offers_raises(init_background_node) -> None:
     with pytest.raises(ServiceUnavailableError):
         RosGraph().call_service(
-            Trigger,
-            "service_that_nobody_offers",
-            Trigger.Request(),
+            service_type=Trigger,
+            service_name="service_that_nobody_offers",
+            request=Trigger.Request(),
             wait_timeout=timedelta(seconds=0.1),
         )

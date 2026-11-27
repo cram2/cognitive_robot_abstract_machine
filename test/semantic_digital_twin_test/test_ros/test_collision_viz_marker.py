@@ -21,7 +21,7 @@ from semantic_digital_twin.collision_checking.collision_rules import (
 from semantic_digital_twin.robots.minimal_robot import MinimalRobot
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MarkerArrayRecorder:
     namespace: str
     last_msg: MarkerArray = field(init=False, default=None)
@@ -35,9 +35,11 @@ def _avoid_robot_environment_collisions(world):
     """
     Adds a rule so the robot avoids both environment bodies and rebuilds the matrix.
     """
-    robot = world.get_semantic_annotations_by_type(MinimalRobot)[0]
-    environment = world.get_kinematic_structure_entity_by_name("environment")
-    environment2 = world.get_kinematic_structure_entity_by_name("environment2")
+    robot = world.get_semantic_annotations_by_type(
+        semantic_annotation_type=MinimalRobot
+    )[0]
+    environment = world.get_kinematic_structure_entity_by_name(name="environment")
+    environment2 = world.get_kinematic_structure_entity_by_name(name="environment2")
     collision_manager = world.collision_manager
     collision_manager.temporary_rules.append(
         AvoidCollisionBetweenGroups(
@@ -116,7 +118,7 @@ def test_color_red_when_violated(rclpy_node, cylinder_bot_world):
 
     # The robot is moved into one environment body; the other stays inside the buffer
     # zone.
-    cylinder_bot_world.get_connections_by_type(OmniDrive)[
+    cylinder_bot_world.get_connections_by_type(connection_type=OmniDrive)[
         0
     ].origin = HomogeneousTransformationMatrix.from_xyz_rpy(x=1)
 
@@ -138,7 +140,7 @@ def test_color_green_when_above_buffer_threshold(rclpy_node, cylinder_bot_world)
     recorder = _subscribe(rclpy_node, publisher)
 
     # put robot to 10.3 to be above buffer threshold but close enough to still get checked.
-    cylinder_bot_world.get_connections_by_type(OmniDrive)[
+    cylinder_bot_world.get_connections_by_type(connection_type=OmniDrive)[
         0
     ].origin = HomogeneousTransformationMatrix.from_xyz_rpy(x=-10.3)
 
@@ -243,7 +245,7 @@ def test_no_labels_for_contacts_outside_the_buffer_zone(rclpy_node, cylinder_bot
     recorder = _subscribe(rclpy_node, publisher)
 
     # put robot to 10.3 to be above buffer threshold but close enough to still get checked.
-    cylinder_bot_world.get_connections_by_type(OmniDrive)[
+    cylinder_bot_world.get_connections_by_type(connection_type=OmniDrive)[
         0
     ].origin = HomogeneousTransformationMatrix.from_xyz_rpy(x=-10.3)
 
@@ -271,7 +273,7 @@ def test_labels_of_contacts_that_left_the_buffer_zone_are_deleted(
     assert published_label_ids
     recorder.last_msg = None
 
-    cylinder_bot_world.get_connections_by_type(OmniDrive)[
+    cylinder_bot_world.get_connections_by_type(connection_type=OmniDrive)[
         0
     ].origin = HomogeneousTransformationMatrix.from_xyz_rpy(x=-10.3)
     collision_manager.compute_collisions()

@@ -13,7 +13,7 @@ from semantic_digital_twin.collision_checking.collision_matrix import CollisionM
 from semantic_digital_twin.world_description.world_entity import Body
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FCLCollisionDetector(CollisionDetector):
     collision_manager: CollisionManager = field(
         default_factory=CollisionManager, init=False
@@ -79,7 +79,7 @@ class FCLCollisionDetector(CollisionDetector):
             )
 
     def check_collisions(
-        self, collision_matrix: CollisionMatrix
+        self, *, collision_matrix: CollisionMatrix
     ) -> CollisionCheckingResult:
         """
         Checks for collisions in the current world state.
@@ -135,7 +135,7 @@ class FCLCollisionDetector(CollisionDetector):
                 )
             )
 
-        return CollisionCheckingResult(result)
+        return CollisionCheckingResult(contacts=result)
 
     def reset_cache(self):
         pass

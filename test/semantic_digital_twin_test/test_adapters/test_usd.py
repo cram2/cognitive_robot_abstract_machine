@@ -203,7 +203,7 @@ def test_parse_places_a_top_level_prim_at_its_authored_pose():
     world = parse(build_jointless_stage_with_posed_top_level_prims())
 
     [body] = [body for body in world.bodies if body.name.name == "object_a"]
-    root_T_body = world.compute_forward_kinematics_np(world.root, body)
+    root_T_body = world.compute_forward_kinematics_np(root=world.root, tip=body)
 
     np.testing.assert_allclose(root_T_body[:3, 3], [2.0, 0.0, 0.0], atol=1e-6)
     np.testing.assert_allclose(
@@ -283,7 +283,7 @@ def test_component_parser_places_a_component_at_its_authored_pose():
     world = parse_components(build_component_scene_stage())
 
     root_T_chair = world.compute_forward_kinematics_np(
-        world.root, component_body(world, "chairs/chair_0")
+        root=world.root, tip=component_body(world, "chairs/chair_0")
     )
 
     np.testing.assert_allclose(root_T_chair[:3, 3], [2.0, 0.0, 0.0], atol=1e-6)
@@ -370,7 +370,7 @@ def test_component_parser_places_a_link_inside_a_component_where_its_joint_puts_
     )
 
     root_T_door = world.compute_forward_kinematics_np(
-        world.root, component_body(world, "cabinet/door")
+        root=world.root, tip=component_body(world, "cabinet/door")
     )
 
     np.testing.assert_allclose(root_T_door[:3, 3], [3.0, 0.0, 0.0], atol=1e-6)
@@ -491,7 +491,7 @@ def test_create_mesh_shape_applies_a_non_uniform_scale():
     stage = build_stage_with_scaled_mesh(scale=(2.0, 3.0, 4.0))
     mesh_prim = stage.GetPrimAtPath("/object/scaled/mesh")
 
-    shape = USDMeshShapeBuilder(mesh_prim, Gf.Matrix4d(1)).build()
+    shape = USDMeshShapeBuilder(prim=mesh_prim, link_to_world=Gf.Matrix4d(1)).build()
 
     vertices = shape.unscaled_mesh.vertices
     np.testing.assert_allclose(vertices.max(axis=0), [2.0, 3.0, 0.0], atol=1e-5)
@@ -563,7 +563,7 @@ def test_parse_inertial_reads_mass_api_properties():
         mass=2.0, center_of_mass=(0.1, 0.2, 0.3), diagonal_inertia=(1.0, 2.0, 3.0)
     )
     link_prim = stage.GetPrimAtPath("/object/child")
-    body = Body(name=PrefixedName("test_body"))
+    body = Body(name=PrefixedName(name="test_body"))
 
     inertial = USDParser._parse_inertial(link_prim=link_prim, body=body)
 
@@ -577,7 +577,7 @@ def test_parse_inertial_reads_mass_api_properties():
 def test_parse_inertial_is_none_without_mass_api():
     stage = build_single_joint_stage("FixedJoint")
     link_prim = stage.GetPrimAtPath("/object/child")
-    body = Body(name=PrefixedName("test_body"))
+    body = Body(name=PrefixedName(name="test_body"))
 
     assert USDParser._parse_inertial(link_prim=link_prim, body=body) is None
 
@@ -662,7 +662,7 @@ def test_diffuse_texture_path_resolves_the_bound_texture(texture_file):
     stage = build_stage_with_textured_mesh(texture_file)
     mesh_prim = stage.GetPrimAtPath("/object/mesh")
 
-    resolved = USDMeshShapeBuilder._diffuse_texture_path(mesh_prim)
+    resolved = USDMeshShapeBuilder._diffuse_texture_path(mesh_prim=mesh_prim)
 
     assert resolved == texture_file
 
@@ -671,7 +671,7 @@ def test_diffuse_texture_path_is_none_without_a_bound_material(texture_file):
     stage = build_stage_with_textured_mesh(texture_file)
     unbound_mesh_prim = stage.DefinePrim("/object/unbound_mesh", "Mesh")
 
-    resolved = USDMeshShapeBuilder._diffuse_texture_path(unbound_mesh_prim)
+    resolved = USDMeshShapeBuilder._diffuse_texture_path(mesh_prim=unbound_mesh_prim)
 
     assert resolved is None
 
@@ -680,7 +680,7 @@ def test_uv_coordinates_reads_the_per_point_st_primvar(texture_file):
     stage = build_stage_with_textured_mesh(texture_file)
     mesh_prim = stage.GetPrimAtPath("/object/mesh")
 
-    uv = USDMeshShapeBuilder._uv_coordinates(mesh_prim)
+    uv = USDMeshShapeBuilder._uv_coordinates(mesh_prim=mesh_prim)
 
     np.testing.assert_array_equal(uv, [[0, 0], [1, 0], [1, 1], [0, 1]])
 
@@ -689,7 +689,7 @@ def test_uv_coordinates_is_none_without_an_st_primvar(texture_file):
     stage = build_stage_with_textured_mesh(texture_file)
     unbound_mesh_prim = stage.DefinePrim("/object/unbound_mesh", "Mesh")
 
-    uv = USDMeshShapeBuilder._uv_coordinates(unbound_mesh_prim)
+    uv = USDMeshShapeBuilder._uv_coordinates(mesh_prim=unbound_mesh_prim)
 
     assert uv is None
 
@@ -698,7 +698,7 @@ def test_create_mesh_shape_applies_the_bound_texture(texture_file):
     stage = build_stage_with_textured_mesh(texture_file)
     mesh_prim = stage.GetPrimAtPath("/object/mesh")
 
-    shape = USDMeshShapeBuilder(mesh_prim, Gf.Matrix4d(1)).build()
+    shape = USDMeshShapeBuilder(prim=mesh_prim, link_to_world=Gf.Matrix4d(1)).build()
 
     mesh = shape.unscaled_mesh
     assert mesh.visual.kind == "texture"
@@ -712,7 +712,9 @@ def test_create_mesh_shape_has_no_texture_without_a_bound_material(texture_file)
     unbound_mesh.CreateFaceVertexCountsAttr([3])
     unbound_mesh.CreateFaceVertexIndicesAttr([0, 1, 2])
 
-    shape = USDMeshShapeBuilder(unbound_mesh.GetPrim(), Gf.Matrix4d(1)).build()
+    shape = USDMeshShapeBuilder(
+        prim=unbound_mesh.GetPrim(), link_to_world=Gf.Matrix4d(1)
+    ).build()
 
     assert shape.unscaled_mesh.visual.kind != "texture"
 
@@ -721,21 +723,29 @@ def test_create_mesh_shape_has_no_texture_without_a_bound_material(texture_file)
 
 
 def test_triangulate_keeps_a_triangle_as_is():
-    faces = USDMeshShapeBuilder._triangulate([3], [0, 1, 2])
+    faces = USDMeshShapeBuilder._triangulate(
+        face_vertex_counts=[3], face_vertex_indices=[0, 1, 2]
+    )
     np.testing.assert_array_equal(faces, [[0, 1, 2]])
 
 
 def test_triangulate_fans_a_quad_into_two_triangles():
-    faces = USDMeshShapeBuilder._triangulate([4], [0, 1, 2, 3])
+    faces = USDMeshShapeBuilder._triangulate(
+        face_vertex_counts=[4], face_vertex_indices=[0, 1, 2, 3]
+    )
     np.testing.assert_array_equal(faces, [[0, 1, 2], [0, 2, 3]])
 
 
 def test_triangulate_fans_a_pentagon_into_three_triangles():
-    faces = USDMeshShapeBuilder._triangulate([5], [0, 1, 2, 3, 4])
+    faces = USDMeshShapeBuilder._triangulate(
+        face_vertex_counts=[5], face_vertex_indices=[0, 1, 2, 3, 4]
+    )
     np.testing.assert_array_equal(faces, [[0, 1, 2], [0, 2, 3], [0, 3, 4]])
 
 
 def test_triangulate_handles_multiple_faces_of_different_sizes():
     # A triangle followed by a quad, sharing no vertex indices.
-    faces = USDMeshShapeBuilder._triangulate([3, 4], [0, 1, 2, 3, 4, 5, 6])
+    faces = USDMeshShapeBuilder._triangulate(
+        face_vertex_counts=[3, 4], face_vertex_indices=[0, 1, 2, 3, 4, 5, 6]
+    )
     np.testing.assert_array_equal(faces, [[0, 1, 2], [3, 4, 5], [3, 5, 6]])

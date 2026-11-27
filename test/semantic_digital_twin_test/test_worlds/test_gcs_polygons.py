@@ -39,20 +39,22 @@ from semantic_digital_twin.world_description.world_entity import Body
 def unit_box_world() -> World:
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("map"))
-        world.add_kinematic_structure_entity(root)
-        obstacle = Body(name=PrefixedName("unit_cube"))
+        root = Body(name=PrefixedName(name="map"))
+        world.add_kinematic_structure_entity(kinematic_structure_entity=root)
+        obstacle = Body(name=PrefixedName(name="unit_cube"))
         world.add_connection(
-            FixedConnection.create_with_dofs(world=world, parent=root, child=obstacle)
+            connection=FixedConnection.create_with_dofs(
+                world=world, parent=root, child=obstacle
+            )
         )
-        obstacle.collision.append(Box(scale=Scale(1.0, 1.0, 1.0)))
+        obstacle.collision.append(shape=Box(scale=Scale(x=1.0, y=1.0, z=1.0)))
     return world
 
 
 @pytest.fixture
 def unit_box_search_space(unit_box_world: World) -> BoundingBoxCollection:
     return BoundingBoxCollection(
-        [
+        shapes=[
             VolumetricBoundingBox(
                 min_x=-2,
                 max_x=3,
@@ -65,7 +67,7 @@ def unit_box_search_space(unit_box_world: World) -> BoundingBoxCollection:
                 ),
             )
         ],
-        unit_box_world.root,
+        reference_frame=unit_box_world.root,
     )
 
 
@@ -73,7 +75,9 @@ def unit_box_search_space(unit_box_world: World) -> BoundingBoxCollection:
 def unit_box_graph_of_convex_polygons(
     unit_box_world: World, unit_box_search_space: BoundingBoxCollection
 ) -> GraphOfConvexPolygons:
-    return GraphOfConvexPolygons.from_world(unit_box_world, unit_box_search_space)
+    return GraphOfConvexPolygons.from_world(
+        world=unit_box_world, search_space=unit_box_search_space
+    )
 
 
 @pytest.fixture
@@ -86,16 +90,18 @@ def non_convex_ring_world(tmp_path) -> World:
     """
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("map"))
-        world.add_kinematic_structure_entity(root)
-        obstacle = Body(name=PrefixedName("ring"))
+        root = Body(name=PrefixedName(name="map"))
+        world.add_kinematic_structure_entity(kinematic_structure_entity=root)
+        obstacle = Body(name=PrefixedName(name="ring"))
         world.add_connection(
-            FixedConnection.create_with_dofs(world=world, parent=root, child=obstacle)
+            connection=FixedConnection.create_with_dofs(
+                world=world, parent=root, child=obstacle
+            )
         )
         ring_mesh = trimesh.creation.annulus(r_min=0.3, r_max=0.5, height=0.2)
         assert not ring_mesh.is_convex
         obstacle.collision.append(
-            Mesh.from_trimesh(mesh=ring_mesh, directory=tmp_path, file_type="stl")
+            shape=Mesh.from_trimesh(mesh=ring_mesh, directory=tmp_path, file_type="stl")
         )
     return world
 
@@ -103,7 +109,7 @@ def non_convex_ring_world(tmp_path) -> World:
 @pytest.fixture
 def non_convex_ring_search_space(non_convex_ring_world: World) -> BoundingBoxCollection:
     return BoundingBoxCollection(
-        [
+        shapes=[
             VolumetricBoundingBox(
                 min_x=-2,
                 max_x=3,
@@ -116,18 +122,18 @@ def non_convex_ring_search_space(non_convex_ring_world: World) -> BoundingBoxCol
                 ),
             )
         ],
-        non_convex_ring_world.root,
+        reference_frame=non_convex_ring_world.root,
     )
 
 
 class TestGraphOfConvexPolygons:
     def test_is_a_graph_of_convex_sets(
-        self, unit_box_graph_of_convex_polygons: GraphOfConvexPolygons
+        self, *, unit_box_graph_of_convex_polygons: GraphOfConvexPolygons
     ):
         assert isinstance(unit_box_graph_of_convex_polygons, GraphOfConvexSets)
 
     def test_from_world_grows_at_least_one_region(
-        self, unit_box_graph_of_convex_polygons: GraphOfConvexPolygons
+        self, *, unit_box_graph_of_convex_polygons: GraphOfConvexPolygons
     ):
         assert unit_box_graph_of_convex_polygons.region_count > 0
         assert (
@@ -136,20 +142,21 @@ class TestGraphOfConvexPolygons:
         )
 
     def test_no_region_contains_the_obstacle(
-        self, unit_box_graph_of_convex_polygons: GraphOfConvexPolygons
+        self, *, unit_box_graph_of_convex_polygons: GraphOfConvexPolygons
     ):
         for region in unit_box_graph_of_convex_polygons.regions:
             assert not region.PointInSet(np.array([0.0, 0.0, 0.0]))
 
     def test_path_from_to_finds_a_path_around_the_cube(
         self,
+        *,
         unit_box_world: World,
         unit_box_graph_of_convex_polygons: GraphOfConvexPolygons,
     ):
         start = Point3(-1.5, -1.5, 0.0, reference_frame=unit_box_world.root)
         goal = Point3(2.5, 2.5, 0.0, reference_frame=unit_box_world.root)
 
-        path = unit_box_graph_of_convex_polygons.path_from_to(start, goal)
+        path = unit_box_graph_of_convex_polygons.path_from_to(start=start, goal=goal)
 
         assert path is not None
         assert path[0] is start
@@ -158,26 +165,29 @@ class TestGraphOfConvexPolygons:
 
     def test_path_from_to_raises_for_an_occupied_start(
         self,
+        *,
         unit_box_world: World,
         unit_box_graph_of_convex_polygons: GraphOfConvexPolygons,
     ):
         occupied = Point3(0.0, 0.0, 0.0, reference_frame=unit_box_world.root)
         free = Point3(2.5, 2.5, 0.0, reference_frame=unit_box_world.root)
         with pytest.raises(PointOccupiedError):
-            unit_box_graph_of_convex_polygons.path_from_to(occupied, free)
+            unit_box_graph_of_convex_polygons.path_from_to(start=occupied, goal=free)
 
     def test_path_from_to_raises_for_an_occupied_goal(
         self,
+        *,
         unit_box_world: World,
         unit_box_graph_of_convex_polygons: GraphOfConvexPolygons,
     ):
         occupied = Point3(0.0, 0.0, 0.0, reference_frame=unit_box_world.root)
         free = Point3(-1.5, -1.5, 0.0, reference_frame=unit_box_world.root)
         with pytest.raises(PointOccupiedError):
-            unit_box_graph_of_convex_polygons.path_from_to(free, occupied)
+            unit_box_graph_of_convex_polygons.path_from_to(start=free, goal=occupied)
 
     def test_repeated_queries_reuse_the_persistent_region_subgraph(
         self,
+        *,
         unit_box_world: World,
         unit_box_graph_of_convex_polygons: GraphOfConvexPolygons,
     ):
@@ -185,7 +195,9 @@ class TestGraphOfConvexPolygons:
         goal = Point3(2.5, 2.5, 0.0, reference_frame=unit_box_world.root)
 
         for start, goal in [(start, goal), (goal, start), (start, goal)]:
-            path = unit_box_graph_of_convex_polygons.path_from_to(start, goal)
+            path = unit_box_graph_of_convex_polygons.path_from_to(
+                start=start, goal=goal
+            )
             assert path is not None
             # region subgraph + one source + one target subgraph, regardless of how
             # many queries have already been solved.
@@ -197,30 +209,50 @@ class TestGraphOfConvexPolygons:
             )
 
     def test_from_world_rejects_a_default_unbounded_search_space(
-        self, unit_box_world: World
+        self, *, unit_box_world: World
     ):
         with pytest.raises(UnboundedSearchSpaceError):
-            GraphOfConvexPolygons.from_world(unit_box_world, None)
+            GraphOfConvexPolygons.from_world(world=unit_box_world, search_space=None)
 
-    def test_from_world_rejects_a_multi_box_search_space(self, unit_box_world: World):
+    def test_from_world_rejects_a_multi_box_search_space(
+        self, *, unit_box_world: World
+    ):
         origin = HomogeneousTransformationMatrix(reference_frame=unit_box_world.root)
         two_boxes = BoundingBoxCollection(
-            [
-                VolumetricBoundingBox(-2, -2, -0.5, -1, -1, 0.5, origin),
-                VolumetricBoundingBox(1, 1, -0.5, 2, 2, 0.5, origin),
+            shapes=[
+                VolumetricBoundingBox(
+                    min_x=-2,
+                    min_y=-2,
+                    min_z=-0.5,
+                    max_x=-1,
+                    max_y=-1,
+                    max_z=0.5,
+                    origin=origin,
+                ),
+                VolumetricBoundingBox(
+                    min_x=1,
+                    min_y=1,
+                    min_z=-0.5,
+                    max_x=2,
+                    max_y=2,
+                    max_z=0.5,
+                    origin=origin,
+                ),
             ],
-            unit_box_world.root,
+            reference_frame=unit_box_world.root,
         )
         with pytest.raises(UnboundedSearchSpaceError):
-            GraphOfConvexPolygons.from_world(unit_box_world, two_boxes)
+            GraphOfConvexPolygons.from_world(
+                world=unit_box_world, search_space=two_boxes
+            )
 
     def test_extra_seed_points_are_seeded_before_the_coverage_grid(
-        self, unit_box_world: World, unit_box_search_space: BoundingBoxCollection
+        self, *, unit_box_world: World, unit_box_search_space: BoundingBoxCollection
     ):
         far_corner = Point3(-1.9, -1.9, 0.0, reference_frame=unit_box_world.root)
         graph_of_convex_polygons = GraphOfConvexPolygons.from_world(
-            unit_box_world,
-            unit_box_search_space,
+            world=unit_box_world,
+            search_space=unit_box_search_space,
             seeding_settings=IrisSeedingSettings(grid_resolution=1, max_regions=1),
             extra_seed_points=[far_corner],
         )
@@ -230,18 +262,19 @@ class TestGraphOfConvexPolygons:
         )
 
     def test_convex_obstacle_uses_an_exact_vpolytope(
-        self, unit_box_graph_of_convex_polygons: GraphOfConvexPolygons
+        self, *, unit_box_graph_of_convex_polygons: GraphOfConvexPolygons
     ):
         assert len(unit_box_graph_of_convex_polygons.obstacles) == 1
         assert isinstance(unit_box_graph_of_convex_polygons.obstacles[0], VPolytope)
 
     def test_non_convex_obstacle_falls_back_to_a_bounding_box(
         self,
+        *,
         non_convex_ring_world: World,
         non_convex_ring_search_space: BoundingBoxCollection,
     ):
         graph_of_convex_polygons = GraphOfConvexPolygons.from_world(
-            non_convex_ring_world, non_convex_ring_search_space
+            world=non_convex_ring_world, search_space=non_convex_ring_search_space
         )
         assert len(graph_of_convex_polygons.obstacles) == 1
         assert isinstance(graph_of_convex_polygons.obstacles[0], HPolyhedron)
@@ -251,6 +284,6 @@ class TestGraphOfConvexPolygons:
         center = Point3(0.0, 0.0, 0.0, reference_frame=non_convex_ring_world.root)
         with pytest.raises(PointOccupiedError):
             graph_of_convex_polygons.path_from_to(
-                center,
-                Point3(2.5, 2.5, 0.0, reference_frame=non_convex_ring_world.root),
+                start=center,
+                goal=Point3(2.5, 2.5, 0.0, reference_frame=non_convex_ring_world.root),
             )

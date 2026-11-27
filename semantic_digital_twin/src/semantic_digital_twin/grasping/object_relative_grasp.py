@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 # %% the result of trying a grasp
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GraspResult:
     """
     What happened to an object when a robot tried to pick it up by a grasp.
@@ -44,8 +44,8 @@ class GraspResult:
 
     object_displacement: Displacement
     """
-    How the object moved from where it rested to where it was held at the end, along
-    the world's axes.
+    How the object moved from where it rested to where it was held at the end, along the
+    world's axes.
     """
 
     slip: Displacement
@@ -90,7 +90,7 @@ def _any_displacement() -> Match[Displacement]:
 # %% grasps relative to an object
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ObjectRelativeGrasp(ABC):
     """
     A grasp of an object, described by parameters relative to the object independently
@@ -103,7 +103,7 @@ class ObjectRelativeGrasp(ABC):
     """
 
     @classmethod
-    def any_pattern(cls, result: Match[GraspResult] | None = None) -> Match[Self]:
+    def any_pattern(cls, *, result: Match[GraspResult] | None = None) -> Match[Self]:
         """
         :param result: The result the grasp is asked to have had; any result when
             ``None``.

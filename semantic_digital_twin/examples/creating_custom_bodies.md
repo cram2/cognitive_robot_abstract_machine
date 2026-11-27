@@ -52,7 +52,7 @@ from semantic_digital_twin.world_description.shape_collection import ShapeCollec
 from semantic_digital_twin.world_description.geometry import Box, Scale, Sphere, Cylinder, Mesh, Color
 
 box_origin = HomogeneousTransformationMatrix.from_xyz_rpy(x=0, y=0, z=0, roll=0, pitch=0, yaw=0)
-box = Box(origin=box_origin, scale=Scale(1., 1., 0.5), color=Color.from_rgba(red=1., green=0., blue=0., opacity=1., ))
+box = Box(origin=box_origin, scale=Scale(x=1., y=1., z=0.5), color=Color.from_rgba(red=1., green=0., blue=0., opacity=1., ))
 
 sphere_origin = HomogeneousTransformationMatrix.from_xyz_quaternion(pos_x=0, pos_y=1., pos_z=1., quat_x=0., quat_y=0., quat_z=0.,
                                                    quat_w=1.)
@@ -65,19 +65,19 @@ cylinder = Cylinder(origin=cylinder_origin, width=0.05, height=0.5)
 mesh = Mesh(origin=HomogeneousTransformationMatrix(),
             filename="package://iai_objects/objects/milk.stl")
 
-collision = ShapeCollection([cylinder, sphere, box])
-visual = ShapeCollection([mesh])
-body = Body(name=PrefixedName("my first body", "my first prefix"), visual=visual, collision=collision)
+collision = ShapeCollection(shapes=[cylinder, sphere, box])
+visual = ShapeCollection(shapes=[mesh])
+body = Body(name=PrefixedName(name="my first body", prefix="my first prefix"), visual=visual, collision=collision)
 ```
 
 When modifying your world, keep in mind that you need to open a `world.modify_world()` whenever you want to add or remove things to/from your world
 
 ```{code-cell} ipython3
 with world.modify_world():
-    world.add_body(body)
+    world.add_body(body=body)
 
 from semantic_digital_twin.spatial_computations.raytracer import RayTracer
-rt = RayTracer(world)
+rt = RayTracer(world=world)
 rt.update_scene()
 rt.scene.show("jupyter")
 ```

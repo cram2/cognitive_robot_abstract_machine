@@ -71,14 +71,17 @@ from ..plan_running import (
 
 
 def _add_box_body(world, name, size, position):
-    shape_collection = ShapeCollection([Box(scale=Scale(*size))])
+    x, y, z = size
+    shape_collection = ShapeCollection(shapes=[Box(scale=Scale(x=x, y=y, z=z))])
     body = Body(
-        name=PrefixedName(name), collision=shape_collection, visual=shape_collection
+        name=PrefixedName(name=name),
+        collision=shape_collection,
+        visual=shape_collection,
     )
     with world.modify_world():
-        world.add_kinematic_structure_entity(body)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=body)
         world.add_connection(
-            FixedConnection(
+            connection=FixedConnection(
                 parent=world.root,
                 child=body,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -285,15 +288,18 @@ def test_pouring_pours_to_the_side_of_its_arm_unless_told_otherwise(
 
 
 def _attach_box_to_gripper(world, robot, name, size, mount_z):
-    shape_collection = ShapeCollection([Box(scale=Scale(*size))])
+    x, y, z = size
+    shape_collection = ShapeCollection(shapes=[Box(scale=Scale(x=x, y=y, z=z))])
     body = Body(
-        name=PrefixedName(name), collision=shape_collection, visual=shape_collection
+        name=PrefixedName(name=name),
+        collision=shape_collection,
+        visual=shape_collection,
     )
     tool_frame = robot.right_arm.end_effector.tool_frame
     with world.modify_world():
-        world.add_kinematic_structure_entity(body)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=body)
         world.add_connection(
-            FixedConnection(
+            connection=FixedConnection(
                 parent=tool_frame,
                 child=body,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -320,7 +326,9 @@ def test_pouring_action_pour_point_lands_on_target_container_center(
     _, pour_pose = action._pour_poses()
 
     tool_frame = robot.right_arm.end_effector.tool_frame
-    tool_frame_T_source = world.compute_forward_kinematics_np(tool_frame, held_source)
+    tool_frame_T_source = world.compute_forward_kinematics_np(
+        root=tool_frame, tip=held_source
+    )
     mouth_in_tool_frame = tool_frame_T_source @ np.array([0.0, 0.0, 0.1, 1.0])
     mouth_in_world = pour_pose.homogeneous_matrix.to_np() @ mouth_in_tool_frame
 
@@ -543,8 +551,8 @@ def test_a_wipe_stalled_beyond_its_tolerance_of_the_final_waypoint_is_not_done(
 
 @pytest.fixture(scope="module")
 def justin_world():
-    world = URDFParser.from_file(Justin.get_ros_file_path()).create_world()
-    Justin.from_world(world)
+    world = URDFParser.from_file(file_path=Justin.get_ros_file_path()).create_world()
+    Justin.from_world(world=world)
     return world
 
 
@@ -567,7 +575,9 @@ def test_justin_keeps_its_torso_upright_while_it_uses_a_tool(justin_world) -> No
     """
     Justin keeps its torso upright with one alignment while it mixes.
     """
-    robot = justin_world.get_semantic_annotations_by_type(Justin)[0]
+    robot = justin_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=Justin
+    )[0]
 
     action = _rewritten_mixing(justin_world, robot)
 

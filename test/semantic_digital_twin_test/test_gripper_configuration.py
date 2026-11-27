@@ -20,12 +20,14 @@ def test_closed_configuration_carries_the_end_effectors_own_joint_state(daisy_wo
     joint state object ``gripper.get_joint_state_by_type(GripperState.CLOSE)`` returns
     -- not a copy.
     """
-    daisy = daisy_world.get_semantic_annotations_by_type(DAiSy)[0]
+    daisy = daisy_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=DAiSy
+    )[0]
 
     for end_effector in daisy.all_end_effectors:
-        expected = end_effector.get_joint_state_by_type(GripperState.CLOSE)
+        expected = end_effector.get_joint_state_by_type(state_type=GripperState.CLOSE)
         configuration = GripperStateConfiguration.from_state_type(
-            end_effector, GripperState.CLOSE
+            end_effector=end_effector, state_type=GripperState.CLOSE
         )
         assert configuration.joint_state is expected
 
@@ -35,11 +37,15 @@ def test_configuration_rejects_foreign_connections(daisy_world):
     A configuration built with a joint state from the other arm's gripper raises
     ``ConnectionsOutsideEndEffector``.
     """
-    daisy = daisy_world.get_semantic_annotations_by_type(DAiSy)[0]
+    daisy = daisy_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=DAiSy
+    )[0]
     left_gripper = daisy.left_arm.end_effector
     right_gripper = daisy.right_arm.end_effector
 
-    right_close_state = right_gripper.get_joint_state_by_type(GripperState.CLOSE)
+    right_close_state = right_gripper.get_joint_state_by_type(
+        state_type=GripperState.CLOSE
+    )
     with pytest.raises(ConnectionsOutsideEndEffector):
         GripperStateConfiguration(
             end_effector=left_gripper,
@@ -51,12 +57,14 @@ def test_configuration_end_effector_and_joint_state_are_carried(daisy_world):
     """
     The configuration carries the end effector and the joint state it was built from.
     """
-    daisy = daisy_world.get_semantic_annotations_by_type(DAiSy)[0]
+    daisy = daisy_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=DAiSy
+    )[0]
     end_effector = daisy.left_arm.end_effector
-    close_state = end_effector.get_joint_state_by_type(GripperState.CLOSE)
+    close_state = end_effector.get_joint_state_by_type(state_type=GripperState.CLOSE)
 
     configuration = GripperStateConfiguration.from_state_type(
-        end_effector, GripperState.CLOSE
+        end_effector=end_effector, state_type=GripperState.CLOSE
     )
     assert configuration.end_effector is end_effector
     assert configuration.joint_state is close_state
@@ -71,13 +79,15 @@ def test_flex_configuration_interpolates_between_the_declared_states(daisy_world
     between the declared open and close states that the configured opening width
     corresponds to.
     """
-    daisy = daisy_world.get_semantic_annotations_by_type(DAiSy)[0]
+    daisy = daisy_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=DAiSy
+    )[0]
     end_effector = daisy.left_arm.end_effector
-    open_state = end_effector.get_joint_state_by_type(GripperState.OPEN)
-    close_state = end_effector.get_joint_state_by_type(GripperState.CLOSE)
+    open_state = end_effector.get_joint_state_by_type(state_type=GripperState.OPEN)
+    close_state = end_effector.get_joint_state_by_type(state_type=GripperState.CLOSE)
 
     configuration = GriplinkFlexConfiguration.from_state_type(
-        end_effector, GripperState.FLEXCLOSE, grip_position=0.06
+        end_effector=end_effector, state_type=GripperState.FLEXCLOSE, grip_position=0.06
     )
 
     fraction = (
@@ -96,12 +106,14 @@ def test_flex_configuration_without_grip_position_commands_the_open_state(daisy_
     Without a configured opening width, a flex configuration commands the declared open
     state, i.e. the fully opened state.
     """
-    daisy = daisy_world.get_semantic_annotations_by_type(DAiSy)[0]
+    daisy = daisy_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=DAiSy
+    )[0]
     end_effector = daisy.left_arm.end_effector
-    open_state = end_effector.get_joint_state_by_type(GripperState.OPEN)
+    open_state = end_effector.get_joint_state_by_type(state_type=GripperState.OPEN)
 
     configuration = GriplinkFlexConfiguration.from_state_type(
-        end_effector, GripperState.FLEXOPEN
+        end_effector=end_effector, state_type=GripperState.FLEXOPEN
     )
 
     expected = [target for _, target in open_state.items()]
@@ -119,12 +131,14 @@ def test_flexclose_configuration_without_grip_position_commands_the_fully_closed
     fingers cross and separate again, so anchoring the interpolation on the limit makes
     a flex close visually open the gripper.
     """
-    daisy = daisy_world.get_semantic_annotations_by_type(DAiSy)[0]
+    daisy = daisy_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=DAiSy
+    )[0]
     end_effector = daisy.left_arm.end_effector
-    close_state = end_effector.get_joint_state_by_type(GripperState.CLOSE)
+    close_state = end_effector.get_joint_state_by_type(state_type=GripperState.CLOSE)
 
     configuration = GriplinkFlexConfiguration.from_state_type(
-        end_effector, GripperState.FLEXCLOSE
+        end_effector=end_effector, state_type=GripperState.FLEXCLOSE
     )
 
     expected = [target for _, target in close_state.items()]
@@ -137,15 +151,17 @@ def test_flexclose_target_closes_the_fingers(daisy_world):
     separation as the declared close state, i.e. the gripper closes instead of stopping
     short or moving past the closed state, where the fingers cross and separate again.
     """
-    daisy = daisy_world.get_semantic_annotations_by_type(DAiSy)[0]
+    daisy = daisy_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=DAiSy
+    )[0]
     end_effector = daisy.left_arm.end_effector
     open_configuration = GriplinkFlexConfiguration.from_state_type(
-        end_effector, GripperState.FLEXOPEN
+        end_effector=end_effector, state_type=GripperState.FLEXOPEN
     )
     close_configuration = GriplinkFlexConfiguration.from_state_type(
-        end_effector, GripperState.FLEXCLOSE
+        end_effector=end_effector, state_type=GripperState.FLEXCLOSE
     )
-    close_state = end_effector.get_joint_state_by_type(GripperState.CLOSE)
+    close_state = end_effector.get_joint_state_by_type(state_type=GripperState.CLOSE)
 
     def tip_separation(joint_state):
         for connection, target in joint_state.items():

@@ -33,7 +33,7 @@ from semantic_digital_twin.world_description.world_modification import (
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldStateUpdate(Message):
     """
     Class describing the updates to the free variables of a world state.
@@ -46,7 +46,7 @@ class WorldStateUpdate(Message):
     """The states of the changed free variables."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ModificationBlock(Message):
     """
     Message describing the modifications done to a world.
@@ -56,7 +56,7 @@ class ModificationBlock(Message):
     """The modifications done to a world."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldUpdate(Message):
     """
     Combined model and state update published on a single ordered ROS topic.
@@ -90,7 +90,7 @@ class WorldUpdate(Message):
         return key
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LoadModel(Message):
     """
     Message for requesting the loading of a model identified by its primary key.
@@ -145,7 +145,7 @@ class ReceivedMessage:
             entity the world does not have.
         """
         with world._world_lock:
-            tracker = WorldEntityWithIDKwargsTracker.from_world(world)
+            tracker = WorldEntityWithIDKwargsTracker.from_world(world=world)
             try:
                 return from_json(self.content, **tracker.create_kwargs())
             except WorldEntityWithIDNotInKwargs as unknown_entity:
@@ -177,7 +177,7 @@ class SnapshotField(StrEnum):
     """How far the snapshot caught up with each publisher."""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldModelSnapshot(SubclassJSONSerializer):
     """
     Snapshot containing the complete modification history and the latest world state.
@@ -244,7 +244,7 @@ class WorldModelSnapshot(SubclassJSONSerializer):
 
     @staticmethod
     def apply_to_json_snapshot_to_world(
-        world: World, json_data: dict[str, Any], **kwargs
+        *, world: World, json_data: dict[str, Any], **kwargs
     ):
         """
         Deserialize modifications and state from JSON and apply them to the world.
@@ -262,10 +262,10 @@ class WorldModelSnapshot(SubclassJSONSerializer):
         state = json_data.get(SnapshotField.STATE, {})
         ids = from_json(state[SnapshotField.IDS])
         states = state.get(SnapshotField.STATES, [])
-        WorldModelSnapshot._apply_json_state(world, ids, states)
+        WorldModelSnapshot._apply_json_state(world=world, ids=ids, states=states)
 
     @staticmethod
-    def _apply_json_state(world: World, ids: list[float], states: list[UUID]):
+    def _apply_json_state(*, world: World, ids: list[float], states: list[UUID]):
         """
         Apply the state contained in the JSON snapshot to the world.
 

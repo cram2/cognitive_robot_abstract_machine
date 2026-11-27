@@ -19,14 +19,14 @@ class Derivatives(IntEnum):
     jerk = 3
 
     @classmethod
-    def range(cls, start: Derivatives, stop: Derivatives, step: int = 1):
+    def range(cls, *, start: Derivatives, stop: Derivatives, step: int = 1):
         """
         Includes stop!
         """
         return [item for item in cls if start <= item <= stop][::step]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DerivativeMap(Generic[T]):
     """
     A container class that maps derivatives (position, velocity, acceleration, jerk) to
@@ -51,7 +51,7 @@ class DerivativeMap(Generic[T]):
     def __hash__(self):
         return hash(tuple(self.data))
 
-    def _broadcast_callable(self, operand: Callable[[T | None], T]) -> Self:
+    def _broadcast_callable(self, *, operand: Callable[[T | None], T]) -> Self:
         """
         Apply a callable to each derivative value and return a new instance with the
         resulting values.
@@ -60,17 +60,21 @@ class DerivativeMap(Generic[T]):
         :return: The new instance with the resulting values.
         """
         return type(self)(
-            operand(self.position),
-            operand(self.velocity),
-            operand(self.acceleration),
-            operand(self.jerk),
+            position=operand(self.position),
+            velocity=operand(self.velocity),
+            acceleration=operand(self.acceleration),
+            jerk=operand(self.jerk),
         )
 
     def __mul__(self, other: float) -> DerivativeMap[T]:
-        return self._broadcast_callable(lambda v: v * other if v is not None else None)
+        return self._broadcast_callable(
+            operand=lambda v: v * other if v is not None else None
+        )
 
     def __add__(self, other: float) -> DerivativeMap[T]:
-        return self._broadcast_callable(lambda v: v + other if v is not None else None)
+        return self._broadcast_callable(
+            operand=lambda v: v + other if v is not None else None
+        )
 
     def __setitem__(self, key: Derivatives, value: T):
         """

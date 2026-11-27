@@ -109,14 +109,16 @@ class EpisodeSceneLoader:
             if file_resolver is not None
             else {}
         )
-        obj_world = URDFParser.from_file(str(file), **resolver_kwargs).create_world()
+        obj_world = URDFParser.from_file(
+            file_path=str(file), **resolver_kwargs
+        ).create_world()
         connection = (
             FixedConnection(parent=self.world.root, child=obj_world.root)
             if obj_name in self.fixed_objects
             else None
         )
         with self.world.modify_world():
-            self.world.merge_world(obj_world, *([connection] if connection else []))
+            self.world.merge_world(other=obj_world, root_connection=connection)
 
     def _load_stl(self, file: Path):
         """
@@ -124,11 +126,11 @@ class EpisodeSceneLoader:
 
         :param file: The path to the STL file to load.
         """
-        mesh = Mesh.from_file(str(file))
+        mesh = Mesh.from_file(file_path=str(file))
         new_body = Body(
-            name=PrefixedName(file.stem),
-            visual=ShapeCollection([mesh]),
-            collision=ShapeCollection([mesh]),
+            name=PrefixedName(name=file.stem),
+            visual=ShapeCollection(shapes=[mesh]),
+            collision=ShapeCollection(shapes=[mesh]),
         )
         with self.world.modify_world():
             connection = Connection6DoF.create_with_dofs(
@@ -136,4 +138,4 @@ class EpisodeSceneLoader:
                 parent=self.world.root,
                 child=new_body,
             )
-            self.world.add_connection(connection)
+            self.world.add_connection(connection=connection)

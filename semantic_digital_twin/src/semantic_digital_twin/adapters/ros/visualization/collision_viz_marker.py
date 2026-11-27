@@ -18,6 +18,7 @@ from semantic_digital_twin.collision_checking.collision_detector import (
     ClosestPoints,
 )
 from semantic_digital_twin.collision_checking.collision_manager import CollisionConsumer
+from krrood.patterns.called_positionally import called_positionally
 
 if TYPE_CHECKING:
     from ....world import World
@@ -59,7 +60,7 @@ class ContactProximity(IntEnum):
         return ColorRGBA(r=0.0, g=1.0, b=0.0, a=1.0)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ClassifiedContact:
     """
     A contact together with how close its bodies are relative to their collision rule.
@@ -99,7 +100,7 @@ class ClassifiedContact:
 # %% publisher
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CollisionVisualizationMarkerPublisher(CollisionConsumer, HasROS2Node):
     """
     Publishes the closest-points results of collision checks as an RViz marker.
@@ -196,7 +197,7 @@ class CollisionVisualizationMarkerPublisher(CollisionConsumer, HasROS2Node):
             MarkerArray, self.topic_name, self.qos_profile
         )
         time.sleep(0.2)
-        self.world.collision_manager.add_collision_consumer(self)
+        self.world.collision_manager.add_collision_consumer(consumer=self)
 
     def stop(self):
         """
@@ -205,46 +206,51 @@ class CollisionVisualizationMarkerPublisher(CollisionConsumer, HasROS2Node):
         The consumer publishes on a node that may already be gone once the world it is
         registered on outlives it.
         """
-        self.world.collision_manager.remove_collision_consumer(self)
+        self.world.collision_manager.remove_collision_consumer(consumer=self)
 
-    def on_world_model_update(self, world: World):
+    def on_world_model_update(self, *, world: World):
         self._root_frame_name = str(world.root.name)
 
     def on_collision_matrix_update(self):
         pass
 
+    @called_positionally
     def on_compute_collisions(self, collision_results: CollisionCheckingResult):
         self._call_counter += 1
         if self._call_counter % self.throttle != 0:
             return
         classified_contacts = [
             ClassifiedContact(
-                contact=contact, proximity=self._classify_proximity(contact)
+                contact=contact, proximity=self._classify_proximity(contact=contact)
             )
             for contact in collision_results.contacts
         ]
         marker_array = MarkerArray()
-        marker_array.markers.append(self._build_contact_marker(classified_contacts))
-        marker_array.markers.extend(self._build_label_markers(classified_contacts))
+        marker_array.markers.append(
+            self._build_contact_marker(classified_contacts=classified_contacts)
+        )
+        marker_array.markers.extend(
+            self._build_label_markers(classified_contacts=classified_contacts)
+        )
         self._publisher.publish(marker_array)
 
-    def _classify_proximity(self, contact: ClosestPoints) -> ContactProximity:
+    def _classify_proximity(self, *, contact: ClosestPoints) -> ContactProximity:
         """
         Compares the distance of a contact against the distances of the rule that
         applies to its body pair.
         """
         if contact.distance < self.collision_manager.get_violated_distance(
-            contact.body_a, contact.body_b
+            body_a=contact.body_a, body_b=contact.body_b
         ):
             return ContactProximity.VIOLATED
         if contact.distance < self.collision_manager.get_buffer_zone_distance(
-            contact.body_a, contact.body_b
+            body_a=contact.body_a, body_b=contact.body_b
         ):
             return ContactProximity.INSIDE_BUFFER_ZONE
         return ContactProximity.CLEAR
 
     def _build_contact_marker(
-        self, classified_contacts: list[ClassifiedContact]
+        self, *, classified_contacts: list[ClassifiedContact]
     ) -> Marker:
         """
         Builds a single ``LINE_LIST`` marker holding one segment per contact.
@@ -264,14 +270,18 @@ class CollisionVisualizationMarkerPublisher(CollisionConsumer, HasROS2Node):
         for classified_contact in classified_contacts:
             color = classified_contact.proximity.color
             contact = classified_contact.contact
-            marker.points.append(self._to_ros_point(contact.root_P_point_on_body_a))
-            marker.points.append(self._to_ros_point(contact.root_P_point_on_body_b))
+            marker.points.append(
+                self._to_ros_point(root_point=contact.root_P_point_on_body_a)
+            )
+            marker.points.append(
+                self._to_ros_point(root_point=contact.root_P_point_on_body_b)
+            )
             marker.colors.append(color)
             marker.colors.append(color)
         return marker
 
     def _build_label_markers(
-        self, classified_contacts: list[ClassifiedContact]
+        self, *, classified_contacts: list[ClassifiedContact]
     ) -> list[Marker]:
         """
         Builds one text marker per contact that is at most a buffer zone away, followed
@@ -290,18 +300,20 @@ class CollisionVisualizationMarkerPublisher(CollisionConsumer, HasROS2Node):
             else []
         )
         markers = [
-            self._build_label_marker(classified_contact, marker_id)
+            self._build_label_marker(
+                classified_contact=classified_contact, marker_id=marker_id
+            )
             for marker_id, classified_contact in enumerate(labeled_contacts)
         ]
         markers.extend(
-            self._build_label_deletion_marker(marker_id)
+            self._build_label_deletion_marker(marker_id=marker_id)
             for marker_id in range(len(labeled_contacts), self._published_label_count)
         )
         self._published_label_count = len(labeled_contacts)
         return markers
 
     def _build_label_marker(
-        self, classified_contact: ClassifiedContact, marker_id: int
+        self, *, classified_contact: ClassifiedContact, marker_id: int
     ) -> Marker:
         """
         Builds the label of a contact, placed halfway between its closest points.
@@ -316,11 +328,13 @@ class CollisionVisualizationMarkerPublisher(CollisionConsumer, HasROS2Node):
         marker.text = classified_contact.label
         marker.scale.z = self.label_height
         marker.color = classified_contact.proximity.color
-        marker.pose.position = self._to_ros_point(classified_contact.root_P_midpoint)
+        marker.pose.position = self._to_ros_point(
+            root_point=classified_contact.root_P_midpoint
+        )
         marker.pose.orientation.w = 1.0
         return marker
 
-    def _build_label_deletion_marker(self, marker_id: int) -> Marker:
+    def _build_label_deletion_marker(self, *, marker_id: int) -> Marker:
         """
         Builds a marker that removes the label with the given id from Rviz.
         """
@@ -331,7 +345,7 @@ class CollisionVisualizationMarkerPublisher(CollisionConsumer, HasROS2Node):
         return marker
 
     @staticmethod
-    def _to_ros_point(root_point: np.ndarray) -> RosPoint:
+    def _to_ros_point(*, root_point: np.ndarray) -> RosPoint:
         """
         Converts a homogeneous root-frame point into a :class:`RosPoint`.
         """

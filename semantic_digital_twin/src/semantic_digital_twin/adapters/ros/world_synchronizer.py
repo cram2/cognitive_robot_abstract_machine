@@ -70,9 +70,10 @@ from semantic_digital_twin.world_description.world_modification import (
 from semantic_digital_twin.world_description.world_entity import (
     WorldEntityWithClassBasedID,
 )
+from krrood.patterns.called_positionally import called_positionally
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Synchronizer(WorldEntityWithClassBasedID, StreamPublisher, StreamReceiver):
     """
     Abstract synchronizer to manage world synchronizations between processes running
@@ -190,6 +191,7 @@ class Synchronizer(WorldEntityWithClassBasedID, StreamPublisher, StreamReceiver)
             model_id=self._world._id,
         )
 
+    @called_positionally
     def subscription_callback(self, message: std_msgs.msg.String) -> None:
         """
         Hand a message of another synchronizer to :meth:`_subscription_callback`; the
@@ -212,7 +214,7 @@ class Synchronizer(WorldEntityWithClassBasedID, StreamPublisher, StreamReceiver)
         self,
         *,
         received: ReceivedMessage,
-        handle: Callable[[ReceivedMessage], None],
+        handle: Callable[..., None],
         error_throttle_period: float = 1.0,
     ) -> None:
         """
@@ -223,13 +225,13 @@ class Synchronizer(WorldEntityWithClassBasedID, StreamPublisher, StreamReceiver)
             got, so the world may hold part of the failed message.
 
         :param received: The message to handle.
-        :param handle: What to do with the message.
+        :param handle: What to do with the message, which it receives as ``message``.
         :param error_throttle_period: The fewest seconds between two logged errors.
         """
         if self.contains(position=received.position):
             return
         try:
-            handle(received)
+            handle(message=received)
         except DataclassException as error:
             divergence = DivergedFromPublisherError(
                 position=received.position, raised_from=error
@@ -271,7 +273,7 @@ class Synchronizer(WorldEntityWithClassBasedID, StreamPublisher, StreamReceiver)
         return positions
 
     @abstractmethod
-    def _subscription_callback(self, message: ReceivedMessage) -> None:
+    def _subscription_callback(self, *, message: ReceivedMessage) -> None:
         """
         Callback function called when receiving new messages from other publishers.
 
@@ -279,7 +281,7 @@ class Synchronizer(WorldEntityWithClassBasedID, StreamPublisher, StreamReceiver)
         """
         raise NotImplementedError
 
-    def publish(self, msg: Message):
+    def publish(self, *, msg: Message):
         """
         Publish a message to the synchronization topic, stamped with its position in
         this synchronizer's stream.
@@ -306,7 +308,7 @@ class Synchronizer(WorldEntityWithClassBasedID, StreamPublisher, StreamReceiver)
             self.publisher = None
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ModelReloadSynchronizer(Synchronizer):
     """
     Synchronizes the model reloading process across different systems using ROS
@@ -369,14 +371,14 @@ class ModelReloadSynchronizer(Synchronizer):
         message = LoadModel(
             primary_key=dao.database_id, position=StreamPosition(origin=self.origin)
         )
-        self.publish(message)
+        self.publish(msg=message)
 
-    def _subscription_callback(self, message: ReceivedMessage) -> None:
+    def _subscription_callback(self, *, message: ReceivedMessage) -> None:
         reload = message.to_message(world=self._world)
         if self.defer_incoming_reloads:
             self.pending_reload = reload
             return
-        self.apply_reload(reload)
+        self.apply_reload(msg=reload)
 
     def apply_pending_reload(self):
         """
@@ -386,9 +388,9 @@ class ModelReloadSynchronizer(Synchronizer):
             return
         message = self.pending_reload
         self.pending_reload = None
-        self.apply_reload(message)
+        self.apply_reload(msg=message)
 
-    def apply_reload(self, msg: LoadModel):
+    def apply_reload(self, *, msg: LoadModel):
         """
         Update the world with the new model by fetching it from the database.
 
@@ -400,18 +402,18 @@ class ModelReloadSynchronizer(Synchronizer):
             WorldMappingDAO.database_id == msg.primary_key
         )
         new_world = self.session.scalars(query).one().from_dao()
-        self._world._replace_with(new_world)
+        self._world._replace_with(other=new_world)
         self.record_applied(position=msg.position)
         for synchronizer in [
             self,
-            *WorldSynchronizer.all_callbacks_of_this_type_from_world(self._world),
+            *WorldSynchronizer.all_callbacks_of_this_type_from_world(world=self._world),
         ]:
             synchronizer.forget_divergences_from_same_model(
                 publisher=msg.position.origin
             )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
     """
     Single ``/world_sync`` topic synchronizer for ordered model + state delivery.
@@ -458,7 +460,7 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
     """
 
     @classmethod
-    def of_world(cls, world: World) -> WorldSynchronizer:
+    def of_world(cls, *, world: World) -> WorldSynchronizer:
         """
         The synchronizer that publishes the changes of ``world``.
 
@@ -466,7 +468,7 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
         :raises WorldHasMultipleSynchronizersError: If several synchronizers publish the
             changes of the world, leaving it undecided which stream to refer to.
         """
-        synchronizers = cls.all_callbacks_of_this_type_from_world(world)
+        synchronizers = cls.all_callbacks_of_this_type_from_world(world=world)
         if not synchronizers:
             raise WorldHasNoSynchronizerError(world=world)
         if len(synchronizers) > 1:
@@ -497,7 +499,7 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
             publish.
         """
         if publish_changes is None:
-            raise MissingPublishChangesKWARG(kwargs)
+            raise MissingPublishChangesKWARG(kwargs=kwargs)
         if not publish_changes:
             return
 
@@ -518,7 +520,7 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
             modification_block=model_block,
             state_update=state_message,
         )
-        self._publish_or_defer(update)
+        self._publish_or_defer(update=update)
         self.update_previous_world_state()
 
     def on_state_change(
@@ -535,7 +537,7 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
             publish.
         """
         if publish_changes is None:
-            raise MissingPublishChangesKWARG(kwargs)
+            raise MissingPublishChangesKWARG(kwargs=kwargs)
         if not publish_changes:
             return
 
@@ -551,20 +553,20 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
         update = WorldUpdate(
             position=StreamPosition(origin=self.origin), state_update=state_message
         )
-        self._publish_or_defer(update)
+        self._publish_or_defer(update=update)
         self.update_previous_world_state()
 
-    def _publish_or_defer(self, update: WorldUpdate) -> None:
+    def _publish_or_defer(self, *, update: WorldUpdate) -> None:
         """
         Publish ``update`` now, or, while a modification of the world is ending, once
         that modification has released the world lock, in the order the updates came.
         """
         if self._world.world_is_being_modified:
             self._world.get_world_model_manager().pending_publications.append(
-                lambda: self.publish(update)
+                lambda: self.publish(msg=update)
             )
         else:
-            self.publish(update)
+            self.publish(msg=update)
 
     def compute_state_changes(self) -> dict[UUID, float]:
         """
@@ -594,14 +596,14 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
             for index in changed_indices
         }
 
-    def _subscription_callback(self, message: ReceivedMessage) -> None:
+    def _subscription_callback(self, *, message: ReceivedMessage) -> None:
         with self._missed_message_lock:
             is_buffered = self._is_paused or self.defer_incoming_updates
             if is_buffered:
                 self.missed_messages.append(message)
         if is_buffered:
             return
-        self.apply_message(message.to_message(world=self._world))
+        self.apply_message(message=message.to_message(world=self._world))
 
     def stop_deferring_incoming_updates(self) -> None:
         """
@@ -627,7 +629,7 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
                 message.carries_model_modification for message in self.missed_messages
             )
 
-    def apply_message(self, message: WorldUpdate) -> None:
+    def apply_message(self, *, message: WorldUpdate) -> None:
         """
         Apply the model change of ``message`` and then its state, as one modification.
 
@@ -642,12 +644,12 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
                     modification_block=message.modification_block,
                 )
             if message.modification_block is not None:
-                self._apply_model(message.modification_block)
+                self._apply_model(modification_block_message=message.modification_block)
             if message.state_update is not None:
-                self._apply_state(message.state_update)
+                self._apply_state(state_update_message=message.state_update)
             self.record_applied(position=message.position)
 
-    def _apply_model(self, modification_block_message: ModificationBlock):
+    def _apply_model(self, *, modification_block_message: ModificationBlock):
         """
         Applies the model and recompiles the world structure before applying the new
         state.
@@ -694,7 +696,7 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
                 non_numeric_states=non_numeric_states
             )
 
-    def _apply_state(self, state_update_message: WorldStateUpdate) -> None:
+    def _apply_state(self, *, state_update_message: WorldStateUpdate) -> None:
         """
         Write the received positions to the degrees of freedom they name and announce
         them to the state change callbacks of the world.
@@ -722,7 +724,7 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
         :raises ApplyMissedMessagesWhileWorldIsBeingModifiedError: If called while a
             ``modify_world`` context is active on this synchronizer's world.
         """
-        self._apply_leading_messages(len(self.missed_messages))
+        self._apply_leading_messages(count=len(self.missed_messages))
 
     def apply_missed_state_updates(self):
         """
@@ -735,7 +737,7 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
         :raises ApplyMissedMessagesWhileWorldIsBeingModifiedError: If called while a
             ``modify_world`` context is active on this synchronizer's world.
         """
-        self._apply_leading_messages(self._count_leading_state_only_messages())
+        self._apply_leading_messages(count=self._count_leading_state_only_messages())
 
     def _count_leading_state_only_messages(self) -> int:
         """
@@ -747,7 +749,7 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
                     return position
             return len(self.missed_messages)
 
-    def _apply_leading_messages(self, count: int):
+    def _apply_leading_messages(self, *, count: int):
         """
         Apply the first ``count`` buffered messages.
 
@@ -777,8 +779,8 @@ class WorldSynchronizer(Synchronizer, ModelChangeCallback, StateChangeCallback):
             for message in pending_messages:
                 self._handle_reporting_divergence(
                     received=message,
-                    handle=lambda received: self.apply_message(
-                        received.to_message(world=self._world)
+                    handle=lambda message: self.apply_message(
+                        message=message.to_message(world=self._world)
                     ),
                 )
 

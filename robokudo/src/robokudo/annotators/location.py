@@ -143,7 +143,7 @@ class LocationAnnotator(ThreadedAnnotator):
         :return: SUCCESS after processing
         """
         start_timer = default_timer()
-        regions = self.world.get_kinematic_structure_entity_by_type(Region)
+        regions = self.world.get_kinematic_structure_entity_by_type(entity_type=Region)
         active_regions = {str(region.name): region for region in regions}
         # TODO Filter active regions by FRUSTUM CULLING
 

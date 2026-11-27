@@ -61,7 +61,7 @@ def test_ros_camera_interface_uses_registered_node(
     node_registry: ROSNodeRegistry,
 ) -> None:
     registered_node = RegisteredNode()
-    node_registry.register(registered_node)
+    node_registry.register(node=registered_node)
 
     interface = camera_interface.ROSCameraInterface(CameraConfigWithoutTF())
 

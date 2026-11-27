@@ -269,7 +269,7 @@ def milk_file_outside_any_package(tmp_path) -> Path:
     """
     milk_file = tmp_path / "milk.stl"
     shutil.copy(
-        PackageUriResolver().resolve("package://iai_objects/objects/milk.stl"),
+        PackageUriResolver().resolve(uri="package://iai_objects/objects/milk.stl"),
         milk_file,
     )
     return milk_file
@@ -337,7 +337,8 @@ def test_textured_primitive_survives_serialization():
     texture intact, rather than silently collapsing to its flat color.
     """
     box = Box(
-        scale=Scale(1.0, 1.0, 1.0), texture=Texture(file_path="/textures/marble.png")
+        scale=Scale(x=1.0, y=1.0, z=1.0),
+        texture=Texture(file_path="/textures/marble.png"),
     )
 
     restored = Box.from_json(data=box.to_json())
@@ -401,7 +402,7 @@ def test_an_undeclared_finish_survives_serialization_as_undeclared(build_shape):
 
 
 def test_box_volume():
-    assert Box(scale=Scale(0.5, 2.0, 3.0)).volume == pytest.approx(3.0)
+    assert Box(scale=Scale(x=0.5, y=2.0, z=3.0)).volume == pytest.approx(3.0)
 
 
 def test_sphere_volume():
@@ -521,7 +522,7 @@ def test_declared_units_compose_with_the_meshs_own_scale():
     much to resize the result.
     """
     mesh = Mesh(
-        filename=collada_fixture_path("centimeter_cube.dae"), scale=Scale(2, 2, 2)
+        filename=collada_fixture_path("centimeter_cube.dae"), scale=Scale(x=2, y=2, z=2)
     )
 
     assert mesh.mesh.extents == pytest.approx([2.0, 2.0, 2.0])
@@ -545,22 +546,22 @@ def test_stl_without_unit_metadata_loads_unchanged(tmp_path):
 def test_mesh_in_frame_applies_the_owning_bodys_world_transform():
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("map"))
-        world.add_kinematic_structure_entity(root)
-        obstacle = Body(name=PrefixedName("obstacle"))
+        root = Body(name=PrefixedName(name="map"))
+        world.add_kinematic_structure_entity(kinematic_structure_entity=root)
+        obstacle = Body(name=PrefixedName(name="obstacle"))
         world.add_connection(
-            FixedConnection(
-                root,
+            connection=FixedConnection(
+                parent=root,
                 child=obstacle,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=2.0, y=0.0, z=0.0, reference_frame=root
                 ),
             )
         )
-        shape = Box(scale=Scale(1.0, 1.0, 1.0))
-        obstacle.collision.append(shape)
+        shape = Box(scale=Scale(x=1.0, y=1.0, z=1.0))
+        obstacle.collision.append(shape=shape)
 
-    world_mesh = shape.mesh_in_frame(root)
+    world_mesh = shape.mesh_in_frame(target_frame=root)
 
     np.testing.assert_allclose(
         world_mesh.bounds, shape.mesh.bounds + np.array([2.0, 0.0, 0.0])
@@ -570,16 +571,18 @@ def test_mesh_in_frame_applies_the_owning_bodys_world_transform():
 def test_mesh_in_frame_in_the_shapes_own_frame_matches_its_local_mesh():
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("map"))
-        world.add_kinematic_structure_entity(root)
-        obstacle = Body(name=PrefixedName("obstacle"))
+        root = Body(name=PrefixedName(name="map"))
+        world.add_kinematic_structure_entity(kinematic_structure_entity=root)
+        obstacle = Body(name=PrefixedName(name="obstacle"))
         world.add_connection(
-            FixedConnection.create_with_dofs(world=world, parent=root, child=obstacle)
+            connection=FixedConnection.create_with_dofs(
+                world=world, parent=root, child=obstacle
+            )
         )
-        shape = Box(scale=Scale(1.0, 1.0, 1.0))
-        obstacle.collision.append(shape)
+        shape = Box(scale=Scale(x=1.0, y=1.0, z=1.0))
+        obstacle.collision.append(shape=shape)
 
-    world_mesh = shape.mesh_in_frame(obstacle)
+    world_mesh = shape.mesh_in_frame(target_frame=obstacle)
 
     np.testing.assert_allclose(world_mesh.bounds, shape.mesh.bounds)
 
@@ -592,9 +595,9 @@ def test_mesh_in_frame_in_the_shapes_own_frame_matches_its_local_mesh():
     [
         Sphere(radius=0.3),
         Cylinder(width=0.2, height=0.4),
-        Box(scale=Scale(1.0, 2.0, 3.0)),
+        Box(scale=Scale(x=1.0, y=2.0, z=3.0)),
         Box(
-            scale=Scale(1.0, 1.0, 1.0),
+            scale=Scale(x=1.0, y=1.0, z=1.0),
             color=Color.from_rgba(red=0.1, green=0.2, blue=0.3, opacity=0.4),
             texture=Texture(file_path="/textures/wood.png"),
         ),
@@ -866,7 +869,7 @@ def test_a_mesh_turned_within_its_file_keeps_its_vertices_through_serialization(
     """
     A JSON round trip keeps the vertices of a mesh turned within its file.
     """
-    mesh = turned_cylinder(scale=Scale(0.5, 0.6, 0.7))
+    mesh = turned_cylinder(scale=Scale(x=0.5, y=0.6, z=0.7))
 
     deserialized = from_json(to_json(mesh))
 
@@ -879,7 +882,7 @@ def test_the_scaled_file_placed_at_its_file_origin_lies_where_the_mesh_does():
     """
     The file's scaled vertices, placed at the file origin, cover the mesh's bounds.
     """
-    mesh = turned_cylinder(scale=Scale(0.5, 0.5, 0.5))
+    mesh = turned_cylinder(scale=Scale(x=0.5, y=0.5, z=0.5))
 
     placed_file = bounds_in_the_body(
         mesh.stored_mesh.vertices * mesh.scale.to_np(), mesh.file_origin.to_np()
@@ -894,7 +897,7 @@ def test_an_unevenly_scaled_mesh_turned_within_its_file_has_no_file_origin():
     """
     No pose places the file of a mesh that is turned within it and scaled unevenly.
     """
-    mesh = turned_cylinder(scale=Scale(0.5, 0.6, 0.7))
+    mesh = turned_cylinder(scale=Scale(x=0.5, y=0.6, z=0.7))
 
     with pytest.raises(MeshFileNotPlaceableByAPose):
         mesh.file_origin

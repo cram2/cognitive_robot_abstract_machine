@@ -91,7 +91,7 @@ def _single_robot_world_setup() -> World:
 @pytest.fixture
 def single_robot_world(_single_robot_world_setup):
     world = deepcopy(_single_robot_world_setup)
-    robot = world.get_semantic_annotations_by_type(PR2)[0]
+    robot = world.get_semantic_annotations_by_type(semantic_annotation_type=PR2)[0]
     return world, robot, robot_extensions(robot)
 
 
@@ -321,13 +321,13 @@ def _box_in(world: World) -> Milk:
     A graspable box with collision geometry, standing away from the robot.
     """
     body = Body(
-        name=PrefixedName("box"),
-        collision=ShapeCollection([Box(scale=Scale(0.1, 0.1, 0.2))]),
+        name=PrefixedName(name="box"),
+        collision=ShapeCollection(shapes=[Box(scale=Scale(x=0.1, y=0.1, z=0.2))]),
     )
     graspable = Milk(root=body)
     with world.modify_world():
         world.add_connection(
-            FixedConnection(
+            connection=FixedConnection(
                 parent=world.root,
                 child=body,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -335,7 +335,7 @@ def _box_in(world: World) -> Milk:
                 ),
             )
         )
-        world.add_semantic_annotation(graspable)
+        world.add_semantic_annotation(semantic_annotation=graspable)
     return graspable
 
 

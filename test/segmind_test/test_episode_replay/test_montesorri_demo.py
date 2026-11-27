@@ -21,7 +21,7 @@ def test_context():
     world = World()
     root = Body(name=PrefixedName(name="root", prefix="world"))
     with world.modify_world():
-        world.add_kinematic_structure_entity(root)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=root)
 
     context = StatechartContext(world=world)
     multiverse_episodes_dir = f"{dirname(__file__)}/../resources/multiverse_episodes"

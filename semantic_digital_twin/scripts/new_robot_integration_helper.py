@@ -15,12 +15,12 @@ from semantic_digital_twin.world import World
 your_ros2_package_name = "iai_offis_g1_description"
 your_path_from_package_root_to_urdf = "urdf/offis_unitree_g1.urdf"
 robot_world = URDFParser.from_file(
-    f"package://{your_ros2_package_name}/{your_path_from_package_root_to_urdf}"
+    file_path=f"package://{your_ros2_package_name}/{your_path_from_package_root_to_urdf}"
 ).create_world()
 robot_world.visualize_world_structure().show()
 
-world = World.create_with_root_body("map")
-world.merge_world(robot_world)
+world = World.create_with_root_body(root_body_name="map")
+world.merge_world(other=robot_world)
 
 rclpy.init()
 VizMarkerPublisher(_world=world, node=rclpy.create_node("urdf_visualization_node"))
@@ -28,6 +28,6 @@ sleep(2)
 
 your_robot_class: AbstractRobot = UnitreeG1
 
-robot = your_robot_class.from_world(world)
+robot = your_robot_class.from_world(world=world)
 
 sleep(2)

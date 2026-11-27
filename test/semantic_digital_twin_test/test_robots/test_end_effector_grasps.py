@@ -56,8 +56,10 @@ def _worlds_of_supported_robots_setup(supported_abstract_robots) -> list[World]:
     """
     worlds = []
     for abstract_robot in supported_abstract_robots:
-        world = URDFParser.from_file(abstract_robot.get_ros_file_path()).create_world()
-        abstract_robot.from_world(world)
+        world = URDFParser.from_file(
+            file_path=abstract_robot.get_ros_file_path()
+        ).create_world()
+        abstract_robot.from_world(world=world)
         worlds.append(world)
     return worlds
 
@@ -78,7 +80,9 @@ def pr2_gripper(pr2_world_copy) -> EndEffector:
     """
     The left gripper of a PR2, in a world built from the robot's description alone.
     """
-    return pr2_world_copy.get_semantic_annotations_by_type(PR2)[0].left_arm.end_effector
+    return pr2_world_copy.get_semantic_annotations_by_type(
+        semantic_annotation_type=PR2
+    )[0].left_arm.end_effector
 
 
 @pytest.fixture
@@ -88,13 +92,13 @@ def graspable_box(pr2_world_copy) -> Milk:
     grasps.
     """
     body = Body(
-        name=PrefixedName("graspable_box"),
-        collision=ShapeCollection([Box(scale=Scale(0.1, 0.1, 0.2))]),
+        name=PrefixedName(name="graspable_box"),
+        collision=ShapeCollection(shapes=[Box(scale=Scale(x=0.1, y=0.1, z=0.2))]),
     )
     annotation = Milk(root=body)
     with pr2_world_copy.modify_world():
         pr2_world_copy.add_connection(
-            FixedConnection(
+            connection=FixedConnection(
                 parent=pr2_world_copy.root,
                 child=body,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -102,7 +106,7 @@ def graspable_box(pr2_world_copy) -> Milk:
                 ),
             )
         )
-        pr2_world_copy.add_semantic_annotation(annotation)
+        pr2_world_copy.add_semantic_annotation(semantic_annotation=annotation)
     return annotation
 
 
@@ -115,10 +119,10 @@ def hold_body(end_effector: EndEffector, name: str = "held_body") -> Body:
     :return: The body it now holds.
     """
     world = end_effector._world
-    body = Body(name=PrefixedName(name))
+    body = Body(name=PrefixedName(name=name))
     with world.modify_world():
         world.add_connection(
-            FixedConnection(
+            connection=FixedConnection(
                 parent=end_effector.tool_frame,
                 child=body,
                 parent_T_connection_expression=HELD_BODY_OFFSET,
@@ -130,7 +134,7 @@ def hold_body(end_effector: EndEffector, name: str = "held_body") -> Body:
 # %% the axes a gripper states in its tool frame
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class EndEffectorWithSkewedAxes(EndEffector):
     """
     An end effector whose closing axis is not perpendicular to its approach axis.
@@ -180,9 +184,9 @@ def test_the_approach_axis_follows_the_grippers_own_convention(
     A PR2 gripper points along its tool frame's x-axis and Tracy's along its z-axis, so
     the very same grasp frame is approached along a different local axis.
     """
-    tracy_gripper = tracy_world.get_semantic_annotations_by_type(Tracy)[
-        0
-    ].left_arm.end_effector
+    tracy_gripper = tracy_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=Tracy
+    )[0].left_arm.end_effector
 
     np.testing.assert_allclose(
         pr2_gripper.approach_axis.to_np()[:3], Vector3.X().to_np()[:3], atol=1e-9
@@ -195,7 +199,7 @@ def test_the_approach_axis_follows_the_grippers_own_convention(
 def test_a_gripper_whose_axes_are_not_perpendicular_is_refused(pr2_gripper) -> None:
     with pytest.raises(GripperAxesNotPerpendicular):
         EndEffectorWithSkewedAxes(
-            name=PrefixedName("skewed_gripper"),
+            name=PrefixedName(name="skewed_gripper"),
             root=pr2_gripper.root,
             tool_frame=pr2_gripper.tool_frame,
         )
@@ -209,10 +213,14 @@ def test_every_robot_states_its_axes_in_the_frame_they_belong_to(
     robot there is.
     """
     for world in worlds_of_supported_robots:
-        for end_effector in world.get_semantic_annotations_by_type(EndEffector):
+        for end_effector in world.get_semantic_annotations_by_type(
+            semantic_annotation_type=EndEffector
+        ):
             assert end_effector.approach_axis.reference_frame is end_effector.tool_frame
             assert end_effector.closing_axis.reference_frame is end_effector.tool_frame
-        for camera in world.get_semantic_annotations_by_type(Camera):
+        for camera in world.get_semantic_annotations_by_type(
+            semantic_annotation_type=Camera
+        ):
             assert camera.viewing_direction.reference_frame is camera.root
 
 
@@ -222,7 +230,7 @@ def test_every_robot_states_its_axes_in_the_frame_they_belong_to(
 def test_tool_frame_goal_keeps_the_grasp_position(pr2_gripper, graspable_box) -> None:
     grasp = graspable_box.grasp_candidates()[0].grasp_pose
 
-    goal = pr2_gripper.tool_frame_goal(grasp)
+    goal = pr2_gripper.tool_frame_goal(grasp_pose=grasp)
 
     np.testing.assert_allclose(goal.to_np()[:3, 3], grasp.to_np()[:3, 3], atol=1e-9)
 
@@ -236,7 +244,7 @@ def test_tool_frame_goal_applies_the_end_effectors_own_orientation(
     """
     grasp = graspable_box.grasp_candidates()[0].grasp_pose
 
-    goal = pr2_gripper.tool_frame_goal(grasp)
+    goal = pr2_gripper.tool_frame_goal(grasp_pose=grasp)
 
     expected = grasp.rotation_matrix @ pr2_gripper.tool_R_grasp.inverse()
     np.testing.assert_allclose(
@@ -284,7 +292,7 @@ def test_the_held_grasp_is_turned_the_way_the_gripper_faces(pr2_gripper) -> None
 
     grasp_R_tool = pr2_gripper.tool_R_grasp.inverse()
     body_T_tool = pr2_gripper._world.transform(
-        pr2_gripper.tool_frame.global_transform, body
+        spatial_object=pr2_gripper.tool_frame.global_transform, target_frame=body
     )
     np.testing.assert_allclose(
         (body_R_grasp @ grasp_R_tool).to_np(),
@@ -316,7 +324,7 @@ def test_the_held_grasp_can_be_read_at_any_point_of_the_gripper(pr2_gripper):
     hold_body(pr2_gripper)
 
     body_T_grasp = pr2_gripper.held_body_T_grasp_at(
-        Point3(0.0, 0.0, 0.0, reference_frame=pr2_gripper.tool_frame)
+        tool_P_point=Point3(0.0, 0.0, 0.0, reference_frame=pr2_gripper.tool_frame)
     )
 
     np.testing.assert_allclose(
@@ -330,15 +338,16 @@ def test_the_grasp_on_a_body_not_below_the_tool_frame_is_read_the_same(pr2_gripp
     holds it all the same.
     """
     world = pr2_gripper._world
-    carried = Body(name=PrefixedName("carried_body"))
+    carried = Body(name=PrefixedName(name="carried_body"))
     with world.modify_world():
         world.add_connection(
-            FixedConnection(
+            connection=FixedConnection(
                 parent=world.root,
                 child=carried,
                 parent_T_connection_expression=world.transform(
-                    pr2_gripper.tool_frame.global_transform @ HELD_BODY_OFFSET,
-                    world.root,
+                    spatial_object=pr2_gripper.tool_frame.global_transform
+                    @ HELD_BODY_OFFSET,
+                    target_frame=world.root,
                 ),
             )
         )
@@ -369,7 +378,7 @@ def test_the_fingertips_are_the_tips_of_the_two_fingers(pr2_gripper):
 
 def test_the_grasp_point_lies_midway_between_the_fingertips(pr2_gripper):
     thumb_tip, finger_tip = (
-        pr2_gripper.fingertips._bounding_box(fingertip).center.to_np()[:3].ravel()
+        pr2_gripper.fingertips._bounding_box(tip=fingertip).center.to_np()[:3].ravel()
         for fingertip in pr2_gripper.fingertips.both
     )
 
@@ -392,7 +401,9 @@ def test_every_two_finger_gripper_can_measure_where_its_fingers_meet(
     gripper there is answers them rather than only the one they were written against.
     """
     for world in worlds_of_supported_robots:
-        for gripper in world.get_semantic_annotations_by_type(EndEffector):
+        for gripper in world.get_semantic_annotations_by_type(
+            semantic_annotation_type=EndEffector
+        ):
             if not isinstance(gripper, HasTwoFingers):
                 continue
             assert gripper.fingertips.tool_P_grasp.reference_frame is gripper.tool_frame
@@ -414,7 +425,7 @@ def test_the_tool_frame_goal_for_a_grasp_puts_the_grasp_point_on_it(
     """
     grasp = graspable_box.grasp_candidates()[0].grasp_pose
 
-    goal = pr2_gripper.tool_frame_goal_for_grasp(grasp)
+    goal = pr2_gripper.tool_frame_goal_for_grasp(grasp_pose=grasp)
 
     reached = goal.homogeneous_matrix.to_np()
     grasp_point_once_reached = (
@@ -432,8 +443,8 @@ def test_the_goal_for_a_grasp_turns_the_gripper_the_same_way_as_the_tool_frame_g
     grasp = graspable_box.grasp_candidates()[0].grasp_pose
 
     np.testing.assert_allclose(
-        pr2_gripper.tool_frame_goal_for_grasp(grasp).rotation_matrix.to_np(),
-        pr2_gripper.tool_frame_goal(grasp).rotation_matrix.to_np(),
+        pr2_gripper.tool_frame_goal_for_grasp(grasp_pose=grasp).rotation_matrix.to_np(),
+        pr2_gripper.tool_frame_goal(grasp_pose=grasp).rotation_matrix.to_np(),
         atol=1e-9,
     )
 
@@ -446,7 +457,7 @@ def test_the_finger_to_thumb_axis_points_from_the_finger_to_the_thumb(
 ) -> None:
     fingertips = pr2_gripper.fingertips
     thumb, finger = (
-        fingertips._bounding_box(tip).center.vector3.dot(
+        fingertips._bounding_box(tip=tip).center.vector3.dot(
             fingertips.tool_V_finger_to_thumb
         )
         for tip in fingertips.both
@@ -465,9 +476,13 @@ def test_each_facing_point_is_read_in_its_own_tips_frame(pr2_gripper) -> None:
 def test_opening_the_gripper_moves_the_facing_points_apart(pr2_gripper) -> None:
     world = pr2_gripper._world
     with world.reset_state_context():
-        pr2_gripper.get_joint_state_by_type(GripperState.CLOSE).apply_to(world)
+        pr2_gripper.get_joint_state_by_type(state_type=GripperState.CLOSE).apply_to(
+            world=world
+        )
         closed = pr2_gripper.fingertips.separation
-        pr2_gripper.get_joint_state_by_type(GripperState.OPEN).apply_to(world)
+        pr2_gripper.get_joint_state_by_type(state_type=GripperState.OPEN).apply_to(
+            world=world
+        )
         opened = pr2_gripper.fingertips.separation
 
     assert opened > closed
@@ -488,7 +503,9 @@ def test_the_meeting_point_can_be_read_for_another_state_and_the_world_stands_ba
     as_it_stands = pr2_gripper.fingertips.tool_P_grasp
 
     with world.reset_state_context():
-        pr2_gripper.get_joint_state_by_type(GripperState.OPEN).apply_to(world)
+        pr2_gripper.get_joint_state_by_type(state_type=GripperState.OPEN).apply_to(
+            world=world
+        )
         while_open = pr2_gripper.fingertips.tool_P_grasp
 
     np.testing.assert_array_equal(world.state.positions, positions_before)
@@ -520,7 +537,9 @@ def test_the_travel_is_read_between_the_grippers_own_open_and_closed_states(
     with world.reset_state_context():
         reached = []
         for state_type in (GripperState.OPEN, GripperState.CLOSE):
-            pr2_gripper.get_joint_state_by_type(state_type).apply_to(world)
+            pr2_gripper.get_joint_state_by_type(state_type=state_type).apply_to(
+                world=world
+            )
             reached.append(pr2_gripper.fingertips.tool_P_grasp)
     open_P_grasp, closed_P_grasp = reached
     expected = (closed_P_grasp - open_P_grasp).dot(pr2_gripper.approach_axis)
@@ -534,9 +553,9 @@ def test_reading_the_travel_stands_the_world_back_up(tracy_world):
     positions the world held come back afterwards. The state version moves, since a
     reset context announces that it put the state back.
     """
-    gripper = tracy_world.get_semantic_annotations_by_type(Tracy)[
-        0
-    ].left_arm.end_effector
+    gripper = tracy_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=Tracy
+    )[0].left_arm.end_effector
     positions_before = tracy_world.state.positions.copy()
 
     gripper.travel_when_closing
@@ -551,10 +570,14 @@ def test_a_gripper_opens_as_wide_as_its_fingertips_stand_in_its_open_state(
     pr2_gripper,
 ) -> None:
     world = pr2_gripper._world
-    pr2_gripper.get_joint_state_by_type(GripperState.CLOSE).apply_to(world)
+    pr2_gripper.get_joint_state_by_type(state_type=GripperState.CLOSE).apply_to(
+        world=world
+    )
     positions_before = world.state.positions.copy()
     with world.reset_state_context():
-        pr2_gripper.get_joint_state_by_type(GripperState.OPEN).apply_to(world)
+        pr2_gripper.get_joint_state_by_type(state_type=GripperState.OPEN).apply_to(
+            world=world
+        )
         expected = pr2_gripper.fingertips.separation
 
     assert pr2_gripper.separation_when_open == pytest.approx(expected)
@@ -567,10 +590,14 @@ def test_a_gripper_stands_as_wide_in_a_state_as_its_fingertips_do_there(
     world = pr2_gripper._world
     positions_before = world.state.positions.copy()
     with world.reset_state_context():
-        pr2_gripper.get_joint_state_by_type(GripperState.CLOSE).apply_to(world)
+        pr2_gripper.get_joint_state_by_type(state_type=GripperState.CLOSE).apply_to(
+            world=world
+        )
         expected = pr2_gripper.fingertips.separation
 
-    assert pr2_gripper.separation_in(GripperState.CLOSE) == pytest.approx(expected)
+    assert pr2_gripper.separation_in(state_type=GripperState.CLOSE) == pytest.approx(
+        expected
+    )
     np.testing.assert_array_equal(world.state.positions, positions_before)
 
 
@@ -580,7 +607,9 @@ def test_the_finger_connections_are_those_the_grippers_states_drive(
     driven = [
         connection
         for state_type in (GripperState.OPEN, GripperState.CLOSE)
-        for connection in pr2_gripper.get_joint_state_by_type(state_type).connections
+        for connection in pr2_gripper.get_joint_state_by_type(
+            state_type=state_type
+        ).connections
     ]
 
     assert set(pr2_gripper.finger_connections) == set(driven)
@@ -595,14 +624,18 @@ def test_every_two_finger_gripper_drives_every_joint_up_to_its_fingertips(
     is, so a goal on the fingertips moves only joints the gripper's states drive.
     """
     for world in worlds_of_supported_robots:
-        for gripper in world.get_semantic_annotations_by_type(EndEffector):
+        for gripper in world.get_semantic_annotations_by_type(
+            semantic_annotation_type=EndEffector
+        ):
             if not isinstance(gripper, HasTwoFingers):
                 continue
             driven = {connection.raw_dof for connection in gripper.finger_connections}
             undriven = [
                 connection.name
                 for tip in gripper.fingertips.both
-                for connection in world.compute_chain_of_connections(gripper.root, tip)
+                for connection in world.compute_chain_of_connections(
+                    root=gripper.root, tip=tip
+                )
                 if isinstance(connection, ActiveConnection1DOF)
                 and connection.raw_dof not in driven
             ]
@@ -612,11 +645,13 @@ def test_every_two_finger_gripper_drives_every_joint_up_to_its_fingertips(
 def test_an_hsr_opens_with_its_motor_and_springs_at_their_upper_limits(
     hsr_world_copy,
 ) -> None:
-    [hsr] = hsr_world_copy.get_semantic_annotations_by_type(HSRB)
+    [hsr] = hsr_world_copy.get_semantic_annotations_by_type(
+        semantic_annotation_type=HSRB
+    )
     gripper = hsr.all_arms[0].end_effector
-    open_state = gripper.get_joint_state_by_type(GripperState.OPEN)
+    open_state = gripper.get_joint_state_by_type(state_type=GripperState.OPEN)
     connections = [
-        hsr_world_copy.get_connection_by_name(joint)
+        hsr_world_copy.get_connection_by_name(name=joint)
         for joint in (
             HSRBJoint.HAND_MOTOR,
             HSRBJoint.HAND_LEFT_SPRING_PROXIMAL,
@@ -638,13 +673,17 @@ def test_every_two_finger_gripper_stands_narrower_closed_than_open(
     for every robot there is.
     """
     for world in worlds_of_supported_robots:
-        for gripper in world.get_semantic_annotations_by_type(EndEffector):
+        for gripper in world.get_semantic_annotations_by_type(
+            semantic_annotation_type=EndEffector
+        ):
             if not isinstance(gripper, HasTwoFingers):
                 continue
             separations = {}
             with world.reset_state_context():
                 for state_type in (GripperState.OPEN, GripperState.CLOSE):
-                    gripper.get_joint_state_by_type(state_type).apply_to(world)
+                    gripper.get_joint_state_by_type(state_type=state_type).apply_to(
+                        world=world
+                    )
                     separations[state_type] = gripper.fingertips.separation
             assert separations[GripperState.CLOSE] < separations[GripperState.OPEN], (
                 gripper.name
@@ -656,8 +695,8 @@ def test_a_robotiq_2f_85_opens_as_wide_as_its_name_says(tracy_world) -> None:
     The 2F-85 is named for the 85 mm its pads stand apart when open, so this is read on
     the pads' surfaces rather than on the fingertip frames.
     """
-    gripper = tracy_world.get_semantic_annotations_by_type(Tracy)[
-        0
-    ].left_arm.end_effector
+    gripper = tracy_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=Tracy
+    )[0].left_arm.end_effector
 
     assert gripper.separation_when_open == pytest.approx(0.085, abs=0.001)

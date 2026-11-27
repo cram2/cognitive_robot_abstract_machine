@@ -79,7 +79,7 @@ class GraspBar(
         root_V_bar_axis.scale(1)
 
         root_T_tip = self.context.world.compose_forward_kinematics_expression(
-            self.kinematic_chain.root, self.kinematic_chain.tip
+            root=self.kinematic_chain.root, tip=self.kinematic_chain.tip
         )
         root_V_tip_normal = root_T_tip @ tip_V_tip_grasp_axis
 

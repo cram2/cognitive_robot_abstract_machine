@@ -105,7 +105,7 @@ class StretchJoint(JointName):
     RIGHT_WHEEL = "joint_right_wheel"
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class StretchLeftFinger(Finger):
     def setup_hardware_interfaces(self):
         pass
@@ -115,19 +115,19 @@ class StretchLeftFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "link_gripper_finger_left"
+                branch_root=robot_root, name="link_gripper_finger_left"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "link_gripper_fingertip_left"
+                branch_root=robot_root, name="link_gripper_fingertip_left"
             ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class StretchRightFinger(Finger):
     def setup_hardware_interfaces(self):
         pass
@@ -137,19 +137,19 @@ class StretchRightFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "link_gripper_finger_right"
+                branch_root=robot_root, name="link_gripper_finger_right"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "link_gripper_fingertip_right"
+                branch_root=robot_root, name="link_gripper_fingertip_right"
             ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class StretchGripper(EndEffector, HasTwoFingers[StretchLeftFinger, StretchRightFinger]):
     @classproperty
     def fingers_are_modelled_like_the_real_ones(cls) -> bool:
@@ -162,13 +162,13 @@ class StretchGripper(EndEffector, HasTwoFingers[StretchLeftFinger, StretchRightF
         gripper_joints = self.active_connections
 
         gripper_open = JointState.from_mapping(
-            name=PrefixedName("gripper_open", prefix=self.name.name),
+            name=PrefixedName(name="gripper_open", prefix=self.name.name),
             mapping=dict(zip(gripper_joints, [0.109, 0.109])),
             state_type=GripperState.OPEN,
         )
 
         gripper_close = JointState.from_mapping(
-            name=PrefixedName("gripper_close", prefix=self.name.name),
+            name=PrefixedName(name="gripper_close", prefix=self.name.name),
             mapping=dict(zip(gripper_joints, [-0.067, -0.067])),
             state_type=GripperState.CLOSE,
         )
@@ -185,32 +185,32 @@ class StretchGripper(EndEffector, HasTwoFingers[StretchLeftFinger, StretchRightF
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "link_straight_gripper"
+                branch_root=robot_root, name="link_straight_gripper"
             ),
             tool_frame=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "link_grasp_center"
+                branch_root=robot_root, name="link_grasp_center"
             ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class StretchArm(Arm[StretchGripper]):
     def setup_hardware_interfaces(self):
         self._setup_hardware_interfaces_for_active_connections()
 
     def setup_joint_states(self) -> list[JointState]:
         arm_park = JointState.from_mapping(
-            name=PrefixedName("arm_park", prefix=self.name.name),
+            name=PrefixedName(name="arm_park", prefix=self.name.name),
             mapping={
-                self._world.get_connection_by_name(StretchJoint.LIFT): 0.65,
-                self._world.get_connection_by_name(StretchJoint.ARM_L3): 0.0,
-                self._world.get_connection_by_name(StretchJoint.ARM_L2): 0.0,
-                self._world.get_connection_by_name(StretchJoint.ARM_L1): 0.0,
-                self._world.get_connection_by_name(StretchJoint.ARM_L0): 0.0,
+                self._world.get_connection_by_name(name=StretchJoint.LIFT): 0.65,
+                self._world.get_connection_by_name(name=StretchJoint.ARM_L3): 0.0,
+                self._world.get_connection_by_name(name=StretchJoint.ARM_L2): 0.0,
+                self._world.get_connection_by_name(name=StretchJoint.ARM_L1): 0.0,
+                self._world.get_connection_by_name(name=StretchJoint.ARM_L0): 0.0,
             },
             state_type=StaticJointState.PARK,
         )
@@ -219,17 +219,19 @@ class StretchArm(Arm[StretchGripper]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "link_lift"),
+            root=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="link_lift"
+            ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "link_wrist_roll"
+                branch_root=robot_root, name="link_wrist_roll"
             ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class StretchCameraColor(RobotCamera[FieldOfViewCameraModel]):
     """
     Camera attached to its robot model's optical frame.
@@ -243,7 +245,7 @@ class StretchCameraColor(RobotCamera[FieldOfViewCameraModel]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         """
         Attach the camera to the optical frame below the supplied robot root.
@@ -253,7 +255,7 @@ class StretchCameraColor(RobotCamera[FieldOfViewCameraModel]):
         """
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "camera_color_optical_frame"
+                branch_root=robot_root, name="camera_color_optical_frame"
             ),
             minimal_height=1.322,
             maximal_height=1.322,
@@ -266,7 +268,7 @@ class StretchCameraColor(RobotCamera[FieldOfViewCameraModel]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class StretchCameraDepth(RobotCamera[FieldOfViewCameraModel]):
     """
     Camera attached to its robot model's optical frame.
@@ -280,7 +282,7 @@ class StretchCameraDepth(RobotCamera[FieldOfViewCameraModel]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         """
         Attach the camera to the optical frame below the supplied robot root.
@@ -290,7 +292,7 @@ class StretchCameraDepth(RobotCamera[FieldOfViewCameraModel]):
         """
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "camera_depth_optical_frame"
+                branch_root=robot_root, name="camera_depth_optical_frame"
             ),
             minimal_height=1.307,
             maximal_height=1.307,
@@ -302,7 +304,7 @@ class StretchCameraDepth(RobotCamera[FieldOfViewCameraModel]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class StretchCameraInfra1(RobotCamera[FieldOfViewCameraModel]):
     """
     Camera attached to its robot model's optical frame.
@@ -316,7 +318,7 @@ class StretchCameraInfra1(RobotCamera[FieldOfViewCameraModel]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         """
         Attach the camera to the optical frame below the supplied robot root.
@@ -326,7 +328,7 @@ class StretchCameraInfra1(RobotCamera[FieldOfViewCameraModel]):
         """
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "camera_infra1_optical_frame"
+                branch_root=robot_root, name="camera_infra1_optical_frame"
             ),
             minimal_height=1.307,
             maximal_height=1.307,
@@ -338,7 +340,7 @@ class StretchCameraInfra1(RobotCamera[FieldOfViewCameraModel]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class StretchCameraInfra2(RobotCamera[FieldOfViewCameraModel]):
     """
     Camera attached to its robot model's optical frame.
@@ -352,7 +354,7 @@ class StretchCameraInfra2(RobotCamera[FieldOfViewCameraModel]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         """
         Attach the camera to the optical frame below the supplied robot root.
@@ -362,7 +364,7 @@ class StretchCameraInfra2(RobotCamera[FieldOfViewCameraModel]):
         """
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "camera_infra2_optical_frame"
+                branch_root=robot_root, name="camera_infra2_optical_frame"
             ),
             minimal_height=1.257,
             maximal_height=1.257,
@@ -374,7 +376,7 @@ class StretchCameraInfra2(RobotCamera[FieldOfViewCameraModel]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class StretchNeck(
     Neck[
         StretchCameraColor,
@@ -391,17 +393,19 @@ class StretchNeck(
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "link_head"),
+            root=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="link_head"
+            ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "link_head_tilt"
+                branch_root=robot_root, name="link_head_tilt"
             ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class StretchTorso(Torso, HasNeck[StretchNeck], HasOneArm[StretchArm]):
     def setup_hardware_interfaces(self):
         self._setup_hardware_interfaces_for_active_connections()
@@ -409,19 +413,19 @@ class StretchTorso(Torso, HasNeck[StretchNeck], HasOneArm[StretchArm]):
     def setup_joint_states(self) -> list[JointState]:
         torso_joint = self.active_connections
         torso_low = JointState.from_mapping(
-            name=PrefixedName("torso_low", prefix=self.name.name),
+            name=PrefixedName(name="torso_low", prefix=self.name.name),
             mapping=dict(zip(torso_joint, [0.0])),
             state_type=TorsoState.LOW,
         )
 
         torso_mid = JointState.from_mapping(
-            name=PrefixedName("torso_mid", prefix=self.name.name),
+            name=PrefixedName(name="torso_mid", prefix=self.name.name),
             mapping=dict(zip(torso_joint, [0.5])),
             state_type=TorsoState.MID,
         )
 
         torso_high = JointState.from_mapping(
-            name=PrefixedName("torso_high", prefix=self.name.name),
+            name=PrefixedName(name="torso_high", prefix=self.name.name),
             mapping=dict(zip(torso_joint, [1])),
             state_type=TorsoState.HIGH,
         )
@@ -430,15 +434,19 @@ class StretchTorso(Torso, HasNeck[StretchNeck], HasOneArm[StretchArm]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "link_mast"),
-            tip=robot_root._world.get_body_in_branch_by_name(robot_root, "link_lift"),
+            root=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="link_mast"
+            ),
+            tip=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="link_lift"
+            ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class StretchBaseLidar(Lidar):
     """
     The RPLIDAR scanner sweeping the whole floor around the Stretch's base.
@@ -449,10 +457,12 @@ class StretchBaseLidar(Lidar):
 
     @classmethod
     def with_source(
-        cls, robot_root: KinematicStructureEntity, source: LidarSource
+        cls, *, robot_root: KinematicStructureEntity, source: LidarSource
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "laser"),
+            root=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="laser"
+            ),
             scan_pattern=ScanPattern(
                 minimum_angle=-np.pi,
                 maximum_angle=np.pi,
@@ -464,7 +474,7 @@ class StretchBaseLidar(Lidar):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class StretchMobileBase(
     MobileBase[DifferentialDrive],
     HasTorso[StretchTorso],
@@ -486,23 +496,27 @@ class StretchMobileBase(
     def setup_hardware_interfaces(self):
         for joint_name in (StretchJoint.RIGHT_WHEEL, StretchJoint.LEFT_WHEEL):
             connection: ActiveConnection = self._world.get_connection_by_name(
-                joint_name
+                name=joint_name
             )
-            self._world.set_dofs_has_hardware_interface(connection.active_dofs, True)
+            self._world.set_dofs_has_hardware_interface(
+                dofs=connection.active_dofs, value=True
+            )
 
     def setup_joint_states(self) -> list[JointState]:
         return []
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "base_link"),
+            root=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="base_link"
+            ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Stretch(AbstractRobot, HasMobileBase[StretchMobileBase]):
     """
     The Stretch 2 robot by Hello Robot.
@@ -526,10 +540,12 @@ class Stretch(AbstractRobot, HasMobileBase[StretchMobileBase]):
             "stretch.srdf",
         )
         self._world.collision_manager.add_ignore_collision_rule(
-            SelfCollisionMatrixRule.from_collision_srdf(srdf_path, self._world)
+            rule=SelfCollisionMatrixRule.from_collision_srdf(
+                file_path=srdf_path, world=self._world
+            )
         )
         self._world.collision_manager.add_default_rule(
-            AvoidExternalCollisions(
+            rule=AvoidExternalCollisions(
                 buffer_zone_distance=0.05, violated_distance=0.0, robot=self
             )
         )
@@ -537,12 +553,16 @@ class Stretch(AbstractRobot, HasMobileBase[StretchMobileBase]):
     def _setup_velocity_limits(self):
         vel_limits = defaultdict(lambda: 0.1)
         vel_limits[
-            self._world.get_connection_by_name(StretchJoint.GRIPPER_LEFT_FINGER)
+            self._world.get_connection_by_name(name=StretchJoint.GRIPPER_LEFT_FINGER)
         ] = 0.0067
         vel_limits[
-            self._world.get_connection_by_name(StretchJoint.GRIPPER_RIGHT_FINGER)
+            self._world.get_connection_by_name(name=StretchJoint.GRIPPER_RIGHT_FINGER)
         ] = 0.0067
-        vel_limits[self._world.get_connection_by_name(StretchJoint.WRIST_YAW)] = 0.4
-        vel_limits[self._world.get_connection_by_name(StretchJoint.HEAD_TILT)] = 0.5
-        vel_limits[self._world.get_connection_by_name(StretchJoint.HEAD_PAN)] = 0.5
+        vel_limits[self._world.get_connection_by_name(name=StretchJoint.WRIST_YAW)] = (
+            0.4
+        )
+        vel_limits[self._world.get_connection_by_name(name=StretchJoint.HEAD_TILT)] = (
+            0.5
+        )
+        vel_limits[self._world.get_connection_by_name(name=StretchJoint.HEAD_PAN)] = 0.5
         self.tighten_dof_velocity_limits_of_1dof_connections(new_limits=vel_limits)

@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from semantic_digital_twin.world import World
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Step(ABC):
     """
     A Step is a transformation that takes a World as input and produces a modified World
@@ -31,14 +31,14 @@ class Step(ABC):
     """
 
     @abstractmethod
-    def _apply(self, world: World) -> World: ...
+    def _apply(self, *, world: World) -> World: ...
 
-    def apply(self, world: World) -> World:
+    def apply(self, *, world: World) -> World:
         with world.modify_world():
-            return self._apply(world)
+            return self._apply(world=world)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Pipeline:
     """
     A Pipeline is a sequence of Steps that are applied to a World in order.
@@ -52,13 +52,13 @@ class Pipeline:
     The list of Steps to be applied in the Pipeline.
     """
 
-    def apply(self, world: World) -> World:
+    def apply(self, *, world: World) -> World:
         for step in self.steps:
-            world = step.apply(world)
+            world = step.apply(world=world)
         return world
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BodyFilter(Step):
     """
     Filters bodies in the world based on a given condition.
@@ -66,14 +66,14 @@ class BodyFilter(Step):
 
     condition: Callable[[Body], bool]
 
-    def _apply(self, world: World) -> World:
+    def _apply(self, *, world: World) -> World:
         for body in world.bodies:
             if not self.condition(body):
-                world.remove_kinematic_structure_entity(body)
+                world.remove_kinematic_structure_entity(kinematic_structure_entity=body)
         return world
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CenterLocalGeometryAndPreserveWorldPose(Step):
     """
     Adjusts the vertices of the collision meshes of each body in the world so that the
@@ -85,7 +85,7 @@ class CenterLocalGeometryAndPreserveWorldPose(Step):
     not centered around that point.
     """
 
-    def _apply(self, world: World) -> World:
+    def _apply(self, *, world: World) -> World:
         for body in world.bodies_topologically_sorted:
             vertices = []
 
@@ -128,7 +128,9 @@ class CenterLocalGeometryAndPreserveWorldPose(Step):
                     parent_T_connection=parent_T_old_origin @ old_origin_T_new_origin
                 )
 
-            for child in world.compute_child_kinematic_structure_entities(body):
+            for child in world.compute_child_kinematic_structure_entities(
+                kinematic_structure_entity=body
+            ):
                 old_origin_T_child_origin = (
                     child.parent_connection.parent_T_connection_expression
                 )
@@ -139,7 +141,7 @@ class CenterLocalGeometryAndPreserveWorldPose(Step):
         return world
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BodyFactoryReplace(Step):
     """
     Replace bodies in the world that match a given condition with new structures created
@@ -161,23 +163,30 @@ class BodyFactoryReplace(Step):
     Defaults to matching bodies containing "dresser_" followed by digits in their name.
     """
 
-    def _apply(self, world: World) -> World:
+    def _apply(self, *, world: World) -> World:
         filtered_bodies = [body for body in world.bodies if self.body_condition(body)]
 
         for body in filtered_bodies:
             semantic_annotation = self.annotation_creator(body, world)
-            new_world = world.move_branch_to_new_world(semantic_annotation.root)
+            new_world = world.move_branch_to_new_world(
+                new_root=semantic_annotation.root
+            )
             parent_connection = body.parent_connection
             if parent_connection is None:
                 return new_world
 
-            for entity in world.get_kinematic_structure_entities_of_branch(body):
-                world.remove_kinematic_structure_entity(entity)
+            for entity in world.get_kinematic_structure_entities_of_branch(root=body):
+                world.remove_kinematic_structure_entity(
+                    kinematic_structure_entity=entity
+                )
 
-            world.remove_kinematic_structure_entity(body)
+            world.remove_kinematic_structure_entity(kinematic_structure_entity=body)
 
             world.merge_world(
-                new_world, parent_connection.copy_with_new_child(new_world.root)
+                other=new_world,
+                root_connection=parent_connection.copy_with_new_child(
+                    new_child=new_world.root
+                ),
             )
 
         return world

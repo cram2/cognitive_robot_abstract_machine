@@ -16,7 +16,7 @@ from semantic_digital_twin.robots.tiago import Tiago, TiagoBaseLidar
 # %% the robots carrying a base lidar
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class LidarCase:
     """
     One robot's base lidar, as its description mounts it.
@@ -42,15 +42,17 @@ class LidarCase:
         :return: This robot, annotated in a world parsed from its own description.
         """
         return self.robot.from_world(
-            URDFParser.from_file(self.robot.get_ros_file_path()).create_world()
+            world=URDFParser.from_file(
+                file_path=self.robot.get_ros_file_path()
+            ).create_world()
         )
 
 
 LIDAR_CASES = [
-    LidarCase(PR2, PR2BaseLidar, "base_laser_link"),
-    LidarCase(HSRB, HSRBBaseLidar, "base_range_sensor_link"),
-    LidarCase(Tiago, TiagoBaseLidar, "base_laser_link"),
-    LidarCase(Stretch, StretchBaseLidar, "laser"),
+    LidarCase(robot=PR2, lidar=PR2BaseLidar, lidar_link="base_laser_link"),
+    LidarCase(robot=HSRB, lidar=HSRBBaseLidar, lidar_link="base_range_sensor_link"),
+    LidarCase(robot=Tiago, lidar=TiagoBaseLidar, lidar_link="base_laser_link"),
+    LidarCase(robot=Stretch, lidar=StretchBaseLidar, lidar_link="laser"),
 ]
 
 
@@ -89,7 +91,7 @@ def test_the_lidar_is_one_of_the_robots_sensors(lidar_case):
 
 def test_the_lidar_sweeps_the_pattern_its_description_declares(lidar_case):
     case, robot = lidar_case
-    declared = case.lidar.with_simulated_source(robot.root).scan_pattern
+    declared = case.lidar.with_simulated_source(robot_root=robot.root).scan_pattern
 
     assert robot.mobile_base.lidar.scan_pattern == declared
 
@@ -127,7 +129,9 @@ def test_the_beams_are_expressed_in_the_lidars_own_frame(lidar_case):
 def test_a_lidar_in_a_furnished_world_measures_the_surfaces_around_it(
     pr2_apartment_world,
 ):
-    robot = pr2_apartment_world.get_semantic_annotations_by_type(PR2)[0]
+    robot = pr2_apartment_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=PR2
+    )[0]
 
     reading = robot.mobile_base.get_lidar_reading()
 

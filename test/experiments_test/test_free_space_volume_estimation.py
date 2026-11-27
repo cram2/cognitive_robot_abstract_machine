@@ -36,13 +36,15 @@ def _search_space_box(world: World, half_extent: float = 5.0) -> VolumetricBound
 def _world_with_box_obstacle(scale: Scale) -> tuple[World, Shape]:
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("map"))
-        world.add_kinematic_structure_entity(root)
-        obstacle = Body(name=PrefixedName("obstacle"))
+        root = Body(name=PrefixedName(name="map"))
+        world.add_kinematic_structure_entity(kinematic_structure_entity=root)
+        obstacle = Body(name=PrefixedName(name="obstacle"))
         world.add_connection(
-            FixedConnection.create_with_dofs(world=world, parent=root, child=obstacle)
+            connection=FixedConnection.create_with_dofs(
+                world=world, parent=root, child=obstacle
+            )
         )
-        obstacle.collision.append(Box(scale=scale))
+        obstacle.collision.append(shape=Box(scale=scale))
     return world, obstacle.collision.shapes[0]
 
 
@@ -50,7 +52,7 @@ def _world_with_box_obstacle(scale: Scale) -> tuple[World, Shape]:
 
 
 def test_watertight_mesh_containment_matches_the_real_geometry():
-    world, shape = _world_with_box_obstacle(Scale(2.0, 2.0, 2.0))
+    world, shape = _world_with_box_obstacle(Scale(x=2.0, y=2.0, z=2.0))
     containment_checker = ObstacleContainmentChecker.for_shape(shape, world.root)
 
     points = np.array([[0.0, 0.0, 0.0], [10.0, 10.0, 10.0]])
@@ -77,14 +79,16 @@ def test_non_watertight_mesh_is_convex_decomposed_instead_of_using_its_bounding_
 ):
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("map"))
-        world.add_kinematic_structure_entity(root)
-        obstacle = Body(name=PrefixedName("ring"))
+        root = Body(name=PrefixedName(name="map"))
+        world.add_kinematic_structure_entity(kinematic_structure_entity=root)
+        obstacle = Body(name=PrefixedName(name="ring"))
         world.add_connection(
-            FixedConnection.create_with_dofs(world=world, parent=root, child=obstacle)
+            connection=FixedConnection.create_with_dofs(
+                world=world, parent=root, child=obstacle
+            )
         )
         obstacle.collision.append(
-            Mesh.from_trimesh(
+            shape=Mesh.from_trimesh(
                 mesh=_non_watertight_ring_mesh(), directory=tmp_path, file_type="stl"
             )
         )
@@ -111,14 +115,16 @@ def test_decomposition_yielding_no_pieces_falls_back_to_the_bounding_box(tmp_pat
 
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("map"))
-        world.add_kinematic_structure_entity(root)
-        obstacle = Body(name=PrefixedName("ring"))
+        root = Body(name=PrefixedName(name="map"))
+        world.add_kinematic_structure_entity(kinematic_structure_entity=root)
+        obstacle = Body(name=PrefixedName(name="ring"))
         world.add_connection(
-            FixedConnection.create_with_dofs(world=world, parent=root, child=obstacle)
+            connection=FixedConnection.create_with_dofs(
+                world=world, parent=root, child=obstacle
+            )
         )
         obstacle.collision.append(
-            Mesh.from_trimesh(
+            shape=Mesh.from_trimesh(
                 mesh=_non_watertight_ring_mesh(), directory=tmp_path, file_type="stl"
             )
         )
@@ -168,8 +174,8 @@ def test_wilson_score_interval_clips_all_successes_at_one():
 def test_free_volume_bound_of_an_empty_scene_brackets_the_full_search_space():
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("map"))
-        world.add_kinematic_structure_entity(root)
+        root = Body(name=PrefixedName(name="map"))
+        world.add_kinematic_structure_entity(kinematic_structure_entity=root)
     sampler = MonteCarloFreeSpaceSampler(
         search_space_bounding_box=_search_space_box(world),
         obstacle_containment_checkers=[],
@@ -185,7 +191,7 @@ def test_free_volume_bound_of_an_empty_scene_brackets_the_full_search_space():
 
 
 def test_free_volume_bound_of_a_fully_occupied_scene_is_zero_at_the_lower_end():
-    world, shape = _world_with_box_obstacle(Scale(10.0, 10.0, 10.0))
+    world, shape = _world_with_box_obstacle(Scale(x=10.0, y=10.0, z=10.0))
     sampler = MonteCarloFreeSpaceSampler(
         search_space_bounding_box=_search_space_box(world),
         obstacle_containment_checkers=[
@@ -204,8 +210,8 @@ def test_free_volume_bound_of_a_fully_occupied_scene_is_zero_at_the_lower_end():
 def test_sample_points_are_deterministic_for_a_fixed_seed():
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("map"))
-        world.add_kinematic_structure_entity(root)
+        root = Body(name=PrefixedName(name="map"))
+        world.add_kinematic_structure_entity(kinematic_structure_entity=root)
     search_space = _search_space_box(world)
     first = MonteCarloFreeSpaceSampler(
         search_space_bounding_box=search_space,

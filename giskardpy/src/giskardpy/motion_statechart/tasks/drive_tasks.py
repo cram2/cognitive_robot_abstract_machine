@@ -100,7 +100,7 @@ class DrivenBaseTask(ConvergingTask, HasGoalPoseParameter, ABC):
             the degrees of freedom of the drive.
         """
         return self.context.world.compose_forward_kinematics_expression(
-            self.drive_parent, self.driven_body
+            root=self.drive_parent, tip=self.driven_body
         )
 
 
@@ -236,7 +236,7 @@ class BaseTurnTowardsGoalPosition(BaseHeading):
         """
         super().set_up()
         self._parent_T_start_binding = ForwardKinematicsBinding(
-            name=PrefixedName("parent_T_start", str(self.name)),
+            name=PrefixedName(name="parent_T_start", prefix=str(self.name)),
             kinematic_chain=KinematicChain(
                 root=self.drive_parent, tip=self.driven_body
             ),

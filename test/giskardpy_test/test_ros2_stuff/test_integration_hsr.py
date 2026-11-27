@@ -42,14 +42,16 @@ class HSRTester(GiskardTester):
     def __post_init__(self):
         super().__post_init__()
         self.base_footprint = self.api.world.get_kinematic_structure_entity_by_name(
-            "base_footprint"
+            name="base_footprint"
         )
         self.map = self.api.world.root
 
     def setup_giskard(self) -> Giskard:
         return Giskard(
             world_source=WorldSpecification(
-                robots=[RobotSpecification.specify_real_robot(HSRB)]
+                robots=[
+                    RobotSpecification.specify_real_robot(semantic_annotation_type=HSRB)
+                ]
             ),
             robot_interface_config=StandAloneRobotInterfaceConfig(),
             server_config=GiskardServerConfig(),

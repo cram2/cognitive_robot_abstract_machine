@@ -138,7 +138,7 @@ class WindowWallResource(StrEnum):
 
 
 # %% Surface measurements
-@dataclass
+@dataclass(kw_only=True)
 class WallProfile:
     """
     A face coordinate varying linearly along the wall in root coordinates.
@@ -157,7 +157,7 @@ class WallProfile:
     Along-wall reference position in metres.
     """
 
-    def coordinate_at(self, along_wall_y: float) -> float:
+    def coordinate_at(self, *, along_wall_y: float) -> float:
         """
         Return the face coordinate at an along-wall position.
         """
@@ -166,7 +166,7 @@ class WallProfile:
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WallStrip:
     """
     A solid wall-mounted strip bounded by fitted front, top and bottom faces.
@@ -187,6 +187,7 @@ class WallStrip:
 
     def create_in_world(
         self,
+        *,
         world: World,
         name: WindowWallPart,
         wall: KitchenWindowWall,
@@ -198,30 +199,30 @@ class WallStrip:
             (depth_x, along_wall_y, height_z)
             for along_wall_y in (wall.start_y, wall.end_y)
             for depth_x in (
-                self.front.coordinate_at(along_wall_y),
+                self.front.coordinate_at(along_wall_y=along_wall_y),
                 wall.interior_x,
             )
             for height_z in (
-                self.bottom.coordinate_at(along_wall_y),
-                self.top.coordinate_at(along_wall_y),
+                self.bottom.coordinate_at(along_wall_y=along_wall_y),
+                self.top.coordinate_at(along_wall_y=along_wall_y),
             )
         ]
         mesh = Mesh.from_trimesh(
-            trimesh.points.PointCloud(vertices).convex_hull,
+            mesh=trimesh.points.PointCloud(vertices).convex_hull,
             directory=wall.geometry_directory,
         )
         specification = SemanticAnnotationWithRootSpecification(
             name=name,
             semantic_annotation_type=WallPanel,
             root_specification=BodySpecification(
-                name=None, shapes=ShapeCollection([mesh])
+                name=None, shapes=ShapeCollection(shapes=[mesh])
             ),
         )
-        return specification.spawn(world)
+        return specification.spawn(world=world)
 
 
 # %% Window recesses
-@dataclass
+@dataclass(kw_only=True)
 class WindowRecess:
     """
     An observed window bay with a sill and a closed recessed panel.
@@ -248,7 +249,9 @@ class WindowRecess:
     Upper recess boundary above the floor in metres.
     """
 
-    def add_to_wall(self, world: World, wall: Wall, model: KitchenWindowWall) -> None:
+    def add_to_wall(
+        self, *, world: World, wall: Wall, model: KitchenWindowWall
+    ) -> None:
         """
         Cut the window recess and add its sill and closed collision panel.
         """
@@ -264,7 +267,7 @@ class WindowRecess:
                 y=center_y,
                 z=(self.sill_top + self.opening_top) / 2,
             ),
-            scale=Scale(depth * 2, width, opening_height),
+            scale=Scale(x=depth * 2, y=width, z=opening_height),
         )
         wall.add(part=aperture)
         window_panel = WallPanel.create_with_new_body_in_world(
@@ -275,10 +278,10 @@ class WindowRecess:
                 y=center_y,
                 z=(self.sill_top + self.opening_top) / 2,
             ),
-            scale=Scale(model.panel_thickness, width, opening_height),
+            scale=Scale(x=model.panel_thickness, y=width, z=opening_height),
         )
         for shape in window_panel.root.visual.shapes:
-            shape.color = Color(0.55, 0.75, 0.9, 0.3)
+            shape.color = Color(hue=0.55, saturation=0.75, value=0.9, opacity=0.3)
         sill_depth = model.panel_front_x + model.panel_thickness - model.sill_front_x
         WallPanel.create_with_new_body_in_world(
             name=f"{self.name}_sill",
@@ -288,12 +291,12 @@ class WindowRecess:
                 y=center_y,
                 z=self.sill_top - model.sill_thickness / 2,
             ),
-            scale=Scale(sill_depth, width, model.sill_thickness),
+            scale=Scale(x=sill_depth, y=width, z=model.sill_thickness),
         )
 
 
 # %% Window wall construction
-@dataclass
+@dataclass(kw_only=True)
 class KitchenWindowWall:
     """
     The lab's window wall with recessed bays and projecting lower features.
@@ -337,9 +340,24 @@ class KitchenWindowWall:
     """
     windows: tuple[WindowRecess, ...] = field(
         default_factory=lambda: (
-            WindowRecess(WindowWallPart.FIRST_WINDOW, -2.370, -0.205, 0.619),
-            WindowRecess(WindowWallPart.SECOND_WINDOW, 0.374, 2.542, 0.615),
-            WindowRecess(WindowWallPart.THIRD_WINDOW, 3.124, 5.300, 0.611),
+            WindowRecess(
+                name=WindowWallPart.FIRST_WINDOW,
+                start_y=-2.370,
+                end_y=-0.205,
+                sill_top=0.619,
+            ),
+            WindowRecess(
+                name=WindowWallPart.SECOND_WINDOW,
+                start_y=0.374,
+                end_y=2.542,
+                sill_top=0.615,
+            ),
+            WindowRecess(
+                name=WindowWallPart.THIRD_WINDOW,
+                start_y=3.124,
+                end_y=5.300,
+                sill_top=0.611,
+            ),
         )
     )
     """
@@ -347,16 +365,24 @@ class KitchenWindowWall:
     """
     cable_channel: WallStrip = field(
         default_factory=lambda: WallStrip(
-            front=WallProfile(4.92004270, -0.004738043),
-            top=WallProfile(0.24908890, -0.002023020),
-            bottom=WallProfile(0.08430169, -0.002697850),
+            front=WallProfile(
+                coordinate_at_reference=4.92004270, along_wall_slope=-0.004738043
+            ),
+            top=WallProfile(
+                coordinate_at_reference=0.24908890, along_wall_slope=-0.002023020
+            ),
+            bottom=WallProfile(
+                coordinate_at_reference=0.08430169, along_wall_slope=-0.002697850
+            ),
         )
     )
     """
     Fitted channel faces extended along the wall.
     """
     lower_strip_front: WallProfile = field(
-        default_factory=lambda: WallProfile(4.94318739, -0.004332790)
+        default_factory=lambda: WallProfile(
+            coordinate_at_reference=4.94318739, along_wall_slope=-0.004332790
+        )
     )
     """
     Observed face of the exposed strip below the channel.
@@ -368,7 +394,7 @@ class KitchenWindowWall:
     Persistent directory for generated collision and visual meshes.
     """
 
-    def create_in_world(self, world: World) -> Wall:
+    def create_in_world(self, *, world: World) -> Wall:
         """
         Add the windowed wall and its fixed surface-mounted features.
         """
@@ -380,22 +406,26 @@ class KitchenWindowWall:
                 x=self.interior_x + depth / 2,
                 y=(self.start_y + self.end_y) / 2,
             ),
-            scale=Scale(depth, self.end_y - self.start_y, self.height),
+            scale=Scale(x=depth, y=self.end_y - self.start_y, z=self.height),
         )
         for window in self.windows:
-            window.add_to_wall(world, wall, self)
-        self.cable_channel.create_in_world(world, WindowWallPart.CHANNEL, self)
+            window.add_to_wall(world=world, wall=wall, model=self)
+        self.cable_channel.create_in_world(
+            world=world, name=WindowWallPart.CHANNEL, wall=self
+        )
         lower_strip = WallStrip(
             front=self.lower_strip_front,
             top=self.cable_channel.bottom,
-            bottom=WallProfile(0.0),
+            bottom=WallProfile(coordinate_at_reference=0.0),
         )
-        lower_strip.create_in_world(world, WindowWallPart.LOWER_STRIP, self)
+        lower_strip.create_in_world(
+            world=world, name=WindowWallPart.LOWER_STRIP, wall=self
+        )
         return wall
 
 
 # %% Sofa surface measurements
-@dataclass
+@dataclass(kw_only=True)
 class SofaProfilePoint:
     """
     A depth and floor-relative height on an upholstered side profile.
@@ -411,7 +441,7 @@ class SofaProfilePoint:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SofaProfile:
     """
     A convex upholstery profile extruded across a specified width interval.
@@ -423,7 +453,7 @@ class SofaProfile:
     """
 
     def create_mesh(
-        self, minimum_width: float, maximum_width: float, origin_height: float
+        self, *, minimum_width: float, maximum_width: float, origin_height: float
     ) -> trimesh.Trimesh:
         """
         Create a closed solid expressed relative to the sofa body origin.
@@ -444,7 +474,7 @@ class SofaResource(StrEnum):
     GEOMETRY = "kitchen_sofa"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class KitchenSofa:
     """
     A sofa with two seat cushions, two back cushions and solid armrests.
@@ -514,18 +544,18 @@ class KitchenSofa:
     """
     seat: SofaProfile = field(
         default_factory=lambda: SofaProfile(
-            [
-                SofaProfilePoint(-0.50, 0.28),
-                SofaProfilePoint(-0.50, 0.35),
-                SofaProfilePoint(-0.48, 0.41),
-                SofaProfilePoint(-0.44, 0.44),
-                SofaProfilePoint(-0.36, 0.453),
-                SofaProfilePoint(-0.25, 0.444),
-                SofaProfilePoint(-0.15, 0.435),
-                SofaProfilePoint(-0.05, 0.428),
-                SofaProfilePoint(0.05, 0.421),
-                SofaProfilePoint(0.18, 0.406),
-                SofaProfilePoint(0.20, 0.28),
+            points=[
+                SofaProfilePoint(depth=-0.50, height=0.28),
+                SofaProfilePoint(depth=-0.50, height=0.35),
+                SofaProfilePoint(depth=-0.48, height=0.41),
+                SofaProfilePoint(depth=-0.44, height=0.44),
+                SofaProfilePoint(depth=-0.36, height=0.453),
+                SofaProfilePoint(depth=-0.25, height=0.444),
+                SofaProfilePoint(depth=-0.15, height=0.435),
+                SofaProfilePoint(depth=-0.05, height=0.428),
+                SofaProfilePoint(depth=0.05, height=0.421),
+                SofaProfilePoint(depth=0.18, height=0.406),
+                SofaProfilePoint(depth=0.20, height=0.28),
             ]
         )
     )
@@ -534,17 +564,17 @@ class KitchenSofa:
     """
     arm: SofaProfile = field(
         default_factory=lambda: SofaProfile(
-            [
-                SofaProfilePoint(-0.47, 0.10),
-                SofaProfilePoint(-0.47, 0.59),
-                SofaProfilePoint(-0.455, 0.64),
-                SofaProfilePoint(-0.42, 0.665),
-                SofaProfilePoint(-0.30, 0.670),
-                SofaProfilePoint(0.20, 0.675),
-                SofaProfilePoint(0.40, 0.660),
-                SofaProfilePoint(0.47, 0.62),
-                SofaProfilePoint(0.47, 0.06),
-                SofaProfilePoint(-0.43, 0.06),
+            points=[
+                SofaProfilePoint(depth=-0.47, height=0.10),
+                SofaProfilePoint(depth=-0.47, height=0.59),
+                SofaProfilePoint(depth=-0.455, height=0.64),
+                SofaProfilePoint(depth=-0.42, height=0.665),
+                SofaProfilePoint(depth=-0.30, height=0.670),
+                SofaProfilePoint(depth=0.20, height=0.675),
+                SofaProfilePoint(depth=0.40, height=0.660),
+                SofaProfilePoint(depth=0.47, height=0.62),
+                SofaProfilePoint(depth=0.47, height=0.06),
+                SofaProfilePoint(depth=-0.43, height=0.06),
             ]
         )
     )
@@ -553,22 +583,22 @@ class KitchenSofa:
     """
     left_back: SofaProfile = field(
         default_factory=lambda: SofaProfile(
-            [
-                SofaProfilePoint(0.12, 0.40),
-                SofaProfilePoint(0.092, 0.50),
-                SofaProfilePoint(0.093, 0.55),
-                SofaProfilePoint(0.108, 0.60),
-                SofaProfilePoint(0.130, 0.65),
-                SofaProfilePoint(0.149, 0.70),
-                SofaProfilePoint(0.168, 0.75),
-                SofaProfilePoint(0.197, 0.80),
-                SofaProfilePoint(0.230, 0.83),
-                SofaProfilePoint(0.270, 0.842),
-                SofaProfilePoint(0.300, 0.838),
-                SofaProfilePoint(0.335, 0.82),
-                SofaProfilePoint(0.350, 0.78),
-                SofaProfilePoint(0.385, 0.65),
-                SofaProfilePoint(0.425, 0.28),
+            points=[
+                SofaProfilePoint(depth=0.12, height=0.40),
+                SofaProfilePoint(depth=0.092, height=0.50),
+                SofaProfilePoint(depth=0.093, height=0.55),
+                SofaProfilePoint(depth=0.108, height=0.60),
+                SofaProfilePoint(depth=0.130, height=0.65),
+                SofaProfilePoint(depth=0.149, height=0.70),
+                SofaProfilePoint(depth=0.168, height=0.75),
+                SofaProfilePoint(depth=0.197, height=0.80),
+                SofaProfilePoint(depth=0.230, height=0.83),
+                SofaProfilePoint(depth=0.270, height=0.842),
+                SofaProfilePoint(depth=0.300, height=0.838),
+                SofaProfilePoint(depth=0.335, height=0.82),
+                SofaProfilePoint(depth=0.350, height=0.78),
+                SofaProfilePoint(depth=0.385, height=0.65),
+                SofaProfilePoint(depth=0.425, height=0.28),
             ]
         )
     )
@@ -577,20 +607,20 @@ class KitchenSofa:
     """
     right_back: SofaProfile = field(
         default_factory=lambda: SofaProfile(
-            [
-                SofaProfilePoint(0.077, 0.40),
-                SofaProfilePoint(0.080, 0.50),
-                SofaProfilePoint(0.090, 0.55),
-                SofaProfilePoint(0.111, 0.60),
-                SofaProfilePoint(0.136, 0.65),
-                SofaProfilePoint(0.168, 0.70),
-                SofaProfilePoint(0.220, 0.75),
-                SofaProfilePoint(0.280, 0.79),
-                SofaProfilePoint(0.320, 0.806),
-                SofaProfilePoint(0.345, 0.80),
-                SofaProfilePoint(0.370, 0.76),
-                SofaProfilePoint(0.400, 0.65),
-                SofaProfilePoint(0.425, 0.28),
+            points=[
+                SofaProfilePoint(depth=0.077, height=0.40),
+                SofaProfilePoint(depth=0.080, height=0.50),
+                SofaProfilePoint(depth=0.090, height=0.55),
+                SofaProfilePoint(depth=0.111, height=0.60),
+                SofaProfilePoint(depth=0.136, height=0.65),
+                SofaProfilePoint(depth=0.168, height=0.70),
+                SofaProfilePoint(depth=0.220, height=0.75),
+                SofaProfilePoint(depth=0.280, height=0.79),
+                SofaProfilePoint(depth=0.320, height=0.806),
+                SofaProfilePoint(depth=0.345, height=0.80),
+                SofaProfilePoint(depth=0.370, height=0.76),
+                SofaProfilePoint(depth=0.400, height=0.65),
+                SofaProfilePoint(depth=0.425, height=0.28),
             ]
         )
     )
@@ -599,7 +629,7 @@ class KitchenSofa:
     """
 
     def create_in_world(
-        self, world: World, root_T_sofa: HomogeneousTransformationMatrix
+        self, *, world: World, root_T_sofa: HomogeneousTransformationMatrix
     ) -> Sofa:
         """
         Add a semantic sofa with a watertight upholstery envelope and seat support.
@@ -627,25 +657,43 @@ class KitchenSofa:
             (-self.width / 2, -inner_width),
             (inner_width, self.width / 2),
         ):
-            meshes.append(self.arm.create_mesh(minimum, maximum, self.origin_height))
+            meshes.append(
+                self.arm.create_mesh(
+                    minimum_width=minimum,
+                    maximum_width=maximum,
+                    origin_height=self.origin_height,
+                )
+            )
         for minimum, maximum, back in (
             (-inner_width, -self.cushion_gap / 2, self.left_back),
             (self.cushion_gap / 2, inner_width, self.right_back),
         ):
-            meshes.append(self.seat.create_mesh(minimum, maximum, self.origin_height))
-            meshes.append(back.create_mesh(minimum, maximum, self.origin_height))
+            meshes.append(
+                self.seat.create_mesh(
+                    minimum_width=minimum,
+                    maximum_width=maximum,
+                    origin_height=self.origin_height,
+                )
+            )
+            meshes.append(
+                back.create_mesh(
+                    minimum_width=minimum,
+                    maximum_width=maximum,
+                    origin_height=self.origin_height,
+                )
+            )
         envelope = trimesh.boolean.union(meshes, engine="manifold")
         shape = Mesh.from_trimesh(
-            envelope,
+            mesh=envelope,
             directory=self.geometry_directory,
         )
         shape.color = Color.BEIGE()
         seat_surface = RegionSpecification.box(
             name="sofa_seat_surface",
             scale=Scale(
-                self.seat_surface_depth,
-                2 * (inner_width - self.seat_surface_width_margin),
-                self.seat_surface_thickness,
+                x=self.seat_surface_depth,
+                y=2 * (inner_width - self.seat_surface_width_margin),
+                z=self.seat_surface_thickness,
             ),
             parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
                 x=self.seat_surface_center_depth,
@@ -658,21 +706,22 @@ class KitchenSofa:
             semantic_annotation_type=Sofa,
             root_specification=BodySpecification(
                 name=None,
-                shapes=ShapeCollection([shape]),
+                shapes=ShapeCollection(shapes=[shape]),
                 child_specifications=[seat_surface],
             ),
         )
-        sofa = specification.spawn(world, parent_T_self=root_T_sofa)
+        sofa = specification.spawn(world=world, parent_T_self=root_T_sofa)
         sofa.add_supporting_surface(
-            cast(
-                Region, world.get_kinematic_structure_entity_by_name(seat_surface.name)
+            region=cast(
+                Region,
+                world.get_kinematic_structure_entity_by_name(name=seat_surface.name),
             )
         )
         return sofa
 
 
 # %% Measured kitchen geometry
-@dataclass
+@dataclass(kw_only=True)
 class KitchenMeasurements:
     """
     Kitchen dimensions and placements in the registered model root frame.
@@ -757,7 +806,7 @@ class KitchenMeasurements:
 
 
 # %% Environment construction
-@dataclass
+@dataclass(kw_only=True)
 class KitchenEnvironment(WorldSource):
     """
     The kitchen together with its neighbouring rooms: their walls, the furniture and the
@@ -770,11 +819,11 @@ class KitchenEnvironment(WorldSource):
     """
 
     def create_world(self) -> World:
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
 
-        self._build_environment_walls(world)
-        self._build_environment_furniture(world)
-        self._build_environment_rooms(world)
+        self._build_environment_walls(world=world)
+        self._build_environment_furniture(world=world)
+        self._build_environment_rooms(world=world)
 
         return world
 
@@ -824,16 +873,16 @@ class KitchenEnvironment(WorldSource):
             ),
         )
 
-    def _build_environment_walls(self, world: World) -> None:
+    def _build_environment_walls(self, *, world: World) -> None:
         """
         Builds and configures the environment walls for a given world.
         """
         root = world.root
 
         north_west_wall = Cylinder(width=1.53, height=3.00)
-        shape_geometry = ShapeCollection([north_west_wall])
+        shape_geometry = ShapeCollection(shapes=[north_west_wall])
         north_west_wall_body = Body(
-            name=PrefixedName("north_west_wall_body"),
+            name=PrefixedName(name="north_west_wall_body"),
             collision=shape_geometry,
             visual=shape_geometry,
         )
@@ -912,7 +961,7 @@ class KitchenEnvironment(WorldSource):
                 world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=-0.145, y=0.45, yaw=np.pi / 2
                 ),
-                scale=Scale(0.05, 0.29, 1.00),
+                scale=Scale(x=0.05, y=0.29, z=1.00),
             )
 
             south_wall6 = Wall.create_with_new_body_in_world(
@@ -921,7 +970,7 @@ class KitchenEnvironment(WorldSource):
                 world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=-0.29025, y=1.80
                 ),
-                scale=Scale(0.05, 2.75, 1.00),
+                scale=Scale(x=0.05, y=2.75, z=1.00),
             )
 
             south_wall7 = Wall.create_with_new_body_in_world(
@@ -930,7 +979,7 @@ class KitchenEnvironment(WorldSource):
                 world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=-0.29025, y=5.16
                 ),
-                scale=Scale(0.05, 2.27, 1.00),
+                scale=Scale(x=0.05, y=2.27, z=1.00),
             )
 
             east_wall = Wall.create_with_new_body_in_world(
@@ -941,7 +990,7 @@ class KitchenEnvironment(WorldSource):
                     y=self.measurements.wall_interior_y - 0.025,
                     yaw=np.pi / 2,
                 ),
-                scale=Scale(0.05, self.measurements.window_wall.interior_x, 3.00),
+                scale=Scale(x=0.05, y=self.measurements.window_wall.interior_x, z=3.00),
             )
 
             middle_wall = Wall.create_with_new_body_in_world(
@@ -950,7 +999,7 @@ class KitchenEnvironment(WorldSource):
                 world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=2.20975, y=5.00
                 ),
-                scale=Scale(0.05, 2.67, 1.00),
+                scale=Scale(x=0.05, y=2.67, z=1.00),
             )
 
             west_wall = Wall.create_with_new_body_in_world(
@@ -959,14 +1008,14 @@ class KitchenEnvironment(WorldSource):
                 world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=1.9345, y=6.32, yaw=np.pi / 2
                 ),
-                scale=Scale(0.05, 4.449, 3.00),
+                scale=Scale(x=0.05, y=4.449, z=3.00),
             )
 
-            self.measurements.window_wall.create_in_world(world)
+            self.measurements.window_wall.create_in_world(world=world)
 
-            world.add_connection(root_C_north_west_wall)
+            world.add_connection(connection=root_C_north_west_wall)
 
-    def _build_environment_furniture(self, world: World) -> None:
+    def _build_environment_furniture(self, *, world: World) -> None:
         """
         Adds furniture items and room layouts to the scene graph.
         """
@@ -976,12 +1025,12 @@ class KitchenEnvironment(WorldSource):
         with world.modify_world():
             # %% Trash can
             trash_can = TrashCan.get_annotation_specification(
-                "trash_can",
-                TrashCan.get_default_root_kinematic_structure_entity_specification(
+                name="trash_can",
+                root_specification=TrashCan.get_default_root_kinematic_structure_entity_specification(
                     scale=Scale(x=0.30, y=0.30, z=0.40), wall_thickness=0.02
                 ),
             ).spawn(
-                world,
+                world=world,
                 parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=0.416, y=5.5, z=0.2
                 ),
@@ -1023,12 +1072,12 @@ class KitchenEnvironment(WorldSource):
             )
 
             refrigerator = Fridge.get_annotation_specification(
-                "refrigerator",
-                Fridge.get_default_root_kinematic_structure_entity_specification(
+                name="refrigerator",
+                root_specification=Fridge.get_default_root_kinematic_structure_entity_specification(
                     scale=Scale(x=fridge_length, y=fridge_width, z=fridge_height),
                     wall_thickness=0.02,
                 ),
-            ).spawn(world, parent_T_self=fridge_pose)
+            ).spawn(world=world, parent_T_self=fridge_pose)
             for shape in refrigerator.root.visual.shapes:
                 shape.color = Color.GRAY()
 
@@ -1049,7 +1098,7 @@ class KitchenEnvironment(WorldSource):
             )
             for shape in fridge_top_plate.root.visual.shapes:
                 shape.color = Color.GRAY()
-            refrigerator.add_object(fridge_top_plate)
+            refrigerator.add_object(object=fridge_top_plate)
 
             fridge_top_gap_facing = WallPanel.create_with_new_body_in_world(
                 world=world,
@@ -1071,7 +1120,7 @@ class KitchenEnvironment(WorldSource):
             )
             for shape in fridge_top_gap_facing.root.visual.shapes:
                 shape.color = Color.GRAY()
-            refrigerator.add_object(fridge_top_gap_facing)
+            refrigerator.add_object(object=fridge_top_gap_facing)
 
             hinge_local_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
                 x=-fridge_length / 2,
@@ -1156,7 +1205,7 @@ class KitchenEnvironment(WorldSource):
             )
             for shape in fridge_base_facing.root.visual.shapes:
                 shape.color = Color.GRAY()
-            refrigerator.add_object(fridge_base_facing)
+            refrigerator.add_object(object=fridge_base_facing)
 
             fridge_door_handle_length = 0.855
             door_handle_world_pose = (
@@ -1167,8 +1216,8 @@ class KitchenEnvironment(WorldSource):
                 )
             )
             fridge_door_handle = Handle.get_annotation_specification(
-                "fridge_door_handle",
-                Handle.get_default_root_kinematic_structure_entity_specification(
+                name="fridge_door_handle",
+                root_specification=Handle.get_default_root_kinematic_structure_entity_specification(
                     scale=Scale(
                         x=standard_handle_depth,
                         y=standard_handle_width,
@@ -1177,7 +1226,7 @@ class KitchenEnvironment(WorldSource):
                     thickness=standard_handle_width,
                 ),
             ).spawn(
-                world,
+                world=world,
                 parent_T_self=door_handle_world_pose,
             )
             for shape in fridge_door_handle.root.visual.shapes:
@@ -1193,8 +1242,8 @@ class KitchenEnvironment(WorldSource):
                 )
             )
             fridge_drawer_handle = Handle.get_annotation_specification(
-                "fridge_drawer_handle",
-                Handle.get_default_root_kinematic_structure_entity_specification(
+                name="fridge_drawer_handle",
+                root_specification=Handle.get_default_root_kinematic_structure_entity_specification(
                     scale=Scale(
                         x=standard_handle_depth,
                         y=standard_handle_width,
@@ -1203,7 +1252,7 @@ class KitchenEnvironment(WorldSource):
                     thickness=standard_handle_width,
                 ),
             ).spawn(
-                world,
+                world=world,
                 parent_T_self=drawer_handle_world_pose,
             )
             for shape in fridge_drawer_handle.root.visual.shapes:
@@ -1266,7 +1315,7 @@ class KitchenEnvironment(WorldSource):
             )
             for shape in counter_base_facing.root.visual.shapes:
                 shape.color = Color.GRAY()
-            counter_top.add_object(counter_base_facing)
+            counter_top.add_object(object=counter_base_facing)
 
             sink_width, sink_depth, sink_fridge_gap = 0.86, 0.50, 0.115
             counter_top_sink_y = (
@@ -1315,8 +1364,8 @@ class KitchenEnvironment(WorldSource):
                 )
             )
             module_1_cabinet = Cabinet.get_annotation_specification(
-                "module_1_cabinet",
-                Cabinet.get_default_root_kinematic_structure_entity_specification(
+                name="module_1_cabinet",
+                root_specification=Cabinet.get_default_root_kinematic_structure_entity_specification(
                     scale=Scale(
                         x=counter_cabinet_depth,
                         y=module_1_width,
@@ -1324,7 +1373,7 @@ class KitchenEnvironment(WorldSource):
                     ),
                     wall_thickness=0.02,
                 ),
-            ).spawn(world, parent_T_self=module_1_pose)
+            ).spawn(world=world, parent_T_self=module_1_pose)
             for shape in module_1_cabinet.root.visual.shapes:
                 shape.color = Color.GRAY()
 
@@ -1374,8 +1423,8 @@ class KitchenEnvironment(WorldSource):
             module_1_cabinet.add(part=module_1_door)
 
             module_1_handle = Handle.get_annotation_specification(
-                "module_1_handle",
-                Handle.get_default_root_kinematic_structure_entity_specification(
+                name="module_1_handle",
+                root_specification=Handle.get_default_root_kinematic_structure_entity_specification(
                     scale=Scale(
                         x=standard_handle_depth,
                         y=module_1_handle_width,
@@ -1384,7 +1433,7 @@ class KitchenEnvironment(WorldSource):
                     thickness=standard_handle_width,
                 ),
             ).spawn(
-                world,
+                world=world,
                 parent_T_self=module_1_hinge_world_pose
                 @ HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=-module_1_door_thickness / 2,
@@ -1410,8 +1459,8 @@ class KitchenEnvironment(WorldSource):
                 )
             )
             dishwasher = Dishwasher.get_annotation_specification(
-                "dishwasher",
-                Dishwasher.get_default_root_kinematic_structure_entity_specification(
+                name="dishwasher",
+                root_specification=Dishwasher.get_default_root_kinematic_structure_entity_specification(
                     scale=Scale(
                         x=counter_cabinet_depth,
                         y=module_2_width,
@@ -1419,7 +1468,7 @@ class KitchenEnvironment(WorldSource):
                     ),
                     wall_thickness=0.02,
                 ),
-            ).spawn(world, parent_T_self=module_2_pose)
+            ).spawn(world=world, parent_T_self=module_2_pose)
             for shape in dishwasher.root.visual.shapes:
                 shape.color = Color.GRAY()
 
@@ -1451,8 +1500,8 @@ class KitchenEnvironment(WorldSource):
             dishwasher.add(part=module_2_door)
 
             module_2_handle = Handle.get_annotation_specification(
-                "dishwasher_handle",
-                Handle.get_default_root_kinematic_structure_entity_specification(
+                name="dishwasher_handle",
+                root_specification=Handle.get_default_root_kinematic_structure_entity_specification(
                     scale=Scale(
                         x=standard_handle_depth,
                         y=standard_handle_width,
@@ -1461,7 +1510,7 @@ class KitchenEnvironment(WorldSource):
                     thickness=standard_handle_width,
                 ),
             ).spawn(
-                world,
+                world=world,
                 parent_T_self=module_2_hinge_world_pose
                 @ HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=-module_2_door_thickness / 2,
@@ -1481,8 +1530,8 @@ class KitchenEnvironment(WorldSource):
                 )
             )
             module_3_cabinet = Cabinet.get_annotation_specification(
-                "module_3_cabinet",
-                Cabinet.get_default_root_kinematic_structure_entity_specification(
+                name="module_3_cabinet",
+                root_specification=Cabinet.get_default_root_kinematic_structure_entity_specification(
                     scale=Scale(
                         x=counter_cabinet_depth,
                         y=module_3_width,
@@ -1490,10 +1539,10 @@ class KitchenEnvironment(WorldSource):
                     ),
                     wall_thickness=0.02,
                 ),
-            ).spawn(world, parent_T_self=module_3_pose)
+            ).spawn(world=world, parent_T_self=module_3_pose)
             for shape in module_3_cabinet.root.visual.shapes:
                 shape.color = Color.GRAY()
-            counter_top.add_object(module_3_cabinet)
+            counter_top.add_object(object=module_3_cabinet)
 
             drawer_heights = [
                 counter_cabinet_height * 0.4,
@@ -1541,8 +1590,8 @@ class KitchenEnvironment(WorldSource):
                     )
                 )
                 handle = Handle.get_annotation_specification(
-                    f"counter_drawer_{drawer_index}_handle",
-                    Handle.get_default_root_kinematic_structure_entity_specification(
+                    name=f"counter_drawer_{drawer_index}_handle",
+                    root_specification=Handle.get_default_root_kinematic_structure_entity_specification(
                         scale=Scale(
                             x=standard_handle_depth,
                             y=standard_handle_width,
@@ -1550,7 +1599,7 @@ class KitchenEnvironment(WorldSource):
                         ),
                         thickness=standard_handle_width,
                     ),
-                ).spawn(world, parent_T_self=handle_pose)
+                ).spawn(world=world, parent_T_self=handle_pose)
                 for shape in handle.root.visual.shapes:
                     shape.color = Color.GRAY()
                 drawer.add(part=handle)
@@ -1583,12 +1632,12 @@ class KitchenEnvironment(WorldSource):
                 yaw=-np.pi / 2,
             )
             tower = Cupboard.get_annotation_specification(
-                "oven_tower",
-                Cupboard.get_default_root_kinematic_structure_entity_specification(
+                name="oven_tower",
+                root_specification=Cupboard.get_default_root_kinematic_structure_entity_specification(
                     scale=Scale(x=oven_depth, y=oven_width, z=oven_height),
                     wall_thickness=0.02,
                 ),
-            ).spawn(world, parent_T_self=tower_pose)
+            ).spawn(world=world, parent_T_self=tower_pose)
             for shape in tower.root.visual.shapes:
                 shape.color = Color.GRAY()
 
@@ -1630,7 +1679,7 @@ class KitchenEnvironment(WorldSource):
             )
             for shape in oven_base_facing.root.visual.shapes:
                 shape.color = Color.GRAY()
-            tower.add_object(oven_base_facing)
+            tower.add_object(object=oven_base_facing)
 
             oven_top_plate = WallPanel.create_with_new_body_in_world(
                 world=world,
@@ -1648,7 +1697,7 @@ class KitchenEnvironment(WorldSource):
             )
             for shape in oven_top_plate.root.visual.shapes:
                 shape.color = Color.GRAY()
-            tower.add_object(oven_top_plate)
+            tower.add_object(object=oven_top_plate)
 
             oven_top_gap_facing = WallPanel.create_with_new_body_in_world(
                 world=world,
@@ -1670,7 +1719,7 @@ class KitchenEnvironment(WorldSource):
             )
             for shape in oven_top_gap_facing.root.visual.shapes:
                 shape.color = Color.GRAY()
-            tower.add_object(oven_top_gap_facing)
+            tower.add_object(object=oven_top_gap_facing)
 
             # Side Drawers
             for side in [-1, 1]:
@@ -1717,8 +1766,8 @@ class KitchenEnvironment(WorldSource):
                     )
                 )
                 handle = Handle.get_annotation_specification(
-                    f"oven_side_handle_{side_name}",
-                    Handle.get_default_root_kinematic_structure_entity_specification(
+                    name=f"oven_side_handle_{side_name}",
+                    root_specification=Handle.get_default_root_kinematic_structure_entity_specification(
                         scale=Scale(
                             x=standard_handle_depth,
                             y=standard_handle_width,
@@ -1726,7 +1775,7 @@ class KitchenEnvironment(WorldSource):
                         ),
                         thickness=standard_handle_width,
                     ),
-                ).spawn(world, parent_T_self=handle_pose)
+                ).spawn(world=world, parent_T_self=handle_pose)
                 for shape in handle.root.visual.shapes:
                     shape.color = Color.GRAY()
                 drawer.add(part=handle)
@@ -1767,8 +1816,8 @@ class KitchenEnvironment(WorldSource):
             tower.add(part=oven_cabinet_door)
 
             oven_cabinet_handle = Handle.get_annotation_specification(
-                "oven_cabinet_handle",
-                Handle.get_default_root_kinematic_structure_entity_specification(
+                name="oven_cabinet_handle",
+                root_specification=Handle.get_default_root_kinematic_structure_entity_specification(
                     scale=Scale(
                         x=standard_handle_depth,
                         y=standard_handle_width,
@@ -1777,7 +1826,7 @@ class KitchenEnvironment(WorldSource):
                     thickness=standard_handle_width,
                 ),
             ).spawn(
-                world,
+                world=world,
                 parent_T_self=oven_cabinet_hinge_world_pose
                 @ HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=-center_door_thickness / 2,
@@ -1824,8 +1873,8 @@ class KitchenEnvironment(WorldSource):
             tower.add(part=drawer)
 
             oven_center_drawer_handle = Handle.get_annotation_specification(
-                "oven_center_drawer_handle",
-                Handle.get_default_root_kinematic_structure_entity_specification(
+                name="oven_center_drawer_handle",
+                root_specification=Handle.get_default_root_kinematic_structure_entity_specification(
                     scale=Scale(
                         x=standard_handle_depth,
                         y=standard_handle_width,
@@ -1834,7 +1883,7 @@ class KitchenEnvironment(WorldSource):
                     thickness=standard_handle_width,
                 ),
             ).spawn(
-                world,
+                world=world,
                 parent_T_self=drawer_pose
                 @ HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=-center_drawer_depth / 2,
@@ -1865,7 +1914,7 @@ class KitchenEnvironment(WorldSource):
             )
             for shape in oven.root.visual.shapes:
                 shape.color = Color.GRAY()
-            tower.add_object(oven)
+            tower.add_object(object=oven)
 
             oven_hinge_world_pose = (
                 oven_pose
@@ -1892,8 +1941,8 @@ class KitchenEnvironment(WorldSource):
             oven_handle_width = 0.025
             oven_handle_top_inset = 0.13  # Measured from the top edge of the oven.
             oven_handle = Handle.get_annotation_specification(
-                "oven_handle",
-                Handle.get_default_root_kinematic_structure_entity_specification(
+                name="oven_handle",
+                root_specification=Handle.get_default_root_kinematic_structure_entity_specification(
                     scale=Scale(
                         x=0.04,
                         y=oven_handle_width,
@@ -1902,7 +1951,7 @@ class KitchenEnvironment(WorldSource):
                     thickness=0.02,
                 ),
             ).spawn(
-                world,
+                world=world,
                 parent_T_self=oven_hinge_world_pose
                 @ HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=-0.02,
@@ -2013,21 +2062,23 @@ class KitchenEnvironment(WorldSource):
                     z=sideboard_height / 2 + sideboard_top_thickness / 2,
                 ),
                 scale=Scale(
-                    sideboard_top_width,
-                    sideboard_top_length,
-                    sideboard_top_thickness,
+                    x=sideboard_top_width,
+                    y=sideboard_top_length,
+                    z=sideboard_top_thickness,
                 ),
             )
             for shape in sideboard.root.visual.shapes:
                 shape.color = Color.WHITE()
 
             sideboard_cabinet = Cabinet.get_annotation_specification(
-                "sideboard_cabinet",
-                Cabinet.get_default_root_kinematic_structure_entity_specification(
-                    scale=Scale(sideboard_width, sideboard_length, sideboard_height),
+                name="sideboard_cabinet",
+                root_specification=Cabinet.get_default_root_kinematic_structure_entity_specification(
+                    scale=Scale(
+                        x=sideboard_width, y=sideboard_length, z=sideboard_height
+                    ),
                     wall_thickness=sideboard_corpus_wall_thickness,
                 ),
-            ).spawn(world, parent_T_self=sideboard_pose)
+            ).spawn(world=world, parent_T_self=sideboard_pose)
             for shape in sideboard_cabinet.root.visual.shapes:
                 shape.color = Color.WHITE()
 
@@ -2054,7 +2105,7 @@ class KitchenEnvironment(WorldSource):
             )
             for shape in sideboard_base_facing.root.visual.shapes:
                 shape.color = Color.GRAY()
-            sideboard_cabinet.add_object(sideboard_base_facing)
+            sideboard_cabinet.add_object(object=sideboard_base_facing)
 
             sideboard_cooktop = Cooktop.create_with_new_body_in_world(
                 world=world,
@@ -2073,7 +2124,7 @@ class KitchenEnvironment(WorldSource):
             )
             for shape in sideboard_cooktop.root.visual.shapes:
                 shape.color = Color.BLACK()
-            sideboard.add_object(sideboard_cooktop)
+            sideboard.add_object(object=sideboard_cooktop)
 
             sideboard_drawer_bottom_height = (
                 -sideboard_height / 2 + sideboard_base_facing_height
@@ -2107,7 +2158,7 @@ class KitchenEnvironment(WorldSource):
                 )
                 for shape in upper_face_plate.root.visual.shapes:
                     shape.color = Color.WHITE()
-                sideboard_cabinet.add_object(upper_face_plate)
+                sideboard_cabinet.add_object(object=upper_face_plate)
 
                 for row_index, z_offset in enumerate(z_offsets):
                     drawer_id = f"sideboard_drawer_{column_index}_{row_index}"
@@ -2128,9 +2179,9 @@ class KitchenEnvironment(WorldSource):
                             travel=0.25
                         ),
                         scale=Scale(
-                            sideboard_drawer_depth,
-                            width,
-                            sideboard_drawer_height,
+                            x=sideboard_drawer_depth,
+                            y=width,
+                            z=sideboard_drawer_height,
                         ),
                     )
 
@@ -2150,24 +2201,24 @@ class KitchenEnvironment(WorldSource):
                         )
                     )
                     handle = Handle.get_annotation_specification(
-                        f"{drawer_id}_handle",
-                        Handle.get_default_root_kinematic_structure_entity_specification(
+                        name=f"{drawer_id}_handle",
+                        root_specification=Handle.get_default_root_kinematic_structure_entity_specification(
                             scale=Scale(
-                                standard_handle_depth,
-                                standard_handle_width,
-                                width - 0.1,
+                                x=standard_handle_depth,
+                                y=standard_handle_width,
+                                z=width - 0.1,
                             ),
                             thickness=standard_handle_width,
                         ),
-                    ).spawn(world, parent_T_self=handle_pose)
+                    ).spawn(world=world, parent_T_self=handle_pose)
                     for shape in handle.root.visual.shapes:
                         shape.color = Color.GRAY()
                     drawer.add(part=handle)
 
             # %% Sofa
             self.measurements.sofa_shape.create_in_world(
-                world,
-                HomogeneousTransformationMatrix.from_xyz_rpy(
+                world=world,
+                root_T_sofa=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=self.measurements.sofa_center_x,
                     y=self.measurements.sofa_center_y,
                     z=self.measurements.sofa_shape.origin_height,
@@ -2176,21 +2227,21 @@ class KitchenEnvironment(WorldSource):
             )
 
             # %% Coffee table
-            self._build_coffee_table(world)
+            self._build_coffee_table(world=world)
 
             # %% Cupboard
-            cupboard_scale = Scale(0.43, 0.80, 2.02)
+            cupboard_scale = Scale(x=0.43, y=0.80, z=2.02)
             cupboard_pose = HomogeneousTransformationMatrix.from_xyz_rpy(
                 x=4.55, y=4.72, z=1.01
             )
             cupboard = Cupboard.get_annotation_specification(
-                "cupboard",
-                Cupboard.get_default_root_kinematic_structure_entity_specification(
+                name="cupboard",
+                root_specification=Cupboard.get_default_root_kinematic_structure_entity_specification(
                     scale=cupboard_scale, wall_thickness=0.02
                 ),
-            ).spawn(world, parent_T_self=cupboard_pose)
+            ).spawn(world=world, parent_T_self=cupboard_pose)
 
-            shelf_scale = Scale(0.40, 0.76, 0.02)
+            shelf_scale = Scale(x=0.40, y=0.76, z=0.02)
             for i, z in enumerate([-0.5, 0.5]):
                 shelf = ShelfLayer.create_with_new_body_in_world(
                     world=world,
@@ -2201,14 +2252,16 @@ class KitchenEnvironment(WorldSource):
                 )
                 for shape in shelf.root.visual.shapes:
                     shape.color = Color.WHITE()
-                cupboard.add_object(shelf)
+                cupboard.add_object(object=shelf)
 
             cupboard_door_height, cupboard_door_width = 1.055, 0.40
             cupboard_door_z_relative = -(cupboard_scale.z / 2) + (
                 cupboard_door_height / 2
             )
             cupboard_door_x_relative = -(cupboard_scale.x / 2) - 0.01
-            cupboard_door_scale = Scale(0.02, cupboard_door_width, cupboard_door_height)
+            cupboard_door_scale = Scale(
+                x=0.02, y=cupboard_door_width, z=cupboard_door_height
+            )
 
             for i, (side, limits, y_off) in enumerate(
                 [("left", [0.0, np.pi / 2], -0.40), ("right", [-np.pi / 2, 0.0], 0.40)]
@@ -2239,13 +2292,13 @@ class KitchenEnvironment(WorldSource):
                 cupboard.add(part=door)
 
                 handle = Handle.get_annotation_specification(
-                    f"cupboard_handle_{side}",
-                    Handle.get_default_root_kinematic_structure_entity_specification(
-                        scale=Scale(0.04, 0.04, 0.04),
+                    name=f"cupboard_handle_{side}",
+                    root_specification=Handle.get_default_root_kinematic_structure_entity_specification(
+                        scale=Scale(x=0.04, y=0.04, z=0.04),
                         thickness=0.02,
                     ),
                 ).spawn(
-                    world,
+                    world=world,
                     parent_T_self=hinge_pose
                     @ HomogeneousTransformationMatrix.from_xyz_rpy(
                         x=-0.03,
@@ -2268,12 +2321,12 @@ class KitchenEnvironment(WorldSource):
                 world=world,
                 name="desk",
                 world_root_T_self=desk_pose,
-                scale=Scale(desk_length, desk_width, desk_plate_thickness),
+                scale=Scale(x=desk_length, y=desk_width, z=desk_plate_thickness),
             )
             for shape in desk.root.visual.shapes:
                 shape.color = desk_color
 
-            leg_scale = Scale(0.04, 0.04, desk_height - desk_plate_thickness)
+            leg_scale = Scale(x=0.04, y=0.04, z=desk_height - desk_plate_thickness)
             x_offset, y_offset, z_position = (
                 (desk_length / 2) - 0.02,
                 (desk_width / 2) - 0.02,
@@ -2308,7 +2361,9 @@ class KitchenEnvironment(WorldSource):
                 name="cooking_table",
                 world_root_T_self=cooking_table_pose,
                 scale=Scale(
-                    cooking_table_length, cooking_table_depth, cooking_table_thickness
+                    x=cooking_table_length,
+                    y=cooking_table_depth,
+                    z=cooking_table_thickness,
                 ),
             )
             for shape in cooking_table.bodies[0].visual.shapes:
@@ -2321,11 +2376,11 @@ class KitchenEnvironment(WorldSource):
                 @ HomogeneousTransformationMatrix.from_xyz_rpy(
                     z=cooking_table_thickness / 2 + 0.005
                 ),
-                scale=Scale(0.5, 0.5, 0.01),
+                scale=Scale(x=0.5, y=0.5, z=0.01),
             )
             for shape in cooking_table_cooktop.root.visual.shapes:
                 shape.color = Color.BLACK()
-            cooking_table.add_object(cooking_table_cooktop)
+            cooking_table.add_object(object=cooking_table_cooktop)
 
             cooking_table_bottom = ShelfLayer.create_with_new_body_in_world(
                 world=world,
@@ -2335,12 +2390,14 @@ class KitchenEnvironment(WorldSource):
                     z=-cooking_table_height + cooking_table_thickness
                 ),
                 scale=Scale(
-                    cooking_table_length, cooking_table_depth, cooking_table_thickness
+                    x=cooking_table_length,
+                    y=cooking_table_depth,
+                    z=cooking_table_thickness,
                 ),
             )
             for shape in cooking_table_bottom.root.visual.shapes:
                 shape.color = Color.BEIGE()
-            cooking_table.add_object(cooking_table_bottom)
+            cooking_table.add_object(object=cooking_table_bottom)
 
             module_width = (cooking_table_length - 0.60) / 2
             for side in [-1, 1]:
@@ -2358,14 +2415,14 @@ class KitchenEnvironment(WorldSource):
                     world=world,
                     world_root_T_self=module_pose,
                     scale=Scale(
-                        module_width,
-                        cooking_table_depth,
-                        cooking_table_height - 2 * cooking_table_thickness,
+                        x=module_width,
+                        y=cooking_table_depth,
+                        z=cooking_table_height - 2 * cooking_table_thickness,
                     ),
                 )
                 for shape in mod.bodies[0].visual.shapes:
                     shape.color = Color.BEIGE()
-                cooking_table.add_object(mod)
+                cooking_table.add_object(object=mod)
 
                 drawer_pose = (
                     module_pose @ HomogeneousTransformationMatrix.from_xyz_rpy(z=0.2)
@@ -2377,7 +2434,9 @@ class KitchenEnvironment(WorldSource):
                     parent_connection_specification=self._drawer_slide_specification(
                         travel=0.40
                     ),
-                    scale=Scale(module_width - 0.04, cooking_table_depth - 0.02, 0.18),
+                    scale=Scale(
+                        x=module_width - 0.04, y=cooking_table_depth - 0.02, z=0.18
+                    ),
                 )
 
                 for shape in drawer.root.visual.shapes:
@@ -2391,12 +2450,12 @@ class KitchenEnvironment(WorldSource):
                     )
                 )
                 handle = Handle.get_annotation_specification(
-                    f"cooking_drawer_handle_{side_name}",
-                    Handle.get_default_root_kinematic_structure_entity_specification(
-                        scale=Scale(0.04, 0.04, module_width / 3),
+                    name=f"cooking_drawer_handle_{side_name}",
+                    root_specification=Handle.get_default_root_kinematic_structure_entity_specification(
+                        scale=Scale(x=0.04, y=0.04, z=module_width / 3),
                         thickness=0.02,
                     ),
-                ).spawn(world, parent_T_self=handle_pose)
+                ).spawn(world=world, parent_T_self=handle_pose)
                 for shape in handle.root.visual.shapes:
                     shape.color = Color.GRAY()
                 drawer.add(part=handle)
@@ -2416,16 +2475,16 @@ class KitchenEnvironment(WorldSource):
                 name="dining_table",
                 world_root_T_self=dining_table_pose,
                 scale=Scale(
-                    dining_table_length,
-                    dining_table_width,
-                    dining_table_plate_thickness,
+                    x=dining_table_length,
+                    y=dining_table_width,
+                    z=dining_table_plate_thickness,
                 ),
             )
             for shape in dining_table.root.visual.shapes:
                 shape.color = Color.BEIGE()
 
             leg_scale = Scale(
-                0.06, 0.06, dining_table_height - dining_table_plate_thickness
+                x=0.06, y=0.06, z=dining_table_height - dining_table_plate_thickness
             )
             x_offset, y_offset, z_position = (
                 (dining_table_length / 2) - 0.03,
@@ -2446,7 +2505,7 @@ class KitchenEnvironment(WorldSource):
                     shape.color = Color.BEIGE()
                 dining_table.add(part=leg)
 
-    def _build_coffee_table(self, world: World) -> None:
+    def _build_coffee_table(self, *, world: World) -> None:
         """
         Builds a refined coffee table with a middle shelf and a closed front.
 
@@ -2465,7 +2524,7 @@ class KitchenEnvironment(WorldSource):
             world=world,
             name="coffee_table",
             world_root_T_self=pose,
-            scale=Scale(length, width, thick),
+            scale=Scale(x=length, y=width, z=thick),
         )
         for shape in table.bodies[0].visual.shapes:
             shape.color = color
@@ -2475,40 +2534,40 @@ class KitchenEnvironment(WorldSource):
             name="coffee_table_shelf",
             world_root_T_self=pose
             @ HomogeneousTransformationMatrix.from_xyz_rpy(z=-height / 2),
-            scale=Scale(length, width, 0.01),
+            scale=Scale(x=length, y=width, z=0.01),
         )
         for shape in shelf.root.visual.shapes:
             shape.color = color
-        table.add_object(shelf)
+        table.add_object(object=shelf)
 
         floor = ShelfLayer.create_with_new_body_in_world(
             world=world,
             name="coffee_table_floor",
             world_root_T_self=pose
             @ HomogeneousTransformationMatrix.from_xyz_rpy(z=-height + thick / 2),
-            scale=Scale(length, width, thick),
+            scale=Scale(x=length, y=width, z=thick),
         )
         for shape in floor.root.visual.shapes:
             shape.color = color
-        table.add_object(floor)
+        table.add_object(object=floor)
 
         for i, y_direction in enumerate([-1, 1]):
             side_wall_body = Body(
-                name=PrefixedName(f"coffee_table_wall_short_{i}_body")
+                name=PrefixedName(name=f"coffee_table_wall_short_{i}_body")
             )
-            side_wall_box = Box(scale=Scale(length, thick, height), color=color)
+            side_wall_box = Box(scale=Scale(x=length, y=thick, z=height), color=color)
             side_wall_box.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
                 reference_frame=side_wall_body
             )
             side_wall_geometry = ShapeCollection(
-                [side_wall_box], reference_frame=side_wall_body
+                shapes=[side_wall_box], reference_frame=side_wall_body
             )
             side_wall_body.collision, side_wall_body.visual = (
                 side_wall_geometry,
                 side_wall_geometry,
             )
             world.add_connection(
-                FixedConnection(
+                connection=FixedConnection(
                     parent=table.root,
                     child=side_wall_body,
                     parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -2521,21 +2580,23 @@ class KitchenEnvironment(WorldSource):
         for side in [-1, 1]:
             side_name = "left" if side == -1 else "right"
             long_wall_body = Body(
-                name=PrefixedName(f"coffee_table_wall_long_{side_name}_body")
+                name=PrefixedName(name=f"coffee_table_wall_long_{side_name}_body")
             )
-            long_wall_box = Box(scale=Scale(thick, wall_length, height), color=color)
+            long_wall_box = Box(
+                scale=Scale(x=thick, y=wall_length, z=height), color=color
+            )
             long_wall_box.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
                 reference_frame=long_wall_body
             )
             long_wall_geometry = ShapeCollection(
-                [long_wall_box], reference_frame=long_wall_body
+                shapes=[long_wall_box], reference_frame=long_wall_body
             )
             long_wall_body.collision, long_wall_body.visual = (
                 long_wall_geometry,
                 long_wall_geometry,
             )
             world.add_connection(
-                FixedConnection(
+                connection=FixedConnection(
                     parent=table.root,
                     child=long_wall_body,
                     parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -2546,7 +2607,7 @@ class KitchenEnvironment(WorldSource):
                 )
             )
 
-    def _build_environment_rooms(self, world: World) -> None:
+    def _build_environment_rooms(self, *, world: World) -> None:
         """
         Annotates the floor area of every room.
         """
@@ -2589,7 +2650,7 @@ class KitchenEnvironment(WorldSource):
                     x=2.317, y=-0.843
                 ),
             )
-            kitchen = Room(floor=kitchen_floor, name=PrefixedName("kitchen"))
+            kitchen = Room(floor=kitchen_floor, name=PrefixedName(name="kitchen"))
             room_annotations.append(kitchen)
 
             living_room_floor = Floor.create_with_new_body_from_polytope_in_world(
@@ -2601,7 +2662,7 @@ class KitchenEnvironment(WorldSource):
                 ),
             )
             living_room = Room(
-                floor=living_room_floor, name=PrefixedName("living_room")
+                floor=living_room_floor, name=PrefixedName(name="living_room")
             )
             room_annotations.append(living_room)
 
@@ -2613,7 +2674,7 @@ class KitchenEnvironment(WorldSource):
                     x=0.96, y=4.96
                 ),
             )
-            bed_room = Room(floor=bed_room_floor, name=PrefixedName("bed_room"))
+            bed_room = Room(floor=bed_room_floor, name=PrefixedName(name="bed_room"))
             room_annotations.append(bed_room)
 
             office_floor = Floor.create_with_new_body_from_polytope_in_world(
@@ -2624,7 +2685,7 @@ class KitchenEnvironment(WorldSource):
                     x=3.5625, y=4.96
                 ),
             )
-            office = Room(floor=office_floor, name=PrefixedName("office"))
+            office = Room(floor=office_floor, name=PrefixedName(name="office"))
             room_annotations.append(office)
 
-            world.add_semantic_annotations(room_annotations)
+            world.add_semantic_annotations(semantic_annotations=room_annotations)

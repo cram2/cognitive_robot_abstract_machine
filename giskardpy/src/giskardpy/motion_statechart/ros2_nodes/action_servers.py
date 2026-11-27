@@ -370,7 +370,7 @@ class NavigateActionServerTask(
             target_frame=self.context.world.root, spatial_object=self.target_pose
         )
         root_T_current = self.context.world.compose_forward_kinematics_expression(
-            self.context.world.root, self.base_link
+            root=self.context.world.root, tip=self.base_link
         )
 
         position_error = root_T_goal.position.euclidean_distance(

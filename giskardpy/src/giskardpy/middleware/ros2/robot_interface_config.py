@@ -151,7 +151,7 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
         """
         with self.world.modify_world():
             self.world.set_dofs_has_hardware_interface(
-                self.world.degrees_of_freedom, False
+                dofs=self.world.degrees_of_freedom, value=False
             )
         self.setup()
 
@@ -176,8 +176,8 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
         """
         if odometry_topic is None:
             odometry_topic = RosGraph(
-                background_node.get_node()
-            ).unique_publisher_of_type(Odometry)
+                node=background_node.get_node()
+            ).unique_publisher_of_type(topic_type=Odometry)
         assert isinstance(joint, (OmniDrive, DifferentialDrive))
         synchronizer = OdometrySynchronizer(
             world=self.world,
@@ -203,7 +203,11 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
                 0, self.tf_frame_synchronizer
             )
             self.control_loop.inputs.synchronizers.insert(0, self.tf_frame_synchronizer)
-        self.tf_frame_synchronizer.track(joint, tf_parent_frame, tf_child_frame)
+        self.tf_frame_synchronizer.track(
+            connection=joint,
+            tf_parent_frame=tf_parent_frame,
+            tf_child_frame=tf_child_frame,
+        )
 
     def sync_robot_parts(self):
         """
@@ -213,18 +217,18 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
         The topics come from the parts, so a part mounted on a different robot is read
         wherever that robot publishes it.
         """
-        self.robot.use_real_sources(background_node.get_node())
-        self.motion_server.inputs.add_robot_inputs(self.robot)
-        self.control_loop.inputs.add_robot_inputs(self.robot)
+        self.robot.use_real_sources(node=background_node.get_node())
+        self.motion_server.inputs.add_robot_inputs(robot=self.robot)
+        self.control_loop.inputs.add_robot_inputs(robot=self.robot)
 
     def sync_robot_part(self, *, robot_part: HasInputSource):
         """
         Tell Giskard to read one part of the robot from the robot itself, on the topic
         that part declares.
         """
-        robot_part.use_real_source(background_node.get_node())
-        self.motion_server.inputs.add_robot_part_input(robot_part)
-        self.control_loop.inputs.add_robot_part_input(robot_part)
+        robot_part.use_real_source(node=background_node.get_node())
+        self.motion_server.inputs.add_robot_part_input(robot_part=robot_part)
+        self.control_loop.inputs.add_robot_part_input(robot_part=robot_part)
 
     def sync_joint_state_topic(self, *, topic_name: str, group_name: str | None = None):
         """
@@ -273,15 +277,15 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
             exactly one drive.
         """
         if drive is None:
-            drives = self.world.get_connections_by_type(WheeledDrive)
+            drives = self.world.get_connections_by_type(connection_type=WheeledDrive)
             if len(drives) != 1:
                 raise NoUniqueDriveError(drives=drives)
             [drive] = drives
         command_format = command_format or TwistFormat()
         if command_topic is None:
             command_topic = RosGraph(
-                background_node.get_node()
-            ).unique_subscriber_of_type(command_format.message_type())
+                node=background_node.get_node()
+            ).unique_subscriber_of_type(topic_type=command_format.message_type())
         self.control_loop.command_publishers.append(
             DriveVelocityCommandPublisher(
                 world=self.world,
@@ -321,7 +325,7 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
             :class:`~giskardpy.middleware.ros2.command_publishing.Float64MultiArrayFormat`.
         """
         controlled_connections: list[ActiveConnection1DOF] = [
-            self.world.get_connection_by_name(connection_name)
+            self.world.get_connection_by_name(name=connection_name)
             for connection_name in connections
         ]
         self.control_loop.command_publishers.append(
@@ -353,7 +357,8 @@ class ClosedLoopRobotInterfaceConfig(RobotInterfaceConfig, ABC):
         :param whitelist: The names of the controllers to consider, all if ``None``.
         """
         controller_manager = ControllerManager(
-            name=controller_manager_name, ros_graph=RosGraph(background_node.get_node())
+            name=controller_manager_name,
+            ros_graph=RosGraph(node=background_node.get_node()),
         )
         for controller in controller_manager.active_controllers(whitelist=whitelist):
             match controller.type:

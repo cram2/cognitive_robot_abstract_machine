@@ -293,7 +293,9 @@ def test_one_visualization_shows_every_repetition_of_a_demonstration(
 def test_a_debugging_action_trial_is_shown_apart_from_the_world_it_copies(
     cylinder_bot_world, rclpy_node
 ) -> None:
-    robot = cylinder_bot_world.get_semantic_annotations_by_type(MinimalRobot)[0]
+    robot = cylinder_bot_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=MinimalRobot
+    )[0]
     executor = KinematicallySimulatedPlanExecutor(
         context=StatechartContext.with_extensions(
             world=cylinder_bot_world, extensions=robot_extensions(robot)

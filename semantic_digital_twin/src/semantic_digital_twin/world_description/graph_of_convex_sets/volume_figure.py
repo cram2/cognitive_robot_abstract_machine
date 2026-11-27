@@ -69,7 +69,7 @@ def polyline_trace(
 # %% the layers a panel is drawn from
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class VolumeLayer(ABC):
     """
     One kind of geometry a panel draws, so that panels differ in what they compose
@@ -78,7 +78,7 @@ class VolumeLayer(ABC):
 
     @abstractmethod
     def traces(
-        self, scene: NavigationScene, palette: FigurePalette
+        self, *, scene: NavigationScene, palette: FigurePalette
     ) -> Sequence[go.BaseTraceType]:
         """
         :param scene: The scene to draw.
@@ -88,7 +88,7 @@ class VolumeLayer(ABC):
         raise NotImplementedError
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class SearchSpaceVolumeLayer(VolumeLayer):
     """
     Draws the volume the graph of convex sets was built in, as a wireframe so that
@@ -96,7 +96,7 @@ class SearchSpaceVolumeLayer(VolumeLayer):
     """
 
     def traces(
-        self, scene: NavigationScene, palette: FigurePalette
+        self, *, scene: NavigationScene, palette: FigurePalette
     ) -> Sequence[go.BaseTraceType]:
         event = Event.from_simple_sets(
             *(box.simple_event for box in scene.search_space)
@@ -123,7 +123,7 @@ class ObstacleEmphasis(float, enum.Enum):
     CONTEXT = 0.2
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class ObstacleVolumeLayer(VolumeLayer):
     """
     Draws the environment's collision geometry as boxes.
@@ -135,7 +135,7 @@ class ObstacleVolumeLayer(VolumeLayer):
     """
 
     def traces(
-        self, scene: NavigationScene, palette: FigurePalette
+        self, *, scene: NavigationScene, palette: FigurePalette
     ) -> Sequence[go.BaseTraceType]:
         event = Event.from_simple_sets(*(box.simple_event for box in scene.obstacles))
         plotter = EventPlotter(event=event)
@@ -149,7 +149,7 @@ class ObstacleVolumeLayer(VolumeLayer):
         ]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class ConvexSetVolumeLayer(VolumeLayer):
     """
     Draws the convex sets partitioning free space, translucent enough to see the sets
@@ -163,7 +163,7 @@ class ConvexSetVolumeLayer(VolumeLayer):
     """
 
     def traces(
-        self, scene: NavigationScene, palette: FigurePalette
+        self, *, scene: NavigationScene, palette: FigurePalette
     ) -> Sequence[go.BaseTraceType]:
         event = Event.from_simple_sets(*(box.simple_event for box in scene.convex_sets))
         plotter = EventPlotter(event=event)
@@ -177,7 +177,7 @@ class ConvexSetVolumeLayer(VolumeLayer):
         ]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class AdjacencyVolumeLayer(VolumeLayer):
     """
     Draws the graph over the convex sets: a node at every set's center and an edge
@@ -185,7 +185,7 @@ class AdjacencyVolumeLayer(VolumeLayer):
     """
 
     def traces(
-        self, scene: NavigationScene, palette: FigurePalette
+        self, *, scene: NavigationScene, palette: FigurePalette
     ) -> Sequence[go.BaseTraceType]:
         centers = np.array(
             [
@@ -217,14 +217,14 @@ class AdjacencyVolumeLayer(VolumeLayer):
         ]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class PathVolumeLayer(VolumeLayer):
     """
     Draws the optimal path and the waypoints it turns at.
     """
 
     def traces(
-        self, scene: NavigationScene, palette: FigurePalette
+        self, *, scene: NavigationScene, palette: FigurePalette
     ) -> Sequence[go.BaseTraceType]:
         coordinates = scene.path.spatial_coordinates
         return [
@@ -242,7 +242,7 @@ class PathVolumeLayer(VolumeLayer):
         ]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class EndpointsVolumeLayer(VolumeLayer):
     """
     Draws the start and the goal of the path, each labelled beside its marker so that
@@ -250,17 +250,27 @@ class EndpointsVolumeLayer(VolumeLayer):
     """
 
     def traces(
-        self, scene: NavigationScene, palette: FigurePalette
+        self, *, scene: NavigationScene, palette: FigurePalette
     ) -> Sequence[go.BaseTraceType]:
         waypoints = scene.path.waypoints
         return [
-            self._endpoint_trace(waypoints[0], "start", "circle", palette.start),
-            self._endpoint_trace(waypoints[-1], "goal", "square", palette.goal),
+            self._endpoint_trace(
+                endpoint=waypoints[0],
+                label="start",
+                symbol="circle",
+                color=palette.start,
+            ),
+            self._endpoint_trace(
+                endpoint=waypoints[-1],
+                label="goal",
+                symbol="square",
+                color=palette.goal,
+            ),
         ]
 
     @staticmethod
     def _endpoint_trace(
-        endpoint: Point3, label: str, symbol: str, color: str
+        *, endpoint: Point3, label: str, symbol: str, color: str
     ) -> go.Scatter3d:
         """
         :param endpoint: The point to mark.
@@ -286,7 +296,7 @@ class EndpointsVolumeLayer(VolumeLayer):
 # %% the panels of the figure
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class VolumePanel(ABC):
     """
     One sub-plot of the figure, defined by the layers it composes and the statistic it
@@ -302,7 +312,7 @@ class VolumePanel(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def subtitle(self, scene: NavigationScene) -> str:
+    def subtitle(self, *, scene: NavigationScene) -> str:
         """
         :param scene: The scene the panel draws.
         :return: The line under the title, quantifying what the panel shows.
@@ -317,7 +327,7 @@ class VolumePanel(ABC):
         raise NotImplementedError
 
     def traces(
-        self, scene: NavigationScene, palette: FigurePalette
+        self, *, scene: NavigationScene, palette: FigurePalette
     ) -> list[go.BaseTraceType]:
         """
         :param scene: The scene to draw.
@@ -325,11 +335,13 @@ class VolumePanel(ABC):
         :return: Every trace the panel's layers contribute.
         """
         return [
-            trace for layer in self.layers() for trace in layer.traces(scene, palette)
+            trace
+            for layer in self.layers()
+            for trace in layer.traces(scene=scene, palette=palette)
         ]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class EnvironmentVolumePanel(VolumePanel):
     """
     Shows what the planner is given: the collision geometry of a world and the volume
@@ -340,7 +352,7 @@ class EnvironmentVolumePanel(VolumePanel):
     def name(self) -> str:
         return "Environment"
 
-    def subtitle(self, scene: NavigationScene) -> str:
+    def subtitle(self, *, scene: NavigationScene) -> str:
         bounds = scene.search_space.bounding_box().to_array_bounds()
         extent = bounds.upper - bounds.lower
         return (
@@ -352,7 +364,7 @@ class EnvironmentVolumePanel(VolumePanel):
         return (SearchSpaceVolumeLayer(), ObstacleVolumeLayer())
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class ConvexSetsVolumePanel(VolumePanel):
     """
     Shows what the planner builds: free space partitioned into convex sets in all three
@@ -363,7 +375,7 @@ class ConvexSetsVolumePanel(VolumePanel):
     def name(self) -> str:
         return "Graph of convex sets"
 
-    def subtitle(self, scene: NavigationScene) -> str:
+    def subtitle(self, *, scene: NavigationScene) -> str:
         return (
             f"{len(scene.convex_sets)} convex sets, "
             f"{len(scene.adjacencies)} adjacencies"
@@ -373,7 +385,7 @@ class ConvexSetsVolumePanel(VolumePanel):
         return (ConvexSetVolumeLayer(), AdjacencyVolumeLayer())
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class OptimalPathVolumePanel(VolumePanel):
     """
     Shows what the planner returns: the minimum-distance path between the queried start
@@ -387,7 +399,7 @@ class OptimalPathVolumePanel(VolumePanel):
     def name(self) -> str:
         return "Optimal path"
 
-    def subtitle(self, scene: NavigationScene) -> str:
+    def subtitle(self, *, scene: NavigationScene) -> str:
         return (
             f"{scene.path.length:.2f} m over {len(scene.path.waypoints)} waypoints, "
             f"{scene.path.vertical_travel:.2f} m of it vertical"
@@ -395,7 +407,7 @@ class OptimalPathVolumePanel(VolumePanel):
 
     def layers(self) -> Sequence[VolumeLayer]:
         return (
-            ObstacleVolumeLayer(ObstacleEmphasis.CONTEXT),
+            ObstacleVolumeLayer(emphasis=ObstacleEmphasis.CONTEXT),
             PathVolumeLayer(),
             EndpointsVolumeLayer(),
         )
@@ -404,7 +416,7 @@ class OptimalPathVolumePanel(VolumePanel):
 # %% the figure
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class SceneCamera:
     """
     Where every panel is looked at from, shared by all of them so the three read against
@@ -426,7 +438,7 @@ class SceneCamera:
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GraphOfConvexSetsVolumeFigure:
     """
     The three-panel volume figure of a scene: its environment, its graph of convex sets,
@@ -495,11 +507,11 @@ class GraphOfConvexSetsVolumeFigure:
             specs=[[{"type": "scene"}] * len(self.panels)],
             horizontal_spacing=0.02,
         )
-        self._add_panels(figure, palette)
-        self._style(figure, palette)
+        self._add_panels(figure=figure, palette=palette)
+        self._style(figure=figure, palette=palette)
         return figure
 
-    def save(self, output_directory: Path) -> list[Path]:
+    def save(self, *, output_directory: Path) -> list[Path]:
         """
         Render the figure and write it as an interactive page, a vector file and a
         raster file.
@@ -527,7 +539,7 @@ class GraphOfConvexSetsVolumeFigure:
             written.append(path)
         return written
 
-    def _add_panels(self, figure: go.Figure, palette: FigurePalette) -> None:
+    def _add_panels(self, *, figure: go.Figure, palette: FigurePalette) -> None:
         """
         Add every panel's traces, showing each legend entry once across the figure.
 
@@ -536,12 +548,12 @@ class GraphOfConvexSetsVolumeFigure:
         """
         shown_groups = set()
         for column, panel in enumerate(self.panels, start=1):
-            for trace in panel.traces(self.scene, palette):
+            for trace in panel.traces(scene=self.scene, palette=palette):
                 trace.showlegend = trace.legendgroup not in shown_groups
                 shown_groups.add(trace.legendgroup)
                 figure.add_trace(trace, row=1, col=column)
 
-    def _style(self, figure: go.Figure, palette: FigurePalette) -> None:
+    def _style(self, *, figure: go.Figure, palette: FigurePalette) -> None:
         """
         Give the figure its titles, its shared camera and its theme.
 
@@ -566,7 +578,7 @@ class GraphOfConvexSetsVolumeFigure:
                 font=dict(color=palette.text_secondary),
             ),
             margin=dict(l=0, r=0, t=110, b=10),
-            annotations=self._panel_titles(palette),
+            annotations=self._panel_titles(palette=palette),
         )
         # Every panel is pinned to the same box rather than auto-scaled to its own
         # traces, so a metre is the same length in all three and they can be read
@@ -578,14 +590,20 @@ class GraphOfConvexSetsVolumeFigure:
                     f"scene{index}": dict(
                         aspectmode="data",
                         camera=self.camera.as_plotly(),
-                        xaxis=self._axis("x [m]", palette, bounds, 0),
-                        yaxis=self._axis("y [m]", palette, bounds, 1),
-                        zaxis=self._axis("z [m]", palette, bounds, 2),
+                        xaxis=self._axis(
+                            title="x [m]", palette=palette, bounds=bounds, axis=0
+                        ),
+                        yaxis=self._axis(
+                            title="y [m]", palette=palette, bounds=bounds, axis=1
+                        ),
+                        zaxis=self._axis(
+                            title="z [m]", palette=palette, bounds=bounds, axis=2
+                        ),
                     )
                 }
             )
 
-    def _panel_titles(self, palette: FigurePalette) -> list[dict[str, object]]:
+    def _panel_titles(self, *, palette: FigurePalette) -> list[dict[str, object]]:
         """
         :param palette: The colors to draw with.
         :return: One annotation per panel, holding its label, its name and the statistic
@@ -601,7 +619,7 @@ class GraphOfConvexSetsVolumeFigure:
                 text=(
                     f"<b>({label}) {panel.name}</b><br>"
                     f'<span style="color:{palette.text_secondary}">'
-                    f"{panel.subtitle(self.scene)}</span>"
+                    f"{panel.subtitle(scene=self.scene)}</span>"
                 ),
                 x=index * width,
                 y=1.0,
@@ -618,7 +636,7 @@ class GraphOfConvexSetsVolumeFigure:
 
     @staticmethod
     def _axis(
-        title: str, palette: FigurePalette, bounds: CoordinateBounds, axis: int
+        *, title: str, palette: FigurePalette, bounds: CoordinateBounds, axis: int
     ) -> dict[str, object]:
         """
         :param title: The axis label.

@@ -27,7 +27,7 @@ from semantic_digital_twin.world_description.world_entity import (
 # %% a mobile base that is the root of its robot
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class RootBodyBase(MobileBase[TGenericDrive], ABC):
     """
     A mobile base that is the root body of its robot, facing along its x-axis.
@@ -45,19 +45,19 @@ class RootBodyBase(MobileBase[TGenericDrive], ABC):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(root=robot_root)
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class RootBodyBaseOnADifferentialDrive(RootBodyBase[DifferentialDrive]):
     """
     A mobile base that is the root body of its robot, driven by a differential drive.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class RootBodyBaseOnAnOmniDrive(RootBodyBase[OmniDrive]):
     """
     A mobile base that is the root body of its robot, driven by an omnidirectional
@@ -68,7 +68,7 @@ class RootBodyBaseOnAnOmniDrive(RootBodyBase[OmniDrive]):
 # %% robots whose root body is their mobile base
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class RobotOnADifferentialDrive(
     MinimalRobot, HasMobileBase[RootBodyBaseOnADifferentialDrive]
 ):
@@ -77,7 +77,7 @@ class RobotOnADifferentialDrive(
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class RobotOnAnOmniDrive(MinimalRobot, HasMobileBase[RootBodyBaseOnAnOmniDrive]):
     """
     A minimal robot whose root body is its mobile base, on an omnidirectional drive.

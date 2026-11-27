@@ -33,20 +33,20 @@ class LifeCycleValue(IntEnum):
     The short text a visualization labels a node in this state with.
     """
 
-    NOT_STARTED = 0, Color.from_hex("#9CA3AF"), "—"
+    NOT_STARTED = 0, Color.from_hex(hex_color="#9CA3AF"), "—"
     """
     The node has not run yet.
 
     Its observation is forced back to unknown every tick.
     """
 
-    RUNNING = 1, Color.from_hex("#3B82F6"), "▶"
+    RUNNING = 1, Color.from_hex(hex_color="#3B82F6"), "▶"
     """
     The node is active: its observation expression is evaluated and
     :meth:`~cramph.node.StatechartNode.on_tick` is called.
     """
 
-    PAUSED = 2, Color.from_hex("#EAB308"), "<B>||</B>"
+    PAUSED = 2, Color.from_hex(hex_color="#EAB308"), "<B>||</B>"
     """
     The node was running and its pause condition became true.
 
@@ -54,17 +54,17 @@ class LifeCycleValue(IntEnum):
     the last value.
     """
 
-    SUCCEEDED = 3, Color.from_hex("#28A745"), "✔"
+    SUCCEEDED = 3, Color.from_hex(hex_color="#28A745"), "✔"
     """
     The node's success condition held.
     """
 
-    FAILED = 4, Color.from_hex("#EF4444"), "✖"
+    FAILED = 4, Color.from_hex(hex_color="#EF4444"), "✖"
     """
     The node declared that it cannot continue, through its own fail condition.
     """
 
-    INTERRUPTED = 5, Color.from_hex("#F97316"), "■"
+    INTERRUPTED = 5, Color.from_hex(hex_color="#F97316"), "■"
     """
     The node's interrupt condition held, an ancestor ended and took it down with it, or
     a :class:`~cramph.node.CancelStatechart` ended the statechart while it was running
@@ -121,9 +121,13 @@ class ObservationStateValue(FloatEnum):
     The short text a visualization labels a node observing this with.
     """
 
-    FALSE = float(Scalar.const_false()), Color.from_hex("#FF5024"), "False"
-    UNKNOWN = float(Scalar.const_trinary_unknown()), Color.from_hex("#8F959E"), "?"
-    TRUE = float(Scalar.const_true()), Color.from_hex("#B6E5A0"), "True"
+    FALSE = float(Scalar.const_false()), Color.from_hex(hex_color="#FF5024"), "False"
+    UNKNOWN = (
+        float(Scalar.const_trinary_unknown()),
+        Color.from_hex(hex_color="#8F959E"),
+        "?",
+    )
+    TRUE = float(Scalar.const_true()), Color.from_hex(hex_color="#B6E5A0"), "True"
 
     def __new__(cls, value: float, color: Color, badge: str) -> ObservationStateValue:
         """

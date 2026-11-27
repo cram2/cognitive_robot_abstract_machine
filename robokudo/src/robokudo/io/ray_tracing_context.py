@@ -147,7 +147,9 @@ class RayTracingContextResolver:
         :raises CameraAnnotationMissing: If a configured camera does not exist.
         :raises CameraAnnotationAmbiguous: If automatic selection is ambiguous.
         """
-        cameras = world.get_semantic_annotations_by_type(Camera)
+        cameras = world.get_semantic_annotations_by_type(
+            semantic_annotation_type=Camera
+        )
         camera_name = source.camera_name
         if camera_name is not None:
             named_cameras = [camera for camera in cameras if camera.name == camera_name]
@@ -193,7 +195,9 @@ class RayTracingContextResolver:
         :param source: Runtime source carrying the optional exact robot name.
         :return: Default camera selected through the robot's Coraplex-compatible API.
         """
-        robots = world.get_semantic_annotations_by_type(AbstractRobot)
+        robots = world.get_semantic_annotations_by_type(
+            semantic_annotation_type=AbstractRobot
+        )
         robot_name = source.robot_name
         if robot_name is not None:
             robots = [robot for robot in robots if robot.name == robot_name]

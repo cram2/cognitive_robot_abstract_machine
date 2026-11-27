@@ -8,7 +8,7 @@ from krrood.patterns.field_metadata import FieldMetadata
 from semantic_digital_twin.exceptions import DuplicateSimulatorPropertyError
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SimulatorAttributeName(FieldMetadata):
     """
     Marks a field of a simulator property whose attribute the simulator spells
@@ -21,7 +21,7 @@ class SimulatorAttributeName(FieldMetadata):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SimulatorAdditionalProperty:
     """
     Class representing an additional property for a simulator.
@@ -34,14 +34,14 @@ class SimulatorAdditionalProperty:
             its own.
         """
         return {
-            self._attribute_name(declared_field.name): getattr(
+            self._attribute_name(field_name=declared_field.name): getattr(
                 self, declared_field.name
             )
             for declared_field in fields(self)
         }
 
     @classmethod
-    def _attribute_name(cls, field_name: str) -> str:
+    def _attribute_name(cls, *, field_name: str) -> str:
         """
         :param field_name: One of this property's fields.
         :return: The simulator's name for it.
@@ -50,7 +50,7 @@ class SimulatorAdditionalProperty:
         return field_name if renamed is None else renamed.attribute_name
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UniqueSimulatorProperty(SimulatorAdditionalProperty):
     """
     A simulator property an entity carries at most one of, such as the physical
@@ -73,7 +73,7 @@ rather than the base class.
 """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasSimulatorProperties:
     """
     Mixin class to add simulator additional properties to a data class.
@@ -89,7 +89,7 @@ class HasSimulatorProperties:
     """
 
     def add_simulator_property(
-        self, simulator_property: SimulatorAdditionalProperty
+        self, *, simulator_property: SimulatorAdditionalProperty
     ) -> None:
         """
         Attach a property to this entity.
@@ -98,11 +98,11 @@ class HasSimulatorProperties:
         :raises DuplicateSimulatorPropertyError: If the property is a
             :class:`UniqueSimulatorProperty` and one of its type is attached already.
         """
-        self.check_simulator_property_attachable(simulator_property)
+        self.check_simulator_property_attachable(simulator_property=simulator_property)
         self.simulator_additional_properties.append(simulator_property)
 
     def check_simulator_property_attachable(
-        self, simulator_property: SimulatorAdditionalProperty
+        self, *, simulator_property: SimulatorAdditionalProperty
     ) -> None:
         """
         Check that :meth:`add_simulator_property` can attach a property to this entity,
@@ -115,11 +115,11 @@ class HasSimulatorProperties:
         if not isinstance(simulator_property, UniqueSimulatorProperty):
             return
         property_type = type(simulator_property)
-        if self.get_simulator_property_of_type(property_type) is not None:
-            raise DuplicateSimulatorPropertyError(property_type)
+        if self.get_simulator_property_of_type(property_type=property_type) is not None:
+            raise DuplicateSimulatorPropertyError(property_type=property_type)
 
     def get_simulator_property_of_type(
-        self, property_type: type[TUniqueSimulatorProperty]
+        self, *, property_type: type[TUniqueSimulatorProperty]
     ) -> TUniqueSimulatorProperty | None:
         """
         The property of ``property_type`` this entity carries.

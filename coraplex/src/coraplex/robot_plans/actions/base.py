@@ -106,7 +106,7 @@ class Action(CompositeNode, ABC):
                 name: (
                     value.rebound_to(world=world)
                     if isinstance(value, Action)
-                    else world.rebind_world_entities(value)
+                    else world.rebind_world_entities(obj=value)
                 )
                 for name, value in self.designator_parameter.items()
             }
@@ -188,7 +188,7 @@ class Action(CompositeNode, ABC):
         super().on_start()
         if self.temporary_collision_rules:
             self.context.world.collision_manager.put_temporary_rules_in_force(
-                self.temporary_collision_rules
+                rules=self.temporary_collision_rules
             )
 
     def on_end(self) -> None:
@@ -214,7 +214,7 @@ class Action(CompositeNode, ABC):
         """
         if self.temporary_collision_rules:
             self.context.world.collision_manager.take_temporary_rules_out_of_force(
-                self.temporary_collision_rules
+                rules=self.temporary_collision_rules
             )
 
     @abstractmethod

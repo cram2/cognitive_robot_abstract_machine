@@ -63,11 +63,11 @@ def test_set_seed_configuration(pr2_world_state_reset):
     goal = 0.1
 
     connection: ActiveConnection1DOF = pr2_world_state_reset.get_connection_by_name(
-        PR2Joint.TORSO_LIFT
+        name=PR2Joint.TORSO_LIFT
     )
 
     node1 = SetSeedConfiguration(
-        seed_configuration=JointState.from_mapping({connection: goal})
+        seed_configuration=JointState.from_mapping(mapping={connection: goal})
     )
     end = EndMotion()
     statechart.add_node(node=node1)
@@ -124,7 +124,7 @@ def test_set_seed_odometry(pr2_world_state_reset):
     assert np.allclose(
         expected.to_np(),
         pr2_world_state_reset.compute_forward_kinematics_np(
-            pr2_world_state_reset.root, node1.odom_connection.child
+            root=pr2_world_state_reset.root, tip=node1.odom_connection.child
         ),
     )
 
@@ -136,35 +136,35 @@ def test_joint_goal(tmp_path):
     """
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("root"))
-        tip = Body(name=PrefixedName("tip"))
-        tip2 = Body(name=PrefixedName("tip2"))
+        root = Body(name=PrefixedName(name="root"))
+        tip = Body(name=PrefixedName(name="tip"))
+        tip2 = Body(name=PrefixedName(name="tip2"))
         limits = DegreeOfFreedomLimits.from_position_range_and_speed(maximum_speed=1)
         dof = DegreeOfFreedom(
-            name=PrefixedName("dof", "a"),
+            name=PrefixedName(name="dof", prefix="a"),
             limits=limits,
         )
-        world.add_degree_of_freedom(dof)
+        world.add_degree_of_freedom(dof=dof)
         root_C_tip = ScrewAxisConnection(
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
             parent=root,
             child=tip,
             raw_dof=dof,
         )
-        world.add_connection(root_C_tip)
+        world.add_connection(connection=root_C_tip)
 
         dof = DegreeOfFreedom(
-            name=PrefixedName("dof", "b"),
+            name=PrefixedName(name="dof", prefix="b"),
             limits=limits,
         )
-        world.add_degree_of_freedom(dof)
+        world.add_degree_of_freedom(dof=dof)
         root_C_tip2 = ScrewAxisConnection(
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
             parent=root,
             child=tip2,
             raw_dof=dof,
         )
-        world.add_connection(root_C_tip2)
+        world.add_connection(connection=root_C_tip2)
 
     executor = StatechartExecutor(
         context=StatechartContext(world=world),
@@ -179,7 +179,9 @@ def test_joint_goal(tmp_path):
     )
     statechart = Statechart(context=executor.context)
 
-    task1 = JointPositionList(goal_state=JointState.from_mapping({root_C_tip: 1}))
+    task1 = JointPositionList(
+        goal_state=JointState.from_mapping(mapping={root_C_tip: 1})
+    )
     always_true = ConstTrueNode()
     statechart.add_node(node=always_true)
     statechart.add_node(node=task1)
@@ -221,10 +223,10 @@ def test_joint_goal(tmp_path):
 
 def test_continuous_joint(pr2_world_state_reset):
     r_wrist_roll_joint = pr2_world_state_reset.get_connection_by_name(
-        PR2Joint.RIGHT_WRIST_ROLL
+        name=PR2Joint.RIGHT_WRIST_ROLL
     )
     l_wrist_roll_joint = pr2_world_state_reset.get_connection_by_name(
-        PR2Joint.LEFT_WRIST_ROLL
+        name=PR2Joint.LEFT_WRIST_ROLL
     )
     executor = StatechartExecutor(
         context=StatechartContext(world=pr2_world_state_reset),
@@ -233,7 +235,7 @@ def test_continuous_joint(pr2_world_state_reset):
     statechart = Statechart(context=executor.context)
     joint_goal = JointPositionList(
         goal_state=JointState.from_mapping(
-            {
+            mapping={
                 r_wrist_roll_joint: -np.pi,
                 l_wrist_roll_joint: -2.1 * np.pi,
             },
@@ -259,8 +261,12 @@ def test_continuous_joint(pr2_world_state_reset):
 
 
 def test_revolute_joint(pr2_world_state_reset):
-    head_pan_joint = pr2_world_state_reset.get_connection_by_name(PR2Joint.HEAD_PAN)
-    head_tilt_joint = pr2_world_state_reset.get_connection_by_name(PR2Joint.HEAD_TILT)
+    head_pan_joint = pr2_world_state_reset.get_connection_by_name(
+        name=PR2Joint.HEAD_PAN
+    )
+    head_tilt_joint = pr2_world_state_reset.get_connection_by_name(
+        name=PR2Joint.HEAD_TILT
+    )
     executor = StatechartExecutor(
         context=StatechartContext(world=pr2_world_state_reset),
         extensions=[MotionControl()],
@@ -268,7 +274,7 @@ def test_revolute_joint(pr2_world_state_reset):
     statechart = Statechart(context=executor.context)
     joint_goal = JointPositionList(
         goal_state=JointState.from_mapping(
-            {
+            mapping={
                 head_pan_joint: 0.042,
                 head_tilt_joint: -0.37,
             },
@@ -292,7 +298,9 @@ def test_joint_velocity_limit_caps_a_fast_goal(pr2_world_state_reset):
     hint -- the joint's velocity must stay within max_velocity on every single tick,
     all the way until the goal is actually reached.
     """
-    head_pan_joint = pr2_world_state_reset.get_connection_by_name(PR2Joint.HEAD_PAN)
+    head_pan_joint = pr2_world_state_reset.get_connection_by_name(
+        name=PR2Joint.HEAD_PAN
+    )
     max_velocity = 0.05
 
     executor = StatechartExecutor(
@@ -303,7 +311,7 @@ def test_joint_velocity_limit_caps_a_fast_goal(pr2_world_state_reset):
     statechart.add_nodes(
         nodes=[
             joint_goal := JointPositionList(
-                goal_state=JointState.from_mapping({head_pan_joint: 0.5}),
+                goal_state=JointState.from_mapping(mapping={head_pan_joint: 0.5}),
             ),
             JointVelocityLimit(
                 connections=[head_pan_joint], max_joint_velocity=max_velocity
@@ -342,12 +350,14 @@ def test_joint_sequence(pr2_world_state_reset):
                 nodes=[
                     JointPositionList(
                         goal_state=JointState.from_str_dict(
-                            {PR2Joint.TORSO_LIFT: 0.1}, world=pr2_world_state_reset
+                            mapping={PR2Joint.TORSO_LIFT: 0.1},
+                            world=pr2_world_state_reset,
                         )
                     ),
                     JointPositionList(
                         goal_state=JointState.from_str_dict(
-                            {PR2Joint.TORSO_LIFT: 0.2}, world=pr2_world_state_reset
+                            mapping={PR2Joint.TORSO_LIFT: 0.2},
+                            world=pr2_world_state_reset,
                         )
                     ),
                 ]
@@ -367,11 +377,15 @@ def test_joint_sequence(pr2_world_state_reset):
 def test_daisy_arm_reaches_its_park_state(
     daisy_world_copy: World, default_daisy_pose: dict[str, float], arm_index: int
 ) -> None:
-    JointState.from_str_dict(default_daisy_pose, daisy_world_copy).apply_to(
-        daisy_world_copy
+    JointState.from_str_dict(
+        mapping=default_daisy_pose, world=daisy_world_copy
+    ).apply_to(world=daisy_world_copy)
+    robot = daisy_world_copy.get_semantic_annotations_by_type(
+        semantic_annotation_type=DAiSy
+    )[0]
+    park_state = robot.arms[arm_index].get_joint_state_by_type(
+        state_type=StaticJointState.PARK
     )
-    robot = daisy_world_copy.get_semantic_annotations_by_type(DAiSy)[0]
-    park_state = robot.arms[arm_index].get_joint_state_by_type(StaticJointState.PARK)
     executor = StatechartExecutor(
         context=StatechartContext(world=daisy_world_copy),
         extensions=[MotionControl()],
@@ -395,7 +409,9 @@ def test_joint_velocity_limit_measures_its_violation_in_the_velocity_limit_of_th
     """
     A joint velocity limit scales its constraint by the velocity limit of the joint.
     """
-    head_pan_joint = pr2_world_state_reset.get_connection_by_name(PR2Joint.HEAD_PAN)
+    head_pan_joint = pr2_world_state_reset.get_connection_by_name(
+        name=PR2Joint.HEAD_PAN
+    )
     limit = JointVelocityLimit(connections=[head_pan_joint], max_joint_velocity=0.05)
     executor = StatechartExecutor(
         context=StatechartContext(world=pr2_world_state_reset),
@@ -418,7 +434,9 @@ def test_a_joint_velocity_limit_of_zero_holds_the_joint_still(
     A joint velocity limit of zero keeps the joint where it is, although a joint goal
     pulls it away.
     """
-    head_pan_joint = pr2_world_state_reset.get_connection_by_name(PR2Joint.HEAD_PAN)
+    head_pan_joint = pr2_world_state_reset.get_connection_by_name(
+        name=PR2Joint.HEAD_PAN
+    )
     start_position = head_pan_joint.position
     executor = StatechartExecutor(
         context=StatechartContext(world=pr2_world_state_reset),
@@ -428,7 +446,7 @@ def test_a_joint_velocity_limit_of_zero_holds_the_joint_still(
     statechart.add_nodes(
         nodes=[
             joint_goal := JointPositionList(
-                goal_state=JointState.from_mapping({head_pan_joint: 0.5})
+                goal_state=JointState.from_mapping(mapping={head_pan_joint: 0.5})
             ),
             JointVelocityLimit(connections=[head_pan_joint], max_joint_velocity=0.0),
         ]
@@ -454,24 +472,24 @@ def world_with_revolute_joints(
     world = World()
     joints = []
     with world.modify_world():
-        root = Body(name=PrefixedName("root"))
+        root = Body(name=PrefixedName(name="root"))
         for index, maximum_speed in enumerate(maximum_speeds):
             dof = DegreeOfFreedom(
-                name=PrefixedName(f"dof_{index}"),
+                name=PrefixedName(name=f"dof_{index}"),
                 limits=DegreeOfFreedomLimits.from_position_range_and_speed(
                     maximum_speed=maximum_speed
                 ),
             )
-            world.add_degree_of_freedom(dof)
+            world.add_degree_of_freedom(dof=dof)
             joint = ScrewAxisConnection(
                 screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
                     axis=Vector3.Z()
                 ),
                 parent=root,
-                child=Body(name=PrefixedName(f"tip_{index}")),
+                child=Body(name=PrefixedName(name=f"tip_{index}")),
                 raw_dof=dof,
             )
-            world.add_connection(joint)
+            world.add_connection(connection=joint)
             joints.append(joint)
     return world, joints
 
@@ -487,7 +505,9 @@ def test_a_joint_goal_measures_each_joint_in_the_lower_of_its_velocity_limit_and
     statechart.add_node(
         node=(
             goal := JointPositionList(
-                goal_state=JointState.from_mapping({joint: 1.0 for joint in joints})
+                goal_state=JointState.from_mapping(
+                    mapping={joint: 1.0 for joint in joints}
+                )
             )
         )
     )

@@ -28,7 +28,7 @@ except ImportError:
     huggingface_hub = None
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Sage10kDatasetLoader:
     """
     Loader for scenes from the Sage10k dataset.
@@ -41,7 +41,7 @@ class Sage10kDatasetLoader:
     The directory where the scene should be downloaded to.
     """
 
-    def _download_scene_if_not_exists(self, scene_url: str) -> Path:
+    def _download_scene_if_not_exists(self, *, scene_url: str) -> Path:
         """
         Download the scene from the Sage10k dataset and unzip it.
 
@@ -77,7 +77,7 @@ class Sage10kDatasetLoader:
         logger.info(f"Downloaded and extracted {scene_url} to {extraction_directory}")
         return extraction_directory
 
-    def _parse_json(self, extracted_dir: Path) -> Sage10kScene:
+    def _parse_json(self, *, extracted_dir: Path) -> Sage10kScene:
         """
         Parses the extracted directory to locate and load a specific JSON file, ensuring
         there is exactly one valid file matching the naming pattern. Load the JSON into
@@ -102,7 +102,7 @@ class Sage10kDatasetLoader:
 
         return result
 
-    def _delete_assets(self, extracted_dir: Path):
+    def _delete_assets(self, *, extracted_dir: Path):
         """
         Delete the assets of a scene.
 
@@ -117,7 +117,7 @@ class Sage10kDatasetLoader:
         for directory in [objects, preview, materials]:
             shutil.rmtree(directory)
 
-    def create_scene(self, scene_url: str) -> Sage10kScene:
+    def create_scene(self, *, scene_url: str) -> Sage10kScene:
         """
         Create a scene from the given URL by downloading it and loading it into the
         memory.
@@ -125,12 +125,12 @@ class Sage10kDatasetLoader:
         :param scene_url: The URL of the scene to be loaded.
         :return: The Sage10kScene object.
         """
-        unzipped_scene = self._download_scene_if_not_exists(scene_url)
-        scene = self._parse_json(unzipped_scene)
+        unzipped_scene = self._download_scene_if_not_exists(scene_url=scene_url)
+        scene = self._parse_json(extracted_dir=unzipped_scene)
         return scene
 
     @staticmethod
-    def environment_name(scene_url: str) -> str:
+    def environment_name(*, scene_url: str) -> str:
         """
         :param scene_url: URL of a Sage10k scene.
         :return: A label for the scene, taken from the curated scene's name where the
@@ -144,7 +144,7 @@ class Sage10kDatasetLoader:
 
     @classmethod
     def available_scenes(
-        cls, repository: str = "nvidia/SAGE-10k", folder_path: str = "scenes"
+        cls, *, repository: str = "nvidia/SAGE-10k", folder_path: str = "scenes"
     ) -> list[str]:
         """
         Use this to select random scenes from the dataset.

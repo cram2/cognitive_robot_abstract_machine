@@ -44,7 +44,7 @@ class RerunMode(StrEnum):
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class RerunModelCallback(ModelChangeCallback):
     """
     Logs the world's static geometry and compiles the body forward kinematics
@@ -85,7 +85,7 @@ class RerunModelCallback(ModelChangeCallback):
                 HomogeneousTransformationMatrix()
                 if body == self._world.root
                 else self._world.compose_forward_kinematics_expression(
-                    self._world.root, body
+                    root=self._world.root, tip=body
                 )
             )
             for body in bodies
@@ -148,7 +148,7 @@ class RerunModelCallback(ModelChangeCallback):
                 )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class RerunAdapter(StateChangeCallback):
     """
     Logs a world to Rerun and keeps the recording in sync with its state.
@@ -226,7 +226,7 @@ class RerunAdapter(StateChangeCallback):
         super().__post_init__()
         self.on_state_change()
 
-    def _log_state(self, static: bool = False) -> None:
+    def _log_state(self, *, static: bool = False) -> None:
         """
         Log the current world-relative transform of every body to Rerun.
 
@@ -268,7 +268,7 @@ class RerunAdapter(StateChangeCallback):
         self.recording.flush()
 
     @staticmethod
-    def read_recording_entities(path: str, dataset_name: str = "semdt") -> set[str]:
+    def read_recording_entities(*, path: str, dataset_name: str = "semdt") -> set[str]:
         """
         Return the entity paths recorded in an ``.rrd`` file.
 

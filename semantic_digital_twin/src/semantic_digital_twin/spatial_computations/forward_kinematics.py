@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from semantic_digital_twin.world import ModelRevision
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ForwardKinematicsManager(ModelChangeCallback):
     """
     Visitor class for collection various forward kinematics expressions in a world
@@ -101,7 +101,7 @@ class ForwardKinematicsManager(ModelChangeCallback):
         ):
             root_T_parent = self.root_T_kse_expression_cache[parent.id]
             for child in childs:
-                parent_C_child = self._world.get_connection(parent, child)
+                parent_C_child = self._world.get_connection(parent=parent, child=child)
                 self.root_T_kse_expression_cache[child.id] = (
                     root_T_parent @ parent_C_child.origin_expression
                 )
@@ -141,7 +141,7 @@ class ForwardKinematicsManager(ModelChangeCallback):
 
     @copy_memoize
     def compose_expression(
-        self, root: KinematicStructureEntity, tip: KinematicStructureEntity
+        self, *, root: KinematicStructureEntity, tip: KinematicStructureEntity
     ) -> HomogeneousTransformationMatrix:
         """
         :param root: The root KinematicStructureEntity in the kinematic chain.
@@ -153,7 +153,7 @@ class ForwardKinematicsManager(ModelChangeCallback):
         if root == self._world.root:
             return self.root_T_kse_expression_cache[tip.id]
         root_chain, tip_chain = self._world.compute_split_chain_of_connections(
-            root, tip
+            root=root, tip=tip
         )
         with CasadiLock():
             fk = HomogeneousTransformationMatrix()
@@ -168,7 +168,7 @@ class ForwardKinematicsManager(ModelChangeCallback):
         return fk
 
     def compute(
-        self, root: KinematicStructureEntity, tip: KinematicStructureEntity
+        self, *, root: KinematicStructureEntity, tip: KinematicStructureEntity
     ) -> HomogeneousTransformationMatrix:
         """
         Compute the forward kinematics from the root KinematicStructureEntity to the tip
@@ -184,12 +184,12 @@ class ForwardKinematicsManager(ModelChangeCallback):
             KinematicStructureEntity with respect to the root KinematicStructureEntity.
         """
         return HomogeneousTransformationMatrix(
-            data=self.compute_np(root, tip), reference_frame=root
+            data=self.compute_np(root=root, tip=tip), reference_frame=root
         )
 
     @memoize
     def compute_np(
-        self, root: KinematicStructureEntity, tip: KinematicStructureEntity
+        self, *, root: KinematicStructureEntity, tip: KinematicStructureEntity
     ) -> NpMatrix4x4:
         """
         Computes the forward kinematics from the root body to the tip body, root_T_tip.

@@ -48,7 +48,7 @@ TSemanticAnnotation = TypeVar(
 # %% semantic annotation specifications
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PartSpecificationBinding:
     """
     Nested annotation parts together with the part-whole relationship field they fill.
@@ -71,7 +71,7 @@ class PartSpecificationBinding:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SemanticAnnotationWithRootSpecification(SpawnSpecification[TSemanticAnnotation]):
     """
     World-independent description of a semantic annotation rooted in a single kinematic
@@ -124,10 +124,11 @@ class SemanticAnnotationWithRootSpecification(SpawnSpecification[TSemanticAnnota
         any world mutation.
         """
         self._validate_annotation_kwargs()
-        self._validate_part_bindings(self.semantic_annotation_type)
+        self._validate_part_bindings(annotation_type=self.semantic_annotation_type)
 
     def spawn(
         self,
+        *,
         world: World,
         name: str | None = None,
         parent: KinematicStructureEntity | None = None,
@@ -150,10 +151,12 @@ class SemanticAnnotationWithRootSpecification(SpawnSpecification[TSemanticAnnota
         :param parent_T_self: Overrides the root specification's stored default pose.
         :return: The materialized semantic annotation.
         """
-        root_entity = self.root_specification.to_domain_object(name or self.name)
+        root_entity = self.root_specification.to_domain_object(name=name or self.name)
 
         instance = self.semantic_annotation_type(
-            name=self._resolved_name(name), root=root_entity, **self.annotation_kwargs
+            name=self._resolved_name(name=name),
+            root=root_entity,
+            **self.annotation_kwargs,
         )
 
         connection_specification = (
@@ -163,10 +166,16 @@ class SemanticAnnotationWithRootSpecification(SpawnSpecification[TSemanticAnnota
 
         with world.modify_world():
             self.root_specification.attach_and_spawn_children(
-                world, root_entity, connection_specification, parent, parent_T_self
+                world=world,
+                entity=root_entity,
+                connection_specification=connection_specification,
+                parent=parent,
+                parent_T_self=parent_T_self,
             )
-            world.add_semantic_annotation(instance)
-            self._mount_part_specifications(world, instance, root_entity)
+            world.add_semantic_annotation(semantic_annotation=instance)
+            self._mount_part_specifications(
+                world=world, instance=instance, root_entity=root_entity
+            )
 
         return instance
 
@@ -194,7 +203,7 @@ class SemanticAnnotationWithRootSpecification(SpawnSpecification[TSemanticAnnota
             )
 
     def _validate_part_bindings(
-        self, annotation_type: type[TSemanticAnnotation]
+        self, *, annotation_type: type[TSemanticAnnotation]
     ) -> None:
         """
         Validate that every binding targets a part-whole relationship field of the
@@ -240,6 +249,7 @@ class SemanticAnnotationWithRootSpecification(SpawnSpecification[TSemanticAnnota
 
     def _mount_part_specifications(
         self,
+        *,
         world: World,
         instance: HasParts,
         root_entity: KinematicStructureEntity,
@@ -256,5 +266,5 @@ class SemanticAnnotationWithRootSpecification(SpawnSpecification[TSemanticAnnota
         """
         for binding in self.part_bindings:
             for part_specification in binding.specifications:
-                part = part_specification.spawn(world, parent=root_entity)
+                part = part_specification.spawn(world=world, parent=root_entity)
                 instance.add(part=part, field_name=binding.field_name)

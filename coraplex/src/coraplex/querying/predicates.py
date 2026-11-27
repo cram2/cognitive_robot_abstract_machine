@@ -45,7 +45,7 @@ class GripperOccupancy:
         """
         bodies_below_tool_frame = (
             self.end_effector._world.get_kinematic_structure_entities_of_branch(
-                self.end_effector.tool_frame
+                root=self.end_effector.tool_frame
             )
         )
         if self.end_effector.tool_frame in bodies_below_tool_frame:

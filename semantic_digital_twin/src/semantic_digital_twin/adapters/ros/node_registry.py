@@ -14,7 +14,7 @@ from semantic_digital_twin.exceptions import ROSNodeNotRegisteredError
 # %% shared node access
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ROSNodeRegistry(metaclass=SingletonMeta):
     """
     Stores the shared ROS node borrowed from this process's lifecycle owner.
@@ -42,7 +42,7 @@ class ROSNodeRegistry(metaclass=SingletonMeta):
         """
         return self._node is not None
 
-    def register(self, node: Node) -> None:
+    def register(self, *, node: Node) -> None:
         """
         Register the application-owned node for shared access.
 
@@ -63,7 +63,7 @@ class ROSNodeRegistry(metaclass=SingletonMeta):
             raise ROSNodeNotRegisteredError()
         return self._node
 
-    def clear(self, expected_node: Node | None = None) -> None:
+    def clear(self, *, expected_node: Node | None = None) -> None:
         """
         Remove the registration without changing the node's lifecycle.
 

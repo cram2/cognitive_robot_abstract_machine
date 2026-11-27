@@ -210,17 +210,19 @@ def world_with_a_head_camera(robot_name: str | None = None) -> World:
         world frame.
     """
     world = World()
-    world_body = Body(name=PrefixedName(FrameName.WORLD))
-    head_body = Body(name=PrefixedName(FrameName.HEAD, prefix=robot_name))
-    camera_body = Body(name=PrefixedName(FrameName.CAMERA, prefix=robot_name))
+    world_body = Body(name=PrefixedName(name=FrameName.WORLD))
+    head_body = Body(name=PrefixedName(name=FrameName.HEAD, prefix=robot_name))
+    camera_body = Body(name=PrefixedName(name=FrameName.CAMERA, prefix=robot_name))
     with world.modify_world():
-        world.add_body(world_body)
+        world.add_body(body=world_body)
         world.add_connection(
-            Connection6DoF.create_with_dofs(
+            connection=Connection6DoF.create_with_dofs(
                 parent=world_body, child=head_body, world=world
             )
         )
-        world.add_connection(FixedConnection(parent=head_body, child=camera_body))
+        world.add_connection(
+            connection=FixedConnection(parent=head_body, child=camera_body)
+        )
     head_body.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         z=1.5, reference_frame=world_body
     )

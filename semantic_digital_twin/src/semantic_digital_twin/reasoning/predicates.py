@@ -46,7 +46,7 @@ if TYPE_CHECKING:
     from semantic_digital_twin.world import World
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class InContactWith(Triple[TBody, TBody]):
     """
     Whether two bodies are touching, by how close their collision geometry comes.
@@ -90,7 +90,7 @@ class InContactWith(Triple[TBody, TBody]):
         """
         detector = self.body1._world.collision_manager.collision_detector
         result = detector.check_collision_between_bodies(
-            self.body1, self.body2, distance=self.maximum_distance
+            body_a=self.body1, body_b=self.body2, distance=self.maximum_distance
         )
         if result is None:
             return None
@@ -151,7 +151,7 @@ def compute_euclidean_planar_distance(
     return body1_position.euclidean_distance(body2_position)
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class SupportedBy(Triple[TBody, TBody]):
     """
     Whether one body rests on another.
@@ -234,7 +234,9 @@ class SupportedBy(Triple[TBody, TBody]):
 
         collision_detector = self.supported._world.collision_manager.collision_detector
         touch = collision_detector.check_collision_between_bodies(
-            self.supported, self.supporting, distance=self.contact_tolerance
+            body_a=self.supported,
+            body_b=self.supporting,
+            distance=self.contact_tolerance,
         )
         if touch is None or touch.distance >= self.contact_tolerance:
             return False
@@ -248,7 +250,7 @@ class SupportedBy(Triple[TBody, TBody]):
         return -touch.distance < self.maximum_intersection_height
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Supports(Predicate):
     """
     Whether anything in the world rests on a body.
@@ -295,7 +297,7 @@ class Supports(Predicate):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class InsideRegion(Triple[TBody, TRegion]):
     """
     Whether a body lies in a region, by what fraction of its collision volume falls
@@ -373,7 +375,7 @@ class InsideRegion(Triple[TBody, TRegion]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class KinematicStructureEntitySpatialRelation(Predicate, ABC):
     """
     Base class for spatial relations between two KinematicStructureEntity instances.
@@ -393,7 +395,7 @@ class KinematicStructureEntitySpatialRelation(Predicate, ABC):
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PointSpatialRelation(Predicate, ABC):
     """
     Check if the point is spatially related to the other point.
@@ -410,7 +412,7 @@ class PointSpatialRelation(Predicate, ABC):
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ViewDependentSpatialRelation(PointSpatialRelation, ABC):
     """
     A spatial relation between two points, read from somewhere in particular.
@@ -449,7 +451,7 @@ class ViewDependentSpatialRelation(PointSpatialRelation, ABC):
     """
     spatial_relation_result: bool = False
 
-    def _signed_distance_along_direction(self, index: int) -> float:
+    def _signed_distance_along_direction(self, *, index: int) -> float:
         """
         Calculate the spatial relation between self.point and self.other with respect to
         a given reference point (self.point_of_semantic_annotation) and a specified axis
@@ -476,7 +478,7 @@ class ViewDependentSpatialRelation(PointSpatialRelation, ABC):
         return (s_body - s_other).compile()()
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class LeftOf(ViewDependentSpatialRelation):
     """
     The "left" direction is taken as the -Y axis of the given point of
@@ -484,11 +486,13 @@ class LeftOf(ViewDependentSpatialRelation):
     """
 
     def __call__(self) -> bool:
-        self.spatial_relation_result = self._signed_distance_along_direction(1) > 0.0
+        self.spatial_relation_result = (
+            self._signed_distance_along_direction(index=1) > 0.0
+        )
         return self.spatial_relation_result
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class RightOf(ViewDependentSpatialRelation):
     """
     The "right" direction is taken as the +Y axis of the given point of
@@ -496,11 +500,13 @@ class RightOf(ViewDependentSpatialRelation):
     """
 
     def __call__(self) -> bool:
-        self.spatial_relation_result = self._signed_distance_along_direction(1) < 0.0
+        self.spatial_relation_result = (
+            self._signed_distance_along_direction(index=1) < 0.0
+        )
         return self.spatial_relation_result
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Above(ViewDependentSpatialRelation):
     """
     The "above" direction is taken as the +Z axis of the given point of
@@ -508,11 +514,13 @@ class Above(ViewDependentSpatialRelation):
     """
 
     def __call__(self) -> bool:
-        self.spatial_relation_result = self._signed_distance_along_direction(2) > 0.0
+        self.spatial_relation_result = (
+            self._signed_distance_along_direction(index=2) > 0.0
+        )
         return self.spatial_relation_result
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Below(ViewDependentSpatialRelation):
     """
     The "below" direction is taken as the -Z axis of the given point of
@@ -520,11 +528,13 @@ class Below(ViewDependentSpatialRelation):
     """
 
     def __call__(self) -> bool:
-        self.spatial_relation_result = self._signed_distance_along_direction(2) < 0.0
+        self.spatial_relation_result = (
+            self._signed_distance_along_direction(index=2) < 0.0
+        )
         return self.spatial_relation_result
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Behind(ViewDependentSpatialRelation):
     """
     The "behind" direction is defined as the -X axis of the given point of semantic
@@ -532,11 +542,13 @@ class Behind(ViewDependentSpatialRelation):
     """
 
     def __call__(self) -> bool:
-        self.spatial_relation_result = self._signed_distance_along_direction(0) < 0.0
+        self.spatial_relation_result = (
+            self._signed_distance_along_direction(index=0) < 0.0
+        )
         return self.spatial_relation_result
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class InFrontOf(ViewDependentSpatialRelation):
     """
     The "in front of" direction is defined as the +X axis of the given point of semantic
@@ -544,11 +556,11 @@ class InFrontOf(ViewDependentSpatialRelation):
     """
 
     def __call__(self) -> bool:
-        self.result = self._signed_distance_along_direction(0) > 0.0
+        self.result = self._signed_distance_along_direction(index=0) > 0.0
         return self.result
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class InsideOf(KinematicStructureEntitySpatialRelation):
     """
     Whether one thing lies inside another, by what fraction of its volume falls within
@@ -625,7 +637,7 @@ class InsideOf(KinematicStructureEntitySpatialRelation):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ContainsType(Predicate):
     """
     Predicate that checks if any object in the iterable is of the given type.
@@ -655,7 +667,7 @@ class ContainsType(Predicate):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PlaceIsOccupied(Predicate):
     """
     Whether anything already stands in a stretch of the world.
@@ -691,7 +703,9 @@ class PlaceIsOccupied(Predicate):
         region_box_shape = self.box.as_shape()  # returns a Box centered at the region
         region_mesh = region_box_shape.mesh.copy()
         region_mesh.apply_transform(
-            self.world.transform(self.pose, self.world.root).to_np()
+            self.world.transform(
+                spatial_object=self.pose, target_frame=self.world.root
+            ).to_np()
         )
 
         # Prepare collision manager with the region mesh

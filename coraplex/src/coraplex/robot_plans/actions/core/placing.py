@@ -112,7 +112,7 @@ class PlaceAction(
                 nodes=[
                     self.gripper_goal_type.create_gripper_goal(
                         configuration=self.arm.end_effector.default_configuration(
-                            GripperState.OPEN,
+                            state_type=GripperState.OPEN,
                             finger_velocity=self.max_release_opening_velocity,
                         )
                     ),
@@ -157,14 +157,14 @@ class PlaceAction(
         super().on_start()
         end_effector = self.arm.end_effector
         grasp = GraspCandidate(
-            self.graspable,
-            end_effector.body_T_grasp(
+            graspable=self.graspable,
+            grasp_pose=end_effector.body_T_grasp(
                 body=self.graspable.root,
                 tool_P_grasp=end_effector.tool_P_grasp_when_closed,
             ),
         )
         place_sequence = self.grasp_pose_sequence(
-            reference_T_grasp=grasp.moved_to(self.goal_pose),
+            reference_T_grasp=grasp.moved_to(reference_T_object=self.goal_pose),
             end_effector=end_effector,
             grasp_candidate=grasp,
         )

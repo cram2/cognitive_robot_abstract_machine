@@ -24,7 +24,7 @@ from semantic_digital_twin.world_description.graph_of_convex_sets.exceptions imp
 )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class PathQuery(Generic[PointT]):
     """
     A start and a goal to plan a path between.
@@ -77,7 +77,7 @@ def hardest_path_query(
         if source < target
     ]
     if not connected_pairs:
-        raise UnconnectedGraphError(graph.graph.num_nodes())
+        raise UnconnectedGraphError(convex_set_count=graph.graph.num_nodes())
 
     # Ties are broken on the pair's coordinates rather than on its graph indices, which
     # depend on the order the world happened to yield its obstacles in.

@@ -124,7 +124,7 @@ class Device(StrEnum):
 # %% the detector
 
 
-@dataclass
+@dataclass(kw_only=True)
 class QwenBoxDetector(PartBoxDetector):
     """
     Asks Qwen3-VL for boxes around a part, about all views in one batch.
@@ -200,9 +200,9 @@ class QwenBoxDetector(PartBoxDetector):
         )
 
     def detect(
-        self, views: RenderedViews, part_name: str, whole_name: str
+        self, *, views: RenderedViews, part_name: str, whole_name: str
     ) -> list[NDArray[np.float64]]:
-        question = self.prompt.question(part_name, whole_name)
+        question = self.prompt.question(part_name=part_name, whole_name=whole_name)
         conversations = [
             [
                 {
@@ -235,7 +235,7 @@ class QwenBoxDetector(PartBoxDetector):
         _, height, width = views.images.shape
         image_size = np.array([width, height, width, height], dtype=np.float64)
         return [
-            self._boxes_in(answer) / self.coordinate_range * image_size
+            self._boxes_in(answer=answer) / self.coordinate_range * image_size
             for answer in answers
         ]
 
@@ -243,7 +243,7 @@ class QwenBoxDetector(PartBoxDetector):
         logger.info("Loaded %s on %s", self.model.repository, self.network.device)
 
     @staticmethod
-    def _boxes_in(answer: str) -> NDArray[np.float64]:
+    def _boxes_in(*, answer: str) -> NDArray[np.float64]:
         """
         :param answer: What the model answered.
         :return: Every group of four numbers in brackets in the answer, as rows.
@@ -256,7 +256,7 @@ class QwenBoxDetector(PartBoxDetector):
 # %% the segmenter
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Sam2BoxSegmenter(BoxSegmenter):
     """
     Masks the part inside each box with SAM 2, one view at a time.
@@ -296,7 +296,7 @@ class Sam2BoxSegmenter(BoxSegmenter):
         )
 
     def segment(
-        self, views: RenderedViews, boxes: list[NDArray[np.float64]]
+        self, *, views: RenderedViews, boxes: list[NDArray[np.float64]]
     ) -> NDArray[np.bool_]:
         masks = np.zeros(views.faces.shape, dtype=bool)
         for mask, image, view_boxes in zip(masks, views.images, boxes):

@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 GraspT = TypeVar("GraspT", bound=ObjectRelativeGrasp)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GraspStrategy(Generic[GraspT], SubClassSafeGeneric, ABC):
     """
     Where an object may be grasped, as conditions on one kind of
@@ -40,6 +40,7 @@ class GraspStrategy(Generic[GraspT], SubClassSafeGeneric, ABC):
 
     def statement(
         self,
+        *,
         graspable: IsGraspable,
         result_pattern: Callable[[], Match[GraspResult]] | None = None,
     ) -> Match[GraspT]:
@@ -51,12 +52,14 @@ class GraspStrategy(Generic[GraspT], SubClassSafeGeneric, ABC):
         :raises NoGraspGeometry: If the object has no shape to measure.
         """
         grasp_type = self.get_type_of_generic_parameter(parameter=GraspT)
-        grasp = grasp_type.any_pattern(result_pattern() if result_pattern else None)
-        return grasp.where(*self.conditions(grasp, graspable))
+        grasp = grasp_type.any_pattern(
+            result=result_pattern() if result_pattern else None
+        )
+        return grasp.where(*self.conditions(grasp=grasp, graspable=graspable))
 
     @abstractmethod
     def conditions(
-        self, grasp: Match[GraspT], graspable: IsGraspable
+        self, *, grasp: Match[GraspT], graspable: IsGraspable
     ) -> list[ConditionType]:
         """
         :param grasp: The grasp of a statement.
@@ -69,7 +72,7 @@ class GraspStrategy(Generic[GraspT], SubClassSafeGeneric, ABC):
 # %% grasping an object on its surface
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SurfaceGraspStrategy(GraspStrategy[SurfaceGrasp], ABC):
     """
     Where on its surface an object may be grasped.
@@ -101,10 +104,10 @@ class SurfaceGraspStrategy(GraspStrategy[SurfaceGrasp], ABC):
     """
 
     def conditions(
-        self, grasp: Match[SurfaceGrasp], graspable: IsGraspable
+        self, *, grasp: Match[SurfaceGrasp], graspable: IsGraspable
     ) -> list[ConditionType]:
         surface = graspable.grasp_surface()
-        heights = self.grasped_heights(surface)
+        heights = self.grasped_heights(surface=surface)
         depth_unit = self.depth_unit(graspable=graspable, surface=surface)
         return [
             grasp.height >= heights.lower,
@@ -120,7 +123,7 @@ class SurfaceGraspStrategy(GraspStrategy[SurfaceGrasp], ABC):
         ]
 
     @abstractmethod
-    def grasped_heights(self, surface: trimesh.Trimesh) -> Bounds[float]:
+    def grasped_heights(self, *, surface: trimesh.Trimesh) -> Bounds[float]:
         """
         :param surface: The object's grasp surface, in its root body's frame.
         :return: The heights the object may be grasped at, as fractions of the grasp
@@ -137,7 +140,7 @@ class SurfaceGraspStrategy(GraspStrategy[SurfaceGrasp], ABC):
         """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GraspBetweenHeights(SurfaceGraspStrategy, ABC):
     """
     A strategy that grasps an object between two fixed heights.
@@ -151,11 +154,11 @@ class GraspBetweenHeights(SurfaceGraspStrategy, ABC):
     bottom to its top, the upper one excluded.
     """
 
-    def grasped_heights(self, surface: trimesh.Trimesh) -> Bounds[float]:
+    def grasped_heights(self, *, surface: trimesh.Trimesh) -> Bounds[float]:
         return self.height
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GraspFromAnySide(GraspBetweenHeights):
     """
     Grasp a solid object from any side, closing on it up to half its narrower horizontal
@@ -172,7 +175,7 @@ class GraspFromAnySide(GraspBetweenHeights):
 # %% grasping an elongated object around its axis
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AxialGraspStrategy(GraspStrategy[AxialGrasp], ABC):
     """
     Where along its axis, and from which side around it, an elongated object may be
@@ -196,7 +199,7 @@ class AxialGraspStrategy(GraspStrategy[AxialGrasp], ABC):
     """
 
     def conditions(
-        self, grasp: Match[AxialGrasp], graspable: IsGraspable
+        self, *, grasp: Match[AxialGrasp], graspable: IsGraspable
     ) -> list[ConditionType]:
         return [
             grasp.position >= self.position.lower,
@@ -206,7 +209,7 @@ class AxialGraspStrategy(GraspStrategy[AxialGrasp], ABC):
         ]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GraspABar(AxialGraspStrategy):
     """
     Grasp a thin, elongated part, such as a handle, around its bar, from any side and
@@ -218,7 +221,7 @@ class GraspABar(AxialGraspStrategy):
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GraspAcrossTheLength(AxialGraspStrategy):
     """
     Grasp a flat, elongated object lying on its side, such as cutlery, from above,
@@ -235,7 +238,7 @@ class GraspAcrossTheLength(AxialGraspStrategy):
 # %% pinching a thin wall
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PinchAWall(SurfaceGraspStrategy, ABC):
     """
     Pinch the thin upright wall of an object, such as an open container, from above,
@@ -268,7 +271,7 @@ class PinchAWall(SurfaceGraspStrategy, ABC):
         directions = np.column_stack([np.cos(yaws), np.sin(yaws), np.zeros(len(yaws))])
         lowest, highest = surface.bounds
         middle = (lowest + highest) / 2
-        heights = self.grasped_heights(surface)
+        heights = self.grasped_heights(surface=surface)
         middle[2] = lowest[2] + (heights.lower + heights.upper) / 2 * (
             highest[2] - lowest[2]
         )
@@ -287,11 +290,11 @@ class PinchAWall(SurfaceGraspStrategy, ABC):
             if len(distances) > 1:
                 thicknesses.append(float(distances[1] - distances[0]))
         if not thicknesses:
-            raise NoGraspGeometry(graspable)
+            raise NoGraspGeometry(graspable=graspable)
         return float(np.median(thicknesses))
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PinchARim(PinchAWall, GraspBetweenHeights):
     """
     Pinch a rim, the upper edge of an open container's wall, between two heights of the
@@ -303,7 +306,7 @@ class PinchARim(PinchAWall, GraspBetweenHeights):
     )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PinchTheTopOfAWall(PinchAWall):
     """
     Pinch the top of an open container's wall, as a rim would be pinched, when the rim
@@ -322,7 +325,7 @@ class PinchTheTopOfAWall(PinchAWall):
     How far below the highest point to pinch, as fractions of :attr:`rim_depth`.
     """
 
-    def grasped_heights(self, surface: trimesh.Trimesh) -> Bounds[float]:
+    def grasped_heights(self, *, surface: trimesh.Trimesh) -> Bounds[float]:
         """
         :return: The heights between the two fractions of the top :attr:`rim_depth`.
         """

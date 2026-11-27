@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 RelocatableType = TypeVar("RelocatableType")
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldEntityRebinding:
     """
     One rebinding of objects onto the world entities of :attr:`world`.
@@ -44,28 +44,28 @@ class WorldEntityRebinding:
     by one of them is not copied a second time either.
     """
 
-    def rebind(self, obj: RelocatableType) -> RelocatableType:
+    def rebind(self, *, obj: RelocatableType) -> RelocatableType:
         """
         :param obj: The object to rebind, or a value containing world entities.
         :return: The equivalent of `obj` referring to :attr:`world`, as described in
             :meth:`World.rebind_world_entities`.
         """
         if isinstance(obj, WorldEntityWithID):
-            return self._rebound_entity(obj)
+            return self._rebound_entity(entity=obj)
         if id(obj) in self.rebound:
             return self.rebound[id(obj)]
-        if self._is_walked_dataclass(obj):
-            return self._rebound_dataclass(obj)
+        if self._is_walked_dataclass(obj=obj):
+            return self._rebound_dataclass(obj=obj)
         if isinstance(obj, CollectionKind.ELEMENT_SEQUENCE.value):
-            rebound = type(obj)(self.rebind(item) for item in obj)
+            rebound = type(obj)(self.rebind(obj=item) for item in obj)
         elif isinstance(obj, dict):
-            rebound = {key: self.rebind(value) for key, value in obj.items()}
+            rebound = {key: self.rebind(obj=value) for key, value in obj.items()}
         else:
             return deepcopy(obj, self.rebound)
         self.rebound[id(obj)] = rebound
         return rebound
 
-    def _rebound_entity(self, entity: WorldEntityWithID) -> WorldEntityWithID:
+    def _rebound_entity(self, *, entity: WorldEntityWithID) -> WorldEntityWithID:
         """
         :param entity: The entity to look up.
         :return: :attr:`world`'s own instance of `entity`, or `entity` itself if
@@ -74,7 +74,7 @@ class WorldEntityRebinding:
             answers with an entity that reports belonging elsewhere.
         """
         try:
-            found = self.world.get_world_entity_with_id_by_id(entity.id)
+            found = self.world.get_world_entity_with_id_by_id(id=entity.id)
         except WorldEntityWithIDNotFoundError:
             return entity
         if found._world is not self.world:
@@ -84,7 +84,7 @@ class WorldEntityRebinding:
         return found
 
     @staticmethod
-    def _is_walked_dataclass(obj: Any) -> bool:
+    def _is_walked_dataclass(*, obj: Any) -> bool:
         """
         :param obj: The object to rebind.
         :return: Whether `obj` is a dataclass instance whose fields are rebound one by
@@ -96,7 +96,7 @@ class WorldEntityRebinding:
             and not hasattr(type(obj), "__deepcopy__")
         )
 
-    def _rebound_dataclass(self, obj: Any) -> Any:
+    def _rebound_dataclass(self, *, obj: Any) -> Any:
         """
         :param obj: The dataclass instance to rebind.
         :return: A copy of `obj` with every field rebound, registered before its fields
@@ -111,7 +111,7 @@ class WorldEntityRebinding:
             setattr(
                 result,
                 dataclass_field.name,
-                self.rebind(getattr(obj, dataclass_field.name)),
+                self.rebind(obj=getattr(obj, dataclass_field.name)),
             )
         if hasattr(obj, "__dict__"):
             for name, value in vars(obj).items():

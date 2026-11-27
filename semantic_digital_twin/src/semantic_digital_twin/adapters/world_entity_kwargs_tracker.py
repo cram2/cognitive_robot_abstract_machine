@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from semantic_digital_twin.world_description.world_entity import WorldEntityWithID
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldEntityReference(ObjectReference):
     """
     How a serialized object points at a world entity.
@@ -36,7 +36,7 @@ class WorldEntityReference(ObjectReference):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldEntityWithIDKwargsTracker(
     # A string, because world_entity imports this module and cannot be imported back.
     DeserializedObjectTracker[UUID, "WorldEntityWithID"],
@@ -55,7 +55,7 @@ class WorldEntityWithIDKwargsTracker(
     """
 
     @classmethod
-    def from_world(cls, world: World) -> Self:
+    def from_world(cls, *, world: World) -> Self:
         """
         Create a new tracker from a world.
 
@@ -71,7 +71,7 @@ class WorldEntityWithIDKwargsTracker(
     def _has_untracked(self, *, key: UUID) -> bool:
         if self._world is None:
             return False
-        return self._world.find_world_entity_with_id(key) is not None
+        return self._world.find_world_entity_with_id(entity_id=key) is not None
 
     def _get_untracked(
         self, *, key: UUID, name: PrefixedName | None = None
@@ -82,7 +82,7 @@ class WorldEntityWithIDKwargsTracker(
         """
         if self._world is None:
             raise MissingWorldError()
-        entity = self._world.find_world_entity_with_id(key)
+        entity = self._world.find_world_entity_with_id(entity_id=key)
         if entity is None:
             raise WorldEntityWithIDNotInKwargs(key=key, world_entity_name=name)
         return entity

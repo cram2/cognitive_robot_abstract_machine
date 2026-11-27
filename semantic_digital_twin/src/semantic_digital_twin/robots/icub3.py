@@ -141,7 +141,7 @@ class ICub3Joint(JointName):
     RIGHT_ANKLE_ROLL = "r_ankle_roll"
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ICub3LeftThumb(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -151,19 +151,19 @@ class ICub3LeftThumb(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "l_hand_thumb_0"
+                branch_root=robot_root, name="l_hand_thumb_0"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "l_hand_thumb_tip"
+                branch_root=robot_root, name="l_hand_thumb_tip"
             ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ICub3LeftIndexFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -173,19 +173,19 @@ class ICub3LeftIndexFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "l_hand_index_0"
+                branch_root=robot_root, name="l_hand_index_0"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "l_hand_index_tip"
+                branch_root=robot_root, name="l_hand_index_tip"
             ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ICub3LeftMiddleFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -195,19 +195,19 @@ class ICub3LeftMiddleFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "l_hand_middle_0"
+                branch_root=robot_root, name="l_hand_middle_0"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "l_hand_middle_tip"
+                branch_root=robot_root, name="l_hand_middle_tip"
             ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ICub3LeftRingFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -217,19 +217,19 @@ class ICub3LeftRingFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "l_hand_ring_0"
+                branch_root=robot_root, name="l_hand_ring_0"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "l_hand_ring_tip"
+                branch_root=robot_root, name="l_hand_ring_tip"
             ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ICub3LeftLittleFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -239,19 +239,19 @@ class ICub3LeftLittleFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "l_hand_little_0"
+                branch_root=robot_root, name="l_hand_little_0"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "l_hand_little_tip"
+                branch_root=robot_root, name="l_hand_little_tip"
             ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ICub3RightThumb(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -261,19 +261,19 @@ class ICub3RightThumb(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "r_hand_thumb_0"
+                branch_root=robot_root, name="r_hand_thumb_0"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "r_hand_thumb_tip"
+                branch_root=robot_root, name="r_hand_thumb_tip"
             ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ICub3RightIndexFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -283,19 +283,19 @@ class ICub3RightIndexFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "r_hand_index_0"
+                branch_root=robot_root, name="r_hand_index_0"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "r_hand_index_tip"
+                branch_root=robot_root, name="r_hand_index_tip"
             ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ICub3RightMiddleFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -305,19 +305,19 @@ class ICub3RightMiddleFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "r_hand_middle_0"
+                branch_root=robot_root, name="r_hand_middle_0"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "r_hand_middle_tip"
+                branch_root=robot_root, name="r_hand_middle_tip"
             ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ICub3RightRingFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -327,19 +327,19 @@ class ICub3RightRingFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "r_hand_ring_0"
+                branch_root=robot_root, name="r_hand_ring_0"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "r_hand_ring_tip"
+                branch_root=robot_root, name="r_hand_ring_tip"
             ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ICub3RightLittleFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -349,19 +349,19 @@ class ICub3RightLittleFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "r_hand_little_0"
+                branch_root=robot_root, name="r_hand_little_0"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "r_hand_little_tip"
+                branch_root=robot_root, name="r_hand_little_tip"
             ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ICub3LeftHand(
     EndEffector,
     HasFingers[
@@ -379,7 +379,7 @@ class ICub3LeftHand(
         gripper_joints = self.active_connections
 
         gripper_open = JointState.from_mapping(
-            name=PrefixedName(f"{self.name.name}_open", prefix=self.name.name),
+            name=PrefixedName(name=f"{self.name.name}_open", prefix=self.name.name),
             mapping=dict(zip(gripper_joints, [0.0] * len(gripper_joints))),
             state_type=GripperState.OPEN,
         )
@@ -408,7 +408,7 @@ class ICub3LeftHand(
         ]
 
         gripper_close = JointState.from_mapping(
-            name=PrefixedName(f"{self.name.name}_close", prefix=self.name.name),
+            name=PrefixedName(name=f"{self.name.name}_close", prefix=self.name.name),
             mapping=dict(zip(gripper_joints, close_vals)),
             state_type=GripperState.CLOSE,
         )
@@ -425,17 +425,19 @@ class ICub3LeftHand(
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "l_hand"),
+            root=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="l_hand"
+            ),
             tool_frame=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "l_gripper_tool_frame"
+                branch_root=robot_root, name="l_gripper_tool_frame"
             ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ICub3RightHand(
     EndEffector,
     HasFingers[
@@ -453,7 +455,7 @@ class ICub3RightHand(
         gripper_joints = self.active_connections
 
         gripper_open = JointState.from_mapping(
-            name=PrefixedName(f"{self.name.name}_open", prefix=self.name.name),
+            name=PrefixedName(name=f"{self.name.name}_open", prefix=self.name.name),
             mapping=dict(zip(gripper_joints, [0.0] * len(gripper_joints))),
             state_type=GripperState.OPEN,
         )
@@ -482,7 +484,7 @@ class ICub3RightHand(
         ]
 
         gripper_close = JointState.from_mapping(
-            name=PrefixedName(f"{self.name.name}_close", prefix=self.name.name),
+            name=PrefixedName(name=f"{self.name.name}_close", prefix=self.name.name),
             mapping=dict(zip(gripper_joints, close_vals)),
             state_type=GripperState.CLOSE,
         )
@@ -499,24 +501,26 @@ class ICub3RightHand(
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "r_hand"),
+            root=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="r_hand"
+            ),
             tool_frame=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "r_gripper_tool_frame"
+                branch_root=robot_root, name="r_gripper_tool_frame"
             ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ICub3LeftArm(Arm[ICub3LeftHand]):
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
     def setup_joint_states(self) -> list[JointState]:
         arm_park = JointState.from_mapping(
-            name=PrefixedName("left_arm_park", prefix=self.name.name),
+            name=PrefixedName(name="left_arm_park", prefix=self.name.name),
             mapping=dict(
                 zip(self.active_connections, [0.0] * len(self.active_connections))
             ),
@@ -526,22 +530,26 @@ class ICub3LeftArm(Arm[ICub3LeftHand]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "root_link"),
-            tip=robot_root._world.get_body_in_branch_by_name(robot_root, "l_hand"),
+            root=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="root_link"
+            ),
+            tip=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="l_hand"
+            ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ICub3RightArm(Arm[ICub3RightHand]):
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
 
     def setup_joint_states(self) -> list[JointState]:
         arm_park = JointState.from_mapping(
-            name=PrefixedName("right_arm_park", prefix=self.name.name),
+            name=PrefixedName(name="right_arm_park", prefix=self.name.name),
             mapping=dict(
                 zip(self.active_connections, [0.0] * len(self.active_connections))
             ),
@@ -551,24 +559,30 @@ class ICub3RightArm(Arm[ICub3RightHand]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "root_link"),
-            tip=robot_root._world.get_body_in_branch_by_name(robot_root, "r_hand"),
+            root=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="root_link"
+            ),
+            tip=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="r_hand"
+            ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ICub3Camera(RobotCamera[FieldOfViewCameraModel]):
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=cls.create_optical_body(
-                robot_root._world.get_body_in_branch_by_name(robot_root, "head"),
-                HomogeneousTransformationMatrix(),
+                mounting_body=robot_root._world.get_body_in_branch_by_name(
+                    branch_root=robot_root, name="head"
+                ),
+                parent_T_optical=HomogeneousTransformationMatrix(),
             ),
             camera_model=FieldOfViewCameraModel(
                 angular_extent=FieldOfView(
@@ -587,7 +601,7 @@ class ICub3Camera(RobotCamera[FieldOfViewCameraModel]):
         return []
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ICub3Neck(Neck[ICub3Camera]):
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
@@ -597,15 +611,19 @@ class ICub3Neck(Neck[ICub3Camera]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "chest"),
-            tip=robot_root._world.get_body_in_branch_by_name(robot_root, "head"),
+            root=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="chest"
+            ),
+            tip=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="head"
+            ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ICub3Torso(
     Torso, HasLeftRightArm[ICub3LeftArm, ICub3RightArm], HasNeck[ICub3Neck]
 ):
@@ -617,15 +635,19 @@ class ICub3Torso(
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "root_link"),
-            tip=robot_root._world.get_body_in_branch_by_name(robot_root, "chest"),
+            root=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="root_link"
+            ),
+            tip=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="chest"
+            ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ICub3MobileBase(MobileBase[OmniDrive]):
     @classproperty
     def forward_axis(cls) -> Vector3:
@@ -633,10 +655,12 @@ class ICub3MobileBase(MobileBase[OmniDrive]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "l_hip_1"),
+            root=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="l_hip_1"
+            ),
         )
 
     def setup_hardware_interfaces(self) -> None:
@@ -646,7 +670,7 @@ class ICub3MobileBase(MobileBase[OmniDrive]):
         return []
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ICub3(AbstractRobot, HasTorso[ICub3Torso], HasMobileBase[ICub3MobileBase]):
     """
     The ICub3 robot built by the Istituto Italiano di Tecnologia.

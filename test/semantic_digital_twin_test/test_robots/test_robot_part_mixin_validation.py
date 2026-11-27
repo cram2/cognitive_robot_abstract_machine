@@ -36,28 +36,28 @@ from semantic_digital_twin.robots.robot_part_mixins import (
 # %% stand-ins for the parts the mixins bind
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class MountedPart:
     """
     A part a mixin can hold, carrying nothing the validation looks at.
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MountedSource(InputSource):
     """
     A source a mixin can be read from, carrying nothing the validation looks at.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Thumb(MountedPart):
     """
     The finger :meth:`HasFingers.thumb` singles out.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class OpposingFinger(MountedPart):
     """
     The finger a thumb closes against.
@@ -67,7 +67,7 @@ class OpposingFinger(MountedPart):
 # %% parts combining mixins
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PartCombiningIndependentMixins(HasTorso[MountedPart], HasLidar[MountedPart]):
     """
     A part whose two mixins are unrelated, so neither one narrows the other's
@@ -75,7 +75,7 @@ class PartCombiningIndependentMixins(HasTorso[MountedPart], HasLidar[MountedPart
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PartNarrowingAMixin(HasTwoFingers[Thumb, OpposingFinger]):
     """
     A part whose mixin narrows another one's assumption about how many fingers there
@@ -83,7 +83,7 @@ class PartNarrowingAMixin(HasTwoFingers[Thumb, OpposingFinger]):
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PartCombiningANarrowingMixinWithAnother(
     HasOneArm[MountedPart], HasNeck[MountedPart]
 ):
@@ -93,28 +93,28 @@ class PartCombiningANarrowingMixinWithAnother(
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PartWithFingers(HasFingers[Thumb, OpposingFinger]):
     """
     A part whose mixin requires a thumb and at least one finger opposing it.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PartWithArms(HasArms[MountedPart, MountedPart, MountedPart]):
     """
     A part whose mixin requires at least one arm.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PartWithOneArm(HasOneArm[MountedPart]):
     """
     A part whose mixin requires exactly one arm.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PartWithLeftAndRightArm(HasLeftRightArm[MountedPart, MountedPart]):
     """
     A part whose mixin requires exactly two arms.
@@ -178,7 +178,7 @@ def test_a_part_satisfying_a_narrowing_mixin_satisfies_the_mixin_it_narrows(
 # %% the exception an unmet assumption raises
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PartWithoutItsSingleChild(
     HasTorso[MountedPart],
     HasNeck[MountedPart],

@@ -42,7 +42,7 @@ edge is a connection (a URDF joint) labeled with its joint type.
 from semantic_digital_twin.adapters.urdf import URDFParser
 
 # Replace this with the path to your robot's URDF or MJCF file.
-parser = URDFParser.from_file("/path/to/your/robot.urdf")
+parser = URDFParser.from_file(file_path="/path/to/your/robot.urdf")
 world = parser.create_world()
 world.visualize_world_structure()
 ```
@@ -186,10 +186,10 @@ class MyRobotLeftFinger(Finger):
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "left_finger_0_link"
+                branch_root=robot_root, name="left_finger_0_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "left_finger_tip_link"
+                branch_root=robot_root, name="left_finger_tip_link"
             ),
         )
 
@@ -209,10 +209,10 @@ class MyRobotRightFinger(Finger):
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "right_finger_0_link"
+                branch_root=robot_root, name="right_finger_0_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "right_finger_tip_link"
+                branch_root=robot_root, name="right_finger_tip_link"
             ),
         )
 
@@ -253,7 +253,7 @@ class MyRobotCamera(RobotCamera):
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "camera_optical_frame"
+                branch_root=robot_root, name="camera_optical_frame"
             ),
             camera_model=FieldOfViewCameraModel(
                 angular_extent=FieldOfView(horizontal_angle=1.047, vertical_angle=0.785)
@@ -307,10 +307,10 @@ class MyRobotGripper(
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "palm_link"
+                branch_root=robot_root, name="palm_link"
             ),
             tool_frame=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "tool_center_point"
+                branch_root=robot_root, name="tool_center_point"
             ),
         )
 
@@ -330,12 +330,12 @@ class MyRobotGripper(
     def setup_joint_states(self) -> List[JointState]:
         joints = self.active_connections
         gripper_open = JointState.from_mapping(
-            name=PrefixedName("gripper_open", prefix=self.name.name),
+            name=PrefixedName(name="gripper_open", prefix=self.name.name),
             mapping=dict(zip(joints, [0.0, 0.0])),
             state_type=GripperState.OPEN,
         )
         gripper_close = JointState.from_mapping(
-            name=PrefixedName("gripper_close", prefix=self.name.name),
+            name=PrefixedName(name="gripper_close", prefix=self.name.name),
             mapping=dict(zip(joints, [0.8, 0.8])),
             state_type=GripperState.CLOSE,
         )
@@ -373,10 +373,10 @@ class MyRobotArm(Arm[MyRobotGripper]):
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "shoulder_link"
+                branch_root=robot_root, name="shoulder_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "wrist_link"
+                branch_root=robot_root, name="wrist_link"
             ),
         )
 
@@ -385,7 +385,7 @@ class MyRobotArm(Arm[MyRobotGripper]):
 
     def setup_joint_states(self) -> List[JointState]:
         arm_park = JointState.from_mapping(
-            name=PrefixedName("arm_park", prefix=self.name.name),
+            name=PrefixedName(name="arm_park", prefix=self.name.name),
             mapping=dict(
                 zip(self.active_connections, [0.0] * len(self.active_connections))
             ),
@@ -403,10 +403,10 @@ class MyRobotNeck(Neck[MyRobotCamera]):
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "neck_base_link"
+                branch_root=robot_root, name="neck_base_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "head_link"
+                branch_root=robot_root, name="head_link"
             ),
         )
 
@@ -450,10 +450,10 @@ class MyRobotTorso(Torso, HasOneArm[MyRobotArm], HasNeck[MyRobotNeck]):
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "base_link"
+                branch_root=robot_root, name="base_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "torso_lift_link"
+                branch_root=robot_root, name="torso_lift_link"
             ),
         )
 
@@ -463,12 +463,12 @@ class MyRobotTorso(Torso, HasOneArm[MyRobotArm], HasNeck[MyRobotNeck]):
     def setup_joint_states(self) -> List[JointState]:
         joints = self.active_connections
         torso_low = JointState.from_mapping(
-            name=PrefixedName("torso_low", prefix=self.name.name),
+            name=PrefixedName(name="torso_low", prefix=self.name.name),
             mapping=dict(zip(joints, [0.0])),
             state_type=TorsoState.LOW,
         )
         torso_high = JointState.from_mapping(
-            name=PrefixedName("torso_high", prefix=self.name.name),
+            name=PrefixedName(name="torso_high", prefix=self.name.name),
             mapping=dict(zip(joints, [0.3])),
             state_type=TorsoState.HIGH,
         )
@@ -487,7 +487,7 @@ class MyRobotMobileBase(MobileBase, HasTorso[MyRobotTorso]):
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "base_link"
+                branch_root=robot_root, name="base_link"
             ),
         )
 
@@ -572,10 +572,10 @@ class MyRobot(AbstractRobot, HasMobileBase[MyRobotMobileBase]):
 from semantic_digital_twin.adapters.urdf import URDFParser
 
 # Re-parse your URDF to get a fresh world, then annotate it with your robot class.
-parser = URDFParser.from_file("/path/to/your/robot.urdf")
+parser = URDFParser.from_file(file_path="/path/to/your/robot.urdf")
 world = parser.create_world()
 
-robot = MyRobot.from_world(world)
+robot = MyRobot.from_world(world=world)
 
 # from_world calls setup_robot_part_semantic_annotations internally, which walks
 # the generic type parameters you declared (e.g. HasMobileBase[MyRobotMobileBase])

@@ -274,15 +274,15 @@ def mini_world() -> World:
     """
     world = World()
     with world.modify_world():
-        body = Body(name=PrefixedName("root"))
-        body2 = Body(name=PrefixedName("tip"))
+        body = Body(name=PrefixedName(name="root"))
+        body2 = Body(name=PrefixedName(name="tip"))
         connection = ScrewAxisConnection.create_with_dofs(
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z()),
             world=world,
             parent=body,
             child=body2,
         )
-        world.add_connection(connection)
+        world.add_connection(connection=connection)
     return world
 
 
@@ -293,8 +293,8 @@ def world_with_two_bodies() -> tuple[World, Body, Body]:
     connection.
     """
     world = World()
-    parent = Body(name=PrefixedName("parent"))
-    child = Body(name=PrefixedName("child"))
+    parent = Body(name=PrefixedName(name="parent"))
+    child = Body(name=PrefixedName(name="child"))
     return world, parent, child
 
 
@@ -303,18 +303,18 @@ def cylinder_bot_world():
     robot_world = World()
     with robot_world.modify_world():
         robot = Body(
-            name=PrefixedName("bot"),
+            name=PrefixedName(name="bot"),
             collision=ShapeCollection(shapes=[Cylinder(width=0.1, height=0.5)]),
         )
-        robot_world.add_body(robot)
-        RobotOnAnOmniDrive.from_world(robot_world)
+        robot_world.add_body(body=robot)
+        RobotOnAnOmniDrive.from_world(world=robot_world)
     world = World()
     with world.modify_world():
         body = Body(
-            name=PrefixedName("map"),
+            name=PrefixedName(name="map"),
         )
         environment = Body(
-            name=PrefixedName("environment"),
+            name=PrefixedName(name="environment"),
             collision=ShapeCollection(shapes=[Cylinder(width=0.5, height=0.5)]),
         )
         env_connection = FixedConnection(
@@ -324,10 +324,10 @@ def cylinder_bot_world():
                 1
             ),
         )
-        world.add_connection(env_connection)
+        world.add_connection(connection=env_connection)
 
         environment2 = Body(
-            name=PrefixedName("environment2"),
+            name=PrefixedName(name="environment2"),
             collision=ShapeCollection(shapes=[Cylinder(width=0.5, height=0.5)]),
         )
         env_connection2 = FixedConnection(
@@ -337,16 +337,16 @@ def cylinder_bot_world():
                 y=0.5
             ),
         )
-        world.add_connection(env_connection2)
+        world.add_connection(connection=env_connection2)
 
         connection = OmniDrive.create_with_dofs(
             world=world, parent=body, child=robot_world.root
         )
-        world.merge_world(robot_world, connection)
-        world.set_dofs_has_hardware_interface(connection.active_dofs, True)
+        world.merge_world(other=robot_world, root_connection=connection)
+        world.set_dofs_has_hardware_interface(dofs=connection.active_dofs, value=True)
 
         world.collision_manager.max_avoided_bodies_rules.append(
-            MaxAvoidedCollisionsOverride(2, {robot})
+            MaxAvoidedCollisionsOverride(value=2, bodies={robot})
         )
 
     return world
@@ -357,43 +357,43 @@ def self_collision_bot_world():
     world = World()
     with world.modify_world():
         robot = Body(
-            name=PrefixedName("map"),
+            name=PrefixedName(name="map"),
             collision=ShapeCollection(shapes=[Sphere(radius=0.1)]),
             visual=ShapeCollection(shapes=[Sphere(radius=0.1)]),
         )
         l_shoulder = Body(
-            name=PrefixedName("l_shoulder"),
+            name=PrefixedName(name="l_shoulder"),
             collision=ShapeCollection(shapes=[Sphere(radius=0.1)]),
             visual=ShapeCollection(shapes=[Sphere(radius=0.1)]),
         )
         l_tip = Body(
-            name=PrefixedName("l_tip"),
+            name=PrefixedName(name="l_tip"),
             collision=ShapeCollection(shapes=[Sphere(radius=0.1)]),
             visual=ShapeCollection(shapes=[Sphere(radius=0.1)]),
         )
         l_thumb = Body(
-            name=PrefixedName("l_thumb"),
+            name=PrefixedName(name="l_thumb"),
             collision=ShapeCollection(shapes=[Sphere(radius=0.1)]),
             visual=ShapeCollection(shapes=[Sphere(radius=0.1)]),
         )
         r_shoulder = Body(
-            name=PrefixedName("r_shoulder"),
+            name=PrefixedName(name="r_shoulder"),
             collision=ShapeCollection(shapes=[Sphere(radius=0.1)]),
             visual=ShapeCollection(shapes=[Sphere(radius=0.1)]),
         )
         r_tip = Body(
-            name=PrefixedName("r_tip"),
+            name=PrefixedName(name="r_tip"),
             collision=ShapeCollection(shapes=[Sphere(radius=0.1)]),
             visual=ShapeCollection(shapes=[Sphere(radius=0.1)]),
         )
         r_thumb = Body(
-            name=PrefixedName("r_thumb"),
+            name=PrefixedName(name="r_thumb"),
             collision=ShapeCollection(shapes=[Sphere(radius=0.1)]),
             visual=ShapeCollection(shapes=[Sphere(radius=0.1)]),
         )
 
         world.add_connection(
-            ScrewAxisConnection.create_with_dofs(
+            connection=ScrewAxisConnection.create_with_dofs(
                 screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
                     axis=Vector3.Z()
                 ),
@@ -406,7 +406,7 @@ def self_collision_bot_world():
             )
         )
         world.add_connection(
-            ScrewAxisConnection.create_with_dofs(
+            connection=ScrewAxisConnection.create_with_dofs(
                 screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
                     axis=Vector3.Z()
                 ),
@@ -419,7 +419,7 @@ def self_collision_bot_world():
             )
         )
         world.add_connection(
-            FixedConnection(
+            connection=FixedConnection(
                 parent=l_tip,
                 child=l_thumb,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -429,7 +429,7 @@ def self_collision_bot_world():
         )
 
         world.add_connection(
-            ScrewAxisConnection.create_with_dofs(
+            connection=ScrewAxisConnection.create_with_dofs(
                 screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
                     axis=Vector3.Z()
                 ),
@@ -443,7 +443,7 @@ def self_collision_bot_world():
             )
         )
         world.add_connection(
-            ScrewAxisConnection.create_with_dofs(
+            connection=ScrewAxisConnection.create_with_dofs(
                 screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
                     axis=Vector3.Z()
                 ),
@@ -456,7 +456,7 @@ def self_collision_bot_world():
             )
         )
         world.add_connection(
-            FixedConnection(
+            connection=FixedConnection(
                 parent=r_tip,
                 child=r_thumb,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -464,7 +464,7 @@ def self_collision_bot_world():
                 ),
             )
         )
-        MinimalRobot.from_world(world)
+        MinimalRobot.from_world(world=world)
 
     return world
 
@@ -492,18 +492,18 @@ def cylinder_bot_diff_world():
     robot_world = World()
     with robot_world.modify_world():
         robot = Body(
-            name=PrefixedName("bot"),
+            name=PrefixedName(name="bot"),
             collision=ShapeCollection(shapes=[Cylinder(width=0.1, height=0.5)]),
         )
-        robot_world.add_body(robot)
-        RobotOnADifferentialDrive.from_world(robot_world)
+        robot_world.add_body(body=robot)
+        RobotOnADifferentialDrive.from_world(world=robot_world)
     world = World()
     with world.modify_world():
         body = Body(
-            name=PrefixedName("map"),
+            name=PrefixedName(name="map"),
         )
         environment = Body(
-            name=PrefixedName("environment"),
+            name=PrefixedName(name="environment"),
             collision=ShapeCollection(shapes=[Cylinder(width=0.5, height=0.5)]),
         )
         env_connection = FixedConnection(
@@ -513,13 +513,13 @@ def cylinder_bot_diff_world():
                 1
             ),
         )
-        world.add_connection(env_connection)
+        world.add_connection(connection=env_connection)
 
         connection = DifferentialDrive.create_with_dofs(
             world=world, parent=body, child=robot_world.root
         )
-        world.merge_world(robot_world, connection)
-        world.set_dofs_has_hardware_interface(connection.active_dofs, True)
+        world.merge_world(other=robot_world, root_connection=connection)
+        world.set_dofs_has_hardware_interface(dofs=connection.active_dofs, value=True)
 
     return world
 
@@ -546,25 +546,27 @@ def world_with_urdf_factory(
     )
     world_with_urdf = urdf_parser.create_world()
     if robot_semantic_annotation is not None:
-        robot_semantic_annotation.from_world(world_with_urdf)
+        robot_semantic_annotation.from_world(world=world_with_urdf)
 
     with world_with_urdf.modify_world():
         old_root = world_with_urdf.root
-        map = Body(name=PrefixedName("map"))
-        localization_body = Body(name=PrefixedName("odom_combined"))
+        map = Body(name=PrefixedName(name="map"))
+        localization_body = Body(name=PrefixedName(name="odom_combined"))
 
         map_C_localization = Connection6DoF.create_with_dofs(
             world=world_with_urdf, parent=map, child=localization_body
         )
-        world_with_urdf.add_connection(map_C_localization)
+        world_with_urdf.add_connection(connection=map_C_localization)
 
         c_root_bf = drive_connection_type.create_with_dofs(
             parent=localization_body,
             child=old_root,
             world=world_with_urdf,
         )
-        world_with_urdf.add_connection(c_root_bf)
-        world_with_urdf.set_dofs_has_hardware_interface(c_root_bf.active_dofs, True)
+        world_with_urdf.add_connection(connection=c_root_bf)
+        world_with_urdf.set_dofs_has_hardware_interface(
+            dofs=c_root_bf.active_dofs, value=True
+        )
     if robot_localization_pose is not None:
         map_C_localization.origin = robot_localization_pose
 
@@ -611,7 +613,7 @@ def tracy_world():
         pytest.skip("Tracy not installed")
     tracy_parser = URDFParser.from_file(file_path=Tracy.get_ros_file_path())
     world_with_tracy = tracy_parser.create_world()
-    Tracy.from_world(world_with_tracy)
+    Tracy.from_world(world=world_with_tracy)
     return world_with_tracy
 
 
@@ -622,7 +624,7 @@ def daisy_world():
     try:
         daisy_parser = URDFParser.from_file(file_path=DAiSy.get_ros_file_path())
         world_with_daisy = daisy_parser.create_world()
-        DAiSy.from_world(world_with_daisy)
+        DAiSy.from_world(world=world_with_daisy)
     except Exception:
         pytest.skip(
             "DAiSy URDF could not be parsed (missing dependency or body mismatch)"
@@ -656,30 +658,34 @@ def _apartment_world_setup():
     :return: The apartment with a floor, a milk carton, a cereal box and a spoon in a drawer.
     """
     apartment_world = URDFParser.from_file(
-        "package://iai_apartment/urdf/apartment.urdf"
+        file_path="package://iai_apartment/urdf/apartment.urdf"
     ).create_world()
-    milk_world = STLParser("package://iai_objects/objects/milk.stl").create_world()
+    milk_world = STLParser(
+        file_path="package://iai_objects/objects/milk.stl"
+    ).create_world()
     cereal_world = STLParser(
-        "package://iai_objects/objects/breakfast_cereal.stl"
+        file_path="package://iai_objects/objects/breakfast_cereal.stl"
     ).create_world()
-    spoon_world = STLParser("package://iai_objects/objects/spoon.stl").create_world()
+    spoon_world = STLParser(
+        file_path="package://iai_objects/objects/spoon.stl"
+    ).create_world()
 
     apartment_world.merge_world_at_pose(
-        milk_world,
-        HomogeneousTransformationMatrix.from_xyz_rpy(
+        other=milk_world,
+        pose=HomogeneousTransformationMatrix.from_xyz_rpy(
             2.37, 2, 1.05, reference_frame=apartment_world.root
         ),
     )
     apartment_world.merge_world_at_pose(
-        cereal_world,
-        HomogeneousTransformationMatrix.from_xyz_rpy(
+        other=cereal_world,
+        pose=HomogeneousTransformationMatrix.from_xyz_rpy(
             2.37, 2.5, 1.05, reference_frame=apartment_world.root
         ),
     )
     apartment_world.merge_world(
-        spoon_world,
-        FixedConnection(
-            parent=apartment_world.get_body_by_name("cabinet10_drawer_top"),
+        other=spoon_world,
+        root_connection=FixedConnection(
+            parent=apartment_world.get_body_by_name(name="cabinet10_drawer_top"),
             child=spoon_world.root,
             parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
                 -0.05, -0.05, -0.02
@@ -693,14 +699,16 @@ def _apartment_world_setup():
                 root=apartment_world.root, _world=apartment_world
             )
             .as_bounding_box_collection_at_origin(
-                HomogeneousTransformationMatrix(reference_frame=apartment_world.root)
+                origin=HomogeneousTransformationMatrix(
+                    reference_frame=apartment_world.root
+                )
             )
             .bounding_box()
         )
         Floor.create_with_new_body_in_world(
             name="apartment_floor",
             world=apartment_world,
-            scale=Scale(footprint.depth, footprint.width, 0.01),
+            scale=Scale(x=footprint.depth, y=footprint.width, z=0.01),
             world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
                 float(footprint.center.x),
                 float(footprint.center.y),
@@ -710,15 +718,17 @@ def _apartment_world_setup():
         )
 
         apartment_world.add_semantic_annotations(
-            [
-                Milk(root=apartment_world.get_body_by_name("milk.stl")),
-                Spoon(root=apartment_world.get_body_by_name("spoon.stl")),
+            semantic_annotations=[
+                Milk(root=apartment_world.get_body_by_name(name="milk.stl")),
+                Spoon(root=apartment_world.get_body_by_name(name="spoon.stl")),
             ]
         )
         apartment_world.add_semantic_annotation_recursively(
-            Drawer(
-                root=apartment_world.get_body_by_name("cabinet10_drawer_top"),
-                handle=Handle(root=apartment_world.get_body_by_name("handle_cab10_t")),
+            semantic_annotation=Drawer(
+                root=apartment_world.get_body_by_name(name="cabinet10_drawer_top"),
+                handle=Handle(
+                    root=apartment_world.get_body_by_name(name="handle_cab10_t")
+                ),
             )
         )
 
@@ -734,15 +744,15 @@ def _elevator_world_setup():
     world = World()
 
     with world.modify_world():
-        world.add_body(Body(name=PrefixedName("root")))
+        world.add_body(body=Body(name=PrefixedName(name="root")))
 
         wall_thickness = 0.05
-        scale = Scale(2, 2, 2)
-        name = PrefixedName("elevator")
+        scale = Scale(x=2, y=2, z=2)
+        name = PrefixedName(name="elevator")
         elevator = Elevator.get_annotation_specification(
-            "Elevator",
-            Elevator.get_default_root_kinematic_structure_entity_specification(
-                scale=Scale(2, 2, 2), wall_thickness=0.05
+            name="Elevator",
+            root_specification=Elevator.get_default_root_kinematic_structure_entity_specification(
+                scale=Scale(x=2, y=2, z=2), wall_thickness=0.05
             ),
             parent_connection_specification=ScrewAxisConnectionSpecification(
                 screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
@@ -752,9 +762,9 @@ def _elevator_world_setup():
                     maximum_speed=1.0
                 ),
             ),
-        ).spawn(world)
+        ).spawn(world=world)
 
-        door_scale = Scale(wall_thickness, scale.y / 2, scale.z)
+        door_scale = Scale(x=wall_thickness, y=scale.y / 2, z=scale.z)
         door_travel = door_scale.y
         for i, door_y in enumerate((-scale.y / 4, scale.y / 4)):
             door = Door.create_with_new_body_in_world(
@@ -776,7 +786,7 @@ def _elevator_world_setup():
             )
             elevator.add(part=door)
 
-        world.add_semantic_annotation(elevator)
+        world.add_semantic_annotation(semantic_annotation=elevator)
     return world
 
 
@@ -790,11 +800,17 @@ def apartment_world_copy(_apartment_world_setup):
 def apartment_world_pr2_copy_with_context(_apartment_world_setup, _pr2_world_setup):
     result = deepcopy(_apartment_world_setup)
     pr2_copy = deepcopy(_pr2_world_setup)
-    result.merge_world(pr2_copy)
+    result.merge_world(other=pr2_copy)
     return (
         result,
-        result.get_semantic_annotations_by_type(AbstractRobot)[0],
-        robot_extensions(result.get_semantic_annotations_by_type(AbstractRobot)[0]),
+        result.get_semantic_annotations_by_type(semantic_annotation_type=AbstractRobot)[
+            0
+        ],
+        robot_extensions(
+            result.get_semantic_annotations_by_type(
+                semantic_annotation_type=AbstractRobot
+            )[0]
+        ),
     )
 
 
@@ -805,19 +821,19 @@ def _simple_apartment_setup():
     """
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("root"))
-        world.add_body(root)
+        root = Body(name=PrefixedName(name="root"))
+        world.add_body(body=root)
 
         box = Body(
-            name=PrefixedName("box"),
-            collision=ShapeCollection([Box(scale=Scale(1, 1, 0.95))]),
-            visual=ShapeCollection([Box(scale=Scale(1, 1, 0.95))]),
+            name=PrefixedName(name="box"),
+            collision=ShapeCollection(shapes=[Box(scale=Scale(x=1, y=1, z=0.95))]),
+            visual=ShapeCollection(shapes=[Box(scale=Scale(x=1, y=1, z=0.95))]),
         )
 
         box_2 = Body(
-            name=PrefixedName("box_2"),
-            collision=ShapeCollection([Box(scale=Scale(1, 1, 0.95))]),
-            visual=ShapeCollection([Box(scale=Scale(1, 1, 0.95))]),
+            name=PrefixedName(name="box_2"),
+            collision=ShapeCollection(shapes=[Box(scale=Scale(x=1, y=1, z=0.95))]),
+            visual=ShapeCollection(shapes=[Box(scale=Scale(x=1, y=1, z=0.95))]),
         )
 
         box_1_connection = FixedConnection(
@@ -836,24 +852,24 @@ def _simple_apartment_setup():
         )
 
         wall1 = Body(
-            name=PrefixedName("wall_1"),
-            collision=ShapeCollection([Box(scale=Scale(8, 0.1, 2))]),
-            visual=ShapeCollection([Box(scale=Scale(8, 0.1, 2))]),
+            name=PrefixedName(name="wall_1"),
+            collision=ShapeCollection(shapes=[Box(scale=Scale(x=8, y=0.1, z=2))]),
+            visual=ShapeCollection(shapes=[Box(scale=Scale(x=8, y=0.1, z=2))]),
         )
         wall2 = Body(
-            name=PrefixedName("wall_2"),
-            collision=ShapeCollection([Box(scale=Scale(8, 0.1, 2))]),
-            visual=ShapeCollection([Box(scale=Scale(8, 0.1, 2))]),
+            name=PrefixedName(name="wall_2"),
+            collision=ShapeCollection(shapes=[Box(scale=Scale(x=8, y=0.1, z=2))]),
+            visual=ShapeCollection(shapes=[Box(scale=Scale(x=8, y=0.1, z=2))]),
         )
         wall3 = Body(
-            name=PrefixedName("wall_3"),
-            collision=ShapeCollection([Box(scale=Scale(8, 0.1, 2))]),
-            visual=ShapeCollection([Box(scale=Scale(8, 0.1, 2))]),
+            name=PrefixedName(name="wall_3"),
+            collision=ShapeCollection(shapes=[Box(scale=Scale(x=8, y=0.1, z=2))]),
+            visual=ShapeCollection(shapes=[Box(scale=Scale(x=8, y=0.1, z=2))]),
         )
         wall4 = Body(
-            name=PrefixedName("wall_4"),
-            collision=ShapeCollection([Box(scale=Scale(8, 0.1, 2))]),
-            visual=ShapeCollection([Box(scale=Scale(8, 0.1, 2))]),
+            name=PrefixedName(name="wall_4"),
+            collision=ShapeCollection(shapes=[Box(scale=Scale(x=8, y=0.1, z=2))]),
+            visual=ShapeCollection(shapes=[Box(scale=Scale(x=8, y=0.1, z=2))]),
         )
 
         wall_1_connection = FixedConnection(
@@ -885,17 +901,19 @@ def _simple_apartment_setup():
             ),
         )
 
-        world.add_connection(box_1_connection)
-        world.add_connection(box_2_connection)
-        world.add_connection(wall_1_connection)
-        world.add_connection(wall_2_connection)
-        world.add_connection(wall_3_connection)
-        world.add_connection(wall_4_connection)
+        world.add_connection(connection=box_1_connection)
+        world.add_connection(connection=box_2_connection)
+        world.add_connection(connection=wall_1_connection)
+        world.add_connection(connection=wall_2_connection)
+        world.add_connection(connection=wall_3_connection)
+        world.add_connection(connection=wall_4_connection)
 
-    milk_world = STLParser("package://iai_objects/objects/milk.stl").create_world()
+    milk_world = STLParser(
+        file_path="package://iai_objects/objects/milk.stl"
+    ).create_world()
     world.merge_world_at_pose(
-        milk_world,
-        HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.02, yaw=np.pi),
+        other=milk_world,
+        pose=HomogeneousTransformationMatrix.from_xyz_rpy(-1.7, 0, 1.02, yaw=np.pi),
     )
     return world
 
@@ -914,24 +932,24 @@ def kitchen_world():
 
 @pytest.fixture(scope="session")
 def building_floor():
-    world = World.create_with_root_body("root")
-    BuildingFloor().spawn(world, "building_floor")
+    world = World.create_with_root_body(root_body_name="root")
+    BuildingFloor().spawn(world=world, name="building_floor")
     return world
 
 
 @pytest.fixture(scope="session")
 def multi_story_building(_elevator_world_setup):
     elevator_copy = deepcopy(_elevator_world_setup)
-    world = World.create_with_root_body("root")
-    BuildingFloor().spawn(world, "floor_1")
+    world = World.create_with_root_body(root_body_name="root")
+    BuildingFloor().spawn(world=world, name="floor_1")
     BuildingFloor().spawn(
-        world,
-        "floor_2",
+        world=world,
+        name="floor_2",
         parent_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(0, 0, 3),
     )
     world.merge_world(
-        elevator_copy,
-        FixedConnection(
+        other=elevator_copy,
+        root_connection=FixedConnection(
             parent=world.root,
             child=elevator_copy.root,
             parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -949,11 +967,11 @@ def multi_story_building(_elevator_world_setup):
         :param center_height: Height of the region's center above the world root.
         """
         region = Region(
-            name=PrefixedName(name),
-            area=ShapeCollection(shapes=[Box(scale=Scale(8, 8, 3))]),
+            name=PrefixedName(name=name),
+            area=ShapeCollection(shapes=[Box(scale=Scale(x=8, y=8, z=3))]),
         )
         world.add_connection(
-            FixedConnection(
+            connection=FixedConnection(
                 parent=world.root,
                 child=region,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -961,7 +979,7 @@ def multi_story_building(_elevator_world_setup):
                 ),
             )
         )
-        world.add_semantic_annotation(level_type(root=region))
+        world.add_semantic_annotation(semantic_annotation=level_type(root=region))
 
     with world.modify_world():
         add_level(GroundFloor, "Ground Floor", 1.5)
@@ -975,7 +993,7 @@ def apartment_meshes():
     Skip tests that need the visual meshes of the ``iai_apartment`` package.
     """
     try:
-        walls_mesh = ApartmentEnvironment.mesh_path("walls.dae")
+        walls_mesh = ApartmentEnvironment.mesh_path(mesh_file_name="walls.dae")
     except ParsingError as error:
         pytest.skip(f"apartment meshes not available: {error}")
     if not os.path.isfile(walls_mesh):
@@ -1000,9 +1018,9 @@ def pr2_apartment_world(_pr2_world_setup, _apartment_world_setup):
     pr2_copy = deepcopy(_pr2_world_setup)
     apartment_copy = deepcopy(_apartment_world_setup)
 
-    pr2_copy.merge_world(apartment_copy)
+    pr2_copy.merge_world(other=apartment_copy)
     pr2_copy.get_body_by_name(
-        "base_footprint"
+        name="base_footprint"
     ).parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(1.3, 2, 0)
     return pr2_copy
 
@@ -1011,8 +1029,10 @@ def pr2_apartment_world(_pr2_world_setup, _apartment_world_setup):
 def simple_pr2_world_setup(_pr2_world_setup, _simple_apartment_setup):
     apartment_world = deepcopy(_simple_apartment_setup)
     pr2_copy = deepcopy(_pr2_world_setup)
-    pr2_copy.merge_world(apartment_world)
-    robot_view = pr2_copy.get_semantic_annotations_by_type(PR2)[0]
+    pr2_copy.merge_world(other=apartment_world)
+    robot_view = pr2_copy.get_semantic_annotations_by_type(
+        semantic_annotation_type=PR2
+    )[0]
     return (
         pr2_copy,
         robot_view,
@@ -1024,10 +1044,12 @@ def simple_pr2_world_setup(_pr2_world_setup, _simple_apartment_setup):
 def hsr_apartment_world(_hsr_world_setup, _apartment_world_setup):
     apartment_copy = deepcopy(_apartment_world_setup)
     hsr_copy = deepcopy(_hsr_world_setup)
-    robot_view = hsr_copy.get_semantic_annotations_by_type(HSRB)[0]
+    robot_view = hsr_copy.get_semantic_annotations_by_type(
+        semantic_annotation_type=HSRB
+    )[0]
 
     apartment_copy.merge_world_at_pose(
-        hsr_copy, HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
+        other=hsr_copy, pose=HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
     )
 
     return (
@@ -1043,7 +1065,7 @@ def stretch_apartment_world(_stretch_world_setup, _apartment_world_setup):
     stretch_copy = deepcopy(_stretch_world_setup)
 
     apartment_copy.merge_world_at_pose(
-        stretch_copy, HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
+        other=stretch_copy, pose=HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
     )
 
     return apartment_copy
@@ -1053,9 +1075,9 @@ def stretch_apartment_world(_stretch_world_setup, _apartment_world_setup):
 def tiago_apartment_world(_tiago_world_setup, _apartment_world_setup):
     apartment_copy = deepcopy(_apartment_world_setup)
     tiago_copy = deepcopy(_tiago_world_setup)
-    apartment_copy.merge_world(tiago_copy)
+    apartment_copy.merge_world(other=tiago_copy)
 
-    return apartment_copy, Tiago.from_world(apartment_copy)
+    return apartment_copy, Tiago.from_world(world=apartment_copy)
 
 
 ###############################
@@ -1190,17 +1212,17 @@ def rclpy_node():
 def kitchen_environment_fixture():
     world = World()
     all_elements_connections = []
-    root = Body(name=PrefixedName("root"))
+    root = Body(name=PrefixedName(name="root"))
 
     with world.modify_world():
-        world.add_kinematic_structure_entity(root)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=root)
         fruit_table = Table.create_with_new_body_in_world(
             world=world,
             name="fruit_table",
             world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
                 x=1, y=1, z=0
             ),
-            scale=Scale(2, 2, 1),
+            scale=Scale(x=2, y=2, z=1),
         )
 
         vegetable_table = Table.create_with_new_body_in_world(
@@ -1209,7 +1231,7 @@ def kitchen_environment_fixture():
             world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
                 x=1, y=1, z=2
             ),
-            scale=Scale(2, 2, 1),
+            scale=Scale(x=2, y=2, z=1),
         )
 
         empty_table = Table.create_with_new_body_in_world(
@@ -1218,7 +1240,7 @@ def kitchen_environment_fixture():
             world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
                 x=1, y=1, z=4
             ),
-            scale=Scale(2, 2, 1),
+            scale=Scale(x=2, y=2, z=1),
         )
 
         empty_table2 = Table.create_with_new_body_in_world(
@@ -1227,7 +1249,7 @@ def kitchen_environment_fixture():
             world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
                 x=1, y=1, z=6
             ),
-            scale=Scale(2, 2, 1),
+            scale=Scale(x=2, y=2, z=1),
         )
 
         apple = Apple.create_with_new_body_in_world(
@@ -1236,7 +1258,7 @@ def kitchen_environment_fixture():
             world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
                 x=1, y=1, z=0.55
             ),
-            scale=Scale(0.10, 0.10, 0.10),
+            scale=Scale(x=0.10, y=0.10, z=0.10),
         )
         for color in apple.bodies[0].visual.shapes:
             color.color = Color.RED()
@@ -1247,7 +1269,7 @@ def kitchen_environment_fixture():
             world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
                 x=1, y=0.5, z=0.55
             ),
-            scale=Scale(0.10, 0.10, 0.10),
+            scale=Scale(x=0.10, y=0.10, z=0.10),
         )
         for color in orange.bodies[0].visual.shapes:
             color.color = Color.ORANGE()
@@ -1258,7 +1280,7 @@ def kitchen_environment_fixture():
             world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
                 x=1, y=0.6, z=0.75
             ),
-            scale=Scale(0.10, 0.10, 0.60),
+            scale=Scale(x=0.10, y=0.10, z=0.60),
         )
         for color in banana1.bodies[0].visual.shapes:
             color.color = Color.YELLOW()
@@ -1269,7 +1291,7 @@ def kitchen_environment_fixture():
             world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
                 x=1, y=1, z=2.6
             ),
-            scale=Scale(0.05, 0.05, 0.20),
+            scale=Scale(x=0.05, y=0.05, z=0.20),
         )
         for color in carrot.bodies[0].visual.shapes:
             color.color = Color.ORANGE()
@@ -1280,7 +1302,7 @@ def kitchen_environment_fixture():
             world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
                 x=1, y=1.5, z=2.55
             ),
-            scale=Scale(0.15, 0.15, 0.10),
+            scale=Scale(x=0.15, y=0.15, z=0.10),
         )
         for color in lettuce.bodies[0].visual.shapes:
             color.color = Color.GREEN()
@@ -1291,15 +1313,15 @@ def kitchen_environment_fixture():
             world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
                 x=10, y=10, z=10
             ),
-            scale=Scale(0.20, 0.05, 0.05),
+            scale=Scale(x=0.20, y=0.05, z=0.05),
         )
         for color in banana.bodies[0].visual.shapes:
             color.color = Color.YELLOW()
 
     fake_robot = Cylinder(width=0.45, height=1.5)
-    shape_geometry = ShapeCollection([fake_robot])
+    shape_geometry = ShapeCollection(shapes=[fake_robot])
     fake_robot_body = Body(
-        name=PrefixedName("base_link_body"),
+        name=PrefixedName(name="base_link_body"),
         collision=shape_geometry,
         visual=shape_geometry,
     )
@@ -1313,6 +1335,6 @@ def kitchen_environment_fixture():
 
     with world.modify_world():
         for conn in all_elements_connections:
-            world.add_connection(conn)
+            world.add_connection(connection=conn)
 
     return world

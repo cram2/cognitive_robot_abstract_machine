@@ -397,7 +397,7 @@ class SubtreeRebuild(NodeRebuild, TrialBuilder):
         """
         :return: `value` referring to :attr:`_world`.
         """
-        return self._world.rebind_world_entities(value)
+        return self._world.rebind_world_entities(obj=value)
 
     def __str__(self) -> str:
         candidates = " beside ".join(map(str, self.candidates.values()))
@@ -537,7 +537,7 @@ class ActionTrial:
             finally:
                 # Undo the model changes before leaving the reset context restores the
                 # state, which needs the degrees of freedom it was snapshotted with.
-                world.rollback_to_version(version)
+                world.rollback_to_version(version=version)
 
     def _trial_executor(self, *, world: World) -> PlanExecutor:
         """
@@ -551,7 +551,7 @@ class ActionTrial:
             context=StatechartContext.with_extensions(
                 world=world,
                 extensions=[
-                    world.rebind_world_entities(extension)
+                    world.rebind_world_entities(obj=extension)
                     for extension in self.executor.supplied_context_extensions
                 ],
             ),
@@ -619,7 +619,7 @@ class ActionTrial:
         with self._copied_world.modify_world():
             for block in modification_blocks[self._replayed_modification_blocks :]:
                 block.update_references_for_world_and_apply(world=self._copied_world)
-            self._copied_world.state.merge_state(self.world.state)
+            self._copied_world.state.merge_state(other=self.world.state)
         self._replayed_modification_blocks = len(modification_blocks)
 
     def discard(self) -> None:

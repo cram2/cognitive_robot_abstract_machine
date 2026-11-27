@@ -47,8 +47,8 @@ world = World()
 
 # Create some bodies
 root = Body(name=PrefixedName(name="root", prefix="world"))
-base = Body(name=PrefixedName("base"))
-link = Body(name=PrefixedName("link"))
+base = Body(name=PrefixedName(name="base"))
+link = Body(name=PrefixedName(name="link"))
 
 # Group structural modifications so validation happens after the block
 with world.modify_world():
@@ -56,21 +56,21 @@ with world.modify_world():
     #    This will automatically create 7 passive DoFs (x, y, z, qx, qy, qz, qw)
     #    and register them in the world's state.
     c_root_base = Connection6DoF.create_with_dofs(parent=root, child=base, world=world)
-    world.add_connection(c_root_base)
+    world.add_connection(connection=c_root_base)
 
     # 2) Create a custom DoF and use it in an active revolute ScrewAxisConnection
     #    from base -> link around the Z axis of the base frame.
     #    We add the DoF first, then reference it from the connection so the
     #    world's DoF set and the connection's DoFs match.
-    dof = DegreeOfFreedom(name=PrefixedName("joint_z"))
-    world.add_degree_of_freedom(dof)
+    dof = DegreeOfFreedom(name=PrefixedName(name="joint_z"))
+    world.add_degree_of_freedom(dof=dof)
     c_base_link = ScrewAxisConnection(
         screw_axis=ScrewAxis(rotation_per_unit_position=Vector3.Z(reference_frame=base)),
         parent=base,
         child=link,
         raw_dof=dof,
         )
-    world.add_connection(c_base_link)
+    world.add_connection(connection=c_base_link)
 
 print(f"Bodies after additions: {[str(b.name) for b in world.bodies]}")
 print(f"Connections after additions: {[str(c.name) for c in world.connections]}")
@@ -82,8 +82,8 @@ To keep the world a connected tree, we also have to remove the now-disconnected 
 
 ```{code-cell} ipython3
 with world.modify_world():
-    world.remove_connection(c_base_link)
-    world.remove_kinematic_structure_entity(link)
+    world.remove_connection(connection=c_base_link)
+    world.remove_kinematic_structure_entity(kinematic_structure_entity=link)
 
 # After the modification block, the world is validated automatically.
 print(f"Final bodies: {[str(b.name) for b in world.bodies]}")
@@ -97,7 +97,7 @@ If you ever feel the need to manage a degree of freedom manually you can do it l
 
 ```{code-cell} ipython3
 with world.modify_world():
-    dof = DegreeOfFreedom(name=PrefixedName("my_dof"))
-    world.add_degree_of_freedom(dof)
-    world.remove_degree_of_freedom(dof)
+    dof = DegreeOfFreedom(name=PrefixedName(name="my_dof"))
+    world.add_degree_of_freedom(dof=dof)
+    world.remove_degree_of_freedom(dof=dof)
 ```

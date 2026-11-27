@@ -40,7 +40,7 @@ TConnection = TypeVar("TConnection", bound=Connection)
 # %% connection specifications
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ConnectionSpecification(
     NamedSpecification, Generic[TConnection], SubClassSafeGeneric, ABC
 ):
@@ -111,7 +111,7 @@ class ConnectionSpecification(
         return result
 
     def parent_T_connection_for_child_at(
-        self, parent_T_child: HomogeneousTransformationMatrix
+        self, *, parent_T_child: HomogeneousTransformationMatrix
     ) -> HomogeneousTransformationMatrix:
         """
         Compute where the connection frame has to sit so that the child is at
@@ -126,7 +126,9 @@ class ConnectionSpecification(
             (parent_T_child @ self.connection_T_child.inverse()).evaluate()
         )
 
-    def reconnect(self, world: World, child: KinematicStructureEntity) -> TConnection:
+    def reconnect(
+        self, *, world: World, child: KinematicStructureEntity
+    ) -> TConnection:
         """
         Replace the connection ``child`` hangs from with one built from this
         specification, under the same parent.
@@ -144,21 +146,21 @@ class ConnectionSpecification(
         replaced_connection = child.parent_connection
         parent = replaced_connection.parent
         parent_T_child = world.compute_forward_kinematics(
-            parent, child, enable_unsafe_inside_world_block=True
+            root=parent, tip=child, enable_unsafe_inside_world_block=True
         )
         with world.modify_world():
-            world.remove_connection(replaced_connection)
+            world.remove_connection(connection=replaced_connection)
             connection = self.connect(
-                world,
+                world=world,
                 child=child,
                 parent=parent,
                 parent_T_connection=self.parent_T_connection_for_child_at(
-                    parent_T_child
+                    parent_T_child=parent_T_child
                 ),
             )
             placed_connection = connection.copy_with_new_parent(
-                parent,
-                HomogeneousTransformationMatrix(
+                new_parent=parent,
+                parent_T_connection_expression=HomogeneousTransformationMatrix(
                     (
                         parent_T_child
                         @ connection.origin_expression.inverse()
@@ -166,12 +168,13 @@ class ConnectionSpecification(
                     ).evaluate()
                 ),
             )
-            world.remove_connection(connection)
-            world.add_connection(placed_connection)
+            world.remove_connection(connection=connection)
+            world.add_connection(connection=placed_connection)
         return placed_connection
 
     def connect(
         self,
+        *,
         world: World,
         child: KinematicStructureEntity,
         parent: KinematicStructureEntity | None = None,
@@ -217,7 +220,7 @@ class ConnectionSpecification(
                 world=world,
                 parent=parent,
                 child=child,
-                name=self._resolved_name(name),
+                name=self._resolved_name(name=name),
                 parent_T_connection_expression=parent_T_connection,
                 connection_T_child_expression=(
                     self.connection_T_child.copy_with_new_reference_frames(
@@ -228,11 +231,11 @@ class ConnectionSpecification(
                 ),
                 **self._create_with_dofs_kwargs(),
             )
-            world.add_connection(connection)
+            world.add_connection(connection=connection)
         return connection
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FixedConnectionSpecification(ConnectionSpecification[FixedConnection]):
     """
     Declares a rigid
@@ -243,7 +246,7 @@ class FixedConnectionSpecification(ConnectionSpecification[FixedConnection]):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Connection6DoFSpecification(ConnectionSpecification[Connection6DoF]):
     """
     Declares a free-floating
@@ -254,7 +257,7 @@ class Connection6DoFSpecification(ConnectionSpecification[Connection6DoF]):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ActiveConnection1DOFSpecification(ConnectionSpecification[TConnection], ABC):
     """
     Specification for a single-DoF active connection.
@@ -305,7 +308,7 @@ class ScrewAxisConnectionSpecification(
 # %% connection specifications with endpoints
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ConnectionSpecificationWithEndpoints:
     """
     A connection specification together with the two bodies it joins and where it sits
@@ -335,7 +338,7 @@ class ConnectionSpecificationWithEndpoints:
     The pose of the joint relative to the parent body.
     """
 
-    def connect(self, world: World) -> Connection:
+    def connect(self, *, world: World) -> Connection:
         """
         Add the connection this joint becomes to ``world``.
 
@@ -343,7 +346,7 @@ class ConnectionSpecificationWithEndpoints:
         :return: The added connection.
         """
         return self.connection_specification.connect(
-            world,
+            world=world,
             child=self.child,
             parent=self.parent,
             parent_T_connection=self.parent_T_connection,

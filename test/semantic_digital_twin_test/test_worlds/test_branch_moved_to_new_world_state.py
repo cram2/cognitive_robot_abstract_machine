@@ -27,19 +27,21 @@ def door_world() -> World:
     A world whose root carries a branch made of a fixed frame and a door hinged to it.
     """
     world = World()
-    branch_root = Body(name=PrefixedName("branch_root"))
+    branch_root = Body(name=PrefixedName(name="branch_root"))
     with world.modify_world():
         world.add_connection(
-            FixedConnection(parent=Body(name=PrefixedName("root")), child=branch_root)
+            connection=FixedConnection(
+                parent=Body(name=PrefixedName(name="root")), child=branch_root
+            )
         )
         world.add_connection(
-            ScrewAxisConnection.create_with_dofs(
+            connection=ScrewAxisConnection.create_with_dofs(
                 screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
                     axis=Vector3.Z()
                 ),
                 world=world,
                 parent=branch_root,
-                child=Body(name=PrefixedName("door")),
+                child=Body(name=PrefixedName(name="door")),
             )
         )
     return world
@@ -52,7 +54,9 @@ def door_hinge(door_world: World) -> ScrewAxisConnection:
     """
     return [
         connection
-        for connection in door_world.get_connections_by_type(ScrewAxisConnection)
+        for connection in door_world.get_connections_by_type(
+            connection_type=ScrewAxisConnection
+        )
         if connection.behaves_like_a_revolute_connection
     ][0]
 
@@ -68,9 +72,14 @@ def test_branch_moved_to_new_world_keeps_its_joint_positions(
     """
     door_hinge.position = 0.5
 
-    new_world = door_world.move_branch_to_new_world(door_hinge.parent)
+    new_world = door_world.move_branch_to_new_world(new_root=door_hinge.parent)
 
-    assert new_world.get_connection(door_hinge.parent, door_hinge.child).position == 0.5
+    assert (
+        new_world.get_connection(
+            parent=door_hinge.parent, child=door_hinge.child
+        ).position
+        == 0.5
+    )
 
 
 def test_branch_moved_to_new_world_keeps_its_joint_velocities(
@@ -81,9 +90,14 @@ def test_branch_moved_to_new_world_keeps_its_joint_velocities(
     """
     door_hinge.velocity = 0.3
 
-    new_world = door_world.move_branch_to_new_world(door_hinge.parent)
+    new_world = door_world.move_branch_to_new_world(new_root=door_hinge.parent)
 
-    assert new_world.get_connection(door_hinge.parent, door_hinge.child).velocity == 0.3
+    assert (
+        new_world.get_connection(
+            parent=door_hinge.parent, child=door_hinge.child
+        ).velocity
+        == 0.3
+    )
 
 
 def test_branch_moved_to_new_world_keeps_a_floating_body_orientation():
@@ -92,18 +106,20 @@ def test_branch_moved_to_new_world_keeps_a_floating_body_orientation():
     arriving with the all-zero quaternion, which is not a rotation.
     """
     world = World()
-    branch_root = Body(name=PrefixedName("branch_root"))
+    branch_root = Body(name=PrefixedName(name="branch_root"))
     with world.modify_world():
         world.add_connection(
-            FixedConnection(parent=Body(name=PrefixedName("root")), child=branch_root)
+            connection=FixedConnection(
+                parent=Body(name=PrefixedName(name="root")), child=branch_root
+            )
         )
         floating = Connection6DoF.create_with_dofs(
-            world=world, parent=branch_root, child=Body(name=PrefixedName("box"))
+            world=world, parent=branch_root, child=Body(name=PrefixedName(name="box"))
         )
-        world.add_connection(floating)
+        world.add_connection(connection=floating)
     positions_before_move = [world.state[dof.id].position for dof in floating.dofs]
 
-    new_world = world.move_branch_to_new_world(branch_root)
+    new_world = world.move_branch_to_new_world(new_root=branch_root)
 
     assert [
         new_world.state[dof.id].position for dof in floating.dofs

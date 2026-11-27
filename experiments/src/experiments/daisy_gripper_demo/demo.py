@@ -137,7 +137,9 @@ class DAiSyGripperDemonstration(RobotDemonstration):
         """
         return [
             RobotAccess(
-                robot=world.get_semantic_annotations_by_type(self.used_robot)[0]
+                robot=world.get_semantic_annotations_by_type(
+                    semantic_annotation_type=self.used_robot
+                )[0]
             )
         ]
 
@@ -181,7 +183,9 @@ class DAiSyGripperDemonstration(RobotDemonstration):
             configuration of `state`, and waiting :attr:`pause_after_motion` after it.
         """
         moves = [
-            SetGripperAction(gripper_configuration=gripper.default_configuration(state))
+            SetGripperAction(
+                gripper_configuration=gripper.default_configuration(state_type=state)
+            )
             for gripper in grippers
         ]
         return [

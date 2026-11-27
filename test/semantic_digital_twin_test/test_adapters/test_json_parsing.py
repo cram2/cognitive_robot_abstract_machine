@@ -58,23 +58,23 @@ from semantic_digital_twin.world_description.world_entity import (
 
 def test_body_json_serialization():
     world = World()
-    body = Body(name=PrefixedName("body"))
+    body = Body(name=PrefixedName(name="body"))
     collision = [
         Box(origin=HomogeneousTransformationMatrix.from_xyz_rpy(0, 1, 0, 0, 0, 1, body))
     ]
-    body.collision = ShapeCollection(collision, reference_frame=body)
+    body.collision = ShapeCollection(shapes=collision, reference_frame=body)
 
     with world.modify_world():
-        world.add_kinematic_structure_entity(body)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=body)
 
     other_world = deepcopy(world)
 
     json_data = body.to_json()
-    tracker = WorldEntityWithIDKwargsTracker.from_world(other_world)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world=other_world)
     body2 = Body.from_json(data=json_data, **tracker.create_kwargs())
 
     assert body2.index is not None
-    assert body2 is other_world.get_world_entity_with_id_by_id(body2.id)
+    assert body2 is other_world.get_world_entity_with_id_by_id(id=body2.id)
 
     for c1 in body.collision:
         for c2 in body2.collision:
@@ -106,8 +106,8 @@ def test_dof_hardware_interface_serialization():
 
 
 def test_transformation_matrix_json_serialization():
-    body = Body(name=PrefixedName("body"))
-    body2 = Body(name=PrefixedName("body2"))
+    body = Body(name=PrefixedName(name="body"))
+    body2 = Body(name=PrefixedName(name="body2"))
     transform = HomogeneousTransformationMatrix.from_xyz_rpy(
         x=1, y=2, z=3, roll=1, pitch=2, yaw=3, reference_frame=body, child_frame=body2
     )
@@ -123,7 +123,7 @@ def test_transformation_matrix_json_serialization():
 
 
 def test_point3_json_serialization():
-    body = Body(name=PrefixedName("body"))
+    body = Body(name=PrefixedName(name="body"))
     point = Point3(1, 2, 3, reference_frame=body)
     json_data = point.to_json()
     kwargs = {}
@@ -136,7 +136,7 @@ def test_point3_json_serialization():
 
 
 def test_KinematicStructureEntityNotInKwargs():
-    body = Body(name=PrefixedName("body"))
+    body = Body(name=PrefixedName(name="body"))
     point = Point3(1, 2, 3, reference_frame=body)
     json_data = point.to_json()
     kwargs = {}
@@ -145,10 +145,10 @@ def test_KinematicStructureEntityNotInKwargs():
 
 
 def test_KinematicStructureEntityNotInKwargs2():
-    body = Body(name=PrefixedName("body"))
+    body = Body(name=PrefixedName(name="body"))
     point = Point3(1, 2, 3, reference_frame=body)
     json_data = point.to_json()
-    tracker = WorldEntityWithIDKwargsTracker.from_world(World())
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world=World())
     with pytest.raises(WorldEntityWithIDNotInKwargs) as raised:
         Point3.from_json(data=json_data, **tracker.create_kwargs())
 
@@ -161,12 +161,12 @@ def test_an_entity_a_reference_cannot_be_resolved_to_is_named():
     A reference says which entity it means, so that a world missing that entity reports
     more than an id nobody can look up.
     """
-    parent = Body(name=PrefixedName("cable_post"))
-    child = Body(name=PrefixedName("cable_hanger"))
+    parent = Body(name=PrefixedName(name="cable_post"))
+    child = Body(name=PrefixedName(name="cable_hanger"))
     connection = FixedConnection(parent=parent, child=child)
     json_data = connection.to_json()
 
-    tracker = WorldEntityWithIDKwargsTracker.from_world(World())
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world=World())
     tracker.add(key=child.id, tracked_object=child)
     with pytest.raises(WorldEntityWithIDNotInKwargs) as raised:
         FixedConnection.from_json(data=json_data, **tracker.create_kwargs())
@@ -180,12 +180,12 @@ def test_a_reference_resolves_to_the_entity_it_names():
     The name a reference carries is context for a reader; the entity itself is still
     found through the id it was written with.
     """
-    parent = Body(name=PrefixedName("cable_post"))
-    child = Body(name=PrefixedName("cable_hanger"))
+    parent = Body(name=PrefixedName(name="cable_post"))
+    child = Body(name=PrefixedName(name="cable_hanger"))
     connection = FixedConnection(parent=parent, child=child)
     json_data = connection.to_json()
 
-    tracker = WorldEntityWithIDKwargsTracker.from_world(World())
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world=World())
     tracker.add(key=parent.id, tracked_object=parent)
     tracker.add(key=child.id, tracked_object=child)
     parsed_connection = FixedConnection.from_json(
@@ -197,7 +197,7 @@ def test_a_reference_resolves_to_the_entity_it_names():
 
 
 def test_an_entity_written_as_a_reference_carries_only_its_id_and_name():
-    body = Body(name=PrefixedName("cable_post"))
+    body = Body(name=PrefixedName(name="cable_post"))
 
     json_data = to_json(body, **WorldEntityReferenceWriter().create_kwargs())
 
@@ -206,20 +206,20 @@ def test_an_entity_written_as_a_reference_carries_only_its_id_and_name():
 
 def test_an_entity_written_as_a_reference_is_read_as_the_entity_of_the_world():
     world = World()
-    body = Body(name=PrefixedName("cable_post"))
+    body = Body(name=PrefixedName(name="cable_post"))
     with world.modify_world():
-        world.add_kinematic_structure_entity(body)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=body)
     json_data = json.loads(
         json.dumps(to_json(body, **WorldEntityReferenceWriter().create_kwargs()))
     )
 
-    tracker = WorldEntityWithIDKwargsTracker.from_world(world)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world=world)
 
     assert from_json(json_data, **tracker.create_kwargs()) is body
 
 
 def test_a_reference_to_an_entity_cannot_be_read_without_a_world():
-    body = Body(name=PrefixedName("cable_post"))
+    body = Body(name=PrefixedName(name="cable_post"))
     json_data = to_json(body, **WorldEntityReferenceWriter().create_kwargs())
 
     with pytest.raises(MissingWorldError):
@@ -227,10 +227,10 @@ def test_a_reference_to_an_entity_cannot_be_read_without_a_world():
 
 
 def test_a_reference_to_an_entity_the_world_lacks_names_the_entity():
-    body = Body(name=PrefixedName("cable_post"))
+    body = Body(name=PrefixedName(name="cable_post"))
     json_data = to_json(body, **WorldEntityReferenceWriter().create_kwargs())
 
-    tracker = WorldEntityWithIDKwargsTracker.from_world(World())
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world=World())
     with pytest.raises(WorldEntityWithIDNotInKwargs) as raised:
         from_json(json_data, **tracker.create_kwargs())
 
@@ -240,10 +240,12 @@ def test_a_reference_to_an_entity_the_world_lacks_names_the_entity():
 
 def test_a_connection_written_as_a_reference_carries_only_its_id_and_name():
     world = World()
-    parent = Body(name=PrefixedName("cable_post"))
-    child = Body(name=PrefixedName("cable"))
+    parent = Body(name=PrefixedName(name="cable_post"))
+    child = Body(name=PrefixedName(name="cable"))
     with world.modify_world():
-        world.add_connection(connection := FixedConnection(parent=parent, child=child))
+        world.add_connection(
+            connection=(connection := FixedConnection(parent=parent, child=child))
+        )
 
     json_data = to_json(connection, **WorldEntityReferenceWriter().create_kwargs())
 
@@ -252,30 +254,32 @@ def test_a_connection_written_as_a_reference_carries_only_its_id_and_name():
 
 def test_a_connection_written_as_a_reference_is_read_as_the_connection_of_the_world():
     world = World()
-    parent = Body(name=PrefixedName("cable_post"))
-    child = Body(name=PrefixedName("cable"))
+    parent = Body(name=PrefixedName(name="cable_post"))
+    child = Body(name=PrefixedName(name="cable"))
     with world.modify_world():
-        world.add_connection(connection := FixedConnection(parent=parent, child=child))
+        world.add_connection(
+            connection=(connection := FixedConnection(parent=parent, child=child))
+        )
     json_data = json.loads(
         json.dumps(to_json(connection, **WorldEntityReferenceWriter().create_kwargs()))
     )
 
-    tracker = WorldEntityWithIDKwargsTracker.from_world(world)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world=world)
 
     assert from_json(json_data, **tracker.create_kwargs()) is connection
 
 
 def test_world_entity_missing_from_the_world_is_an_untracked_object():
-    body = Body(name=PrefixedName("body"))
+    body = Body(name=PrefixedName(name="body"))
     point = Point3(1, 2, 3, reference_frame=body)
     json_data = point.to_json()
-    tracker = WorldEntityWithIDKwargsTracker.from_world(World())
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world=World())
     with pytest.raises(UntrackedObjectError):
         Point3.from_json(data=json_data, **tracker.create_kwargs())
 
 
 def test_vector3_json_serialization():
-    body = Body(name=PrefixedName("body"))
+    body = Body(name=PrefixedName(name="body"))
     vector = Vector3(1, 2, 3, reference_frame=body)
     json_data = vector.to_json()
     kwargs = {}
@@ -288,7 +292,7 @@ def test_vector3_json_serialization():
 
 
 def test_quaternion_json_serialization():
-    body = Body(name=PrefixedName("body"))
+    body = Body(name=PrefixedName(name="body"))
     quaternion = Quaternion(1, 0, 0, 0, reference_frame=body)
     json_data = quaternion.to_json()
     kwargs = {}
@@ -301,7 +305,7 @@ def test_quaternion_json_serialization():
 
 
 def test_rotation_matrix_json_serialization():
-    body = Body(name=PrefixedName("body"))
+    body = Body(name=PrefixedName(name="body"))
     rotation = RotationMatrix.from_rpy(roll=1, pitch=2, yaw=3, reference_frame=body)
     json_data = rotation.to_json()
     kwargs = {}
@@ -314,7 +318,7 @@ def test_rotation_matrix_json_serialization():
 
 
 def test_pose_json_serialization():
-    body = Body(name=PrefixedName("body"))
+    body = Body(name=PrefixedName(name="body"))
     pose = Pose.from_xyz_rpy(
         x=4, y=5, z=7, roll=1, pitch=2, yaw=3, reference_frame=body
     )
@@ -330,11 +334,11 @@ def test_pose_json_serialization():
 
 def test_connection_json_serialization_with_world():
     world = World()
-    body = Body(name=PrefixedName("body"))
-    body2 = Body(name=PrefixedName("body2"))
+    body = Body(name=PrefixedName(name="body"))
+    body2 = Body(name=PrefixedName(name="body2"))
     with world.modify_world():
-        world.add_kinematic_structure_entity(body)
-        world.add_kinematic_structure_entity(body2)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=body)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=body2)
         c = FixedConnection(
             parent=body,
             child=body2,
@@ -342,9 +346,9 @@ def test_connection_json_serialization_with_world():
                 x=1, roll=2, reference_frame=body, child_frame=body2
             ),
         )
-        world.add_connection(c)
+        world.add_connection(connection=c)
     json_data = c.to_json()
-    tracker = WorldEntityWithIDKwargsTracker.from_world(world)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world=world)
     c2 = FixedConnection.from_json(data=json_data, **tracker.create_kwargs())
     assert c == c2
     assert c._world != c2._world
@@ -366,12 +370,12 @@ def test_connection_json_serialization_with_world():
 
 def test_screw_connection_json_serialization_with_world():
     world = World()
-    body = Body(name=PrefixedName("body"))
-    body2 = Body(name=PrefixedName("body2"))
+    body = Body(name=PrefixedName(name="body"))
+    body2 = Body(name=PrefixedName(name="body2"))
     screw_pitch = 0.005
     with world.modify_world():
-        world.add_kinematic_structure_entity(body)
-        world.add_kinematic_structure_entity(body2)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=body)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=body2)
         connection = ScrewAxisConnection.create_with_dofs(
             world=world,
             parent=body,
@@ -385,9 +389,9 @@ def test_screw_connection_json_serialization_with_world():
                 x=1, reference_frame=body, child_frame=body2
             ),
         )
-        world.add_connection(connection)
+        world.add_connection(connection=connection)
     json_data = connection.to_json()
-    tracker = WorldEntityWithIDKwargsTracker.from_world(world)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world=world)
     restored_connection = ScrewAxisConnection.from_json(
         data=json_data, **tracker.create_kwargs()
     )
@@ -407,7 +411,11 @@ def test_json_serialization_with_mesh():
     """
     A body with a mesh keeps its geometry through a JSON round-trip.
     """
-    body: Body = STLParser("package://iai_objects/objects/milk.stl").create_world().root
+    body: Body = (
+        STLParser(file_path="package://iai_objects/objects/milk.stl")
+        .create_world()
+        .root
+    )
 
     json_data = to_json(body)
     body2 = from_json(json_data)
@@ -435,11 +443,11 @@ def _world_with_two_equally_named_connections() -> tuple[
     Merging two instances of the same robot description produces exactly this, since
     every entity is named after the description it was parsed from.
     """
-    world = World.create_with_root_body("root")
+    world = World.create_with_root_body(root_body_name="root")
     connections = []
     for index in range(2):
         with world.modify_world():
-            child = Body(name=PrefixedName("link", prefix=f"branch_{index}"))
+            child = Body(name=PrefixedName(name="link", prefix=f"branch_{index}"))
             connection = ScrewAxisConnection.create_with_dofs(
                 screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
                     axis=Vector3.Z()
@@ -447,9 +455,9 @@ def _world_with_two_equally_named_connections() -> tuple[
                 world=world,
                 parent=world.root,
                 child=child,
-                name=PrefixedName("shared_joint"),
+                name=PrefixedName(name="shared_joint"),
             )
-            world.add_connection(connection)
+            world.add_connection(connection=connection)
         connections.append(connection)
     return world, connections[0], connections[1]
 
@@ -459,10 +467,10 @@ def test_joint_state_resolves_the_connection_it_was_built_from():
         _world_with_two_equally_named_connections()
     )
     joint_state = JointState.from_mapping(
-        mapping={second_connection: 0.5}, name=PrefixedName("state")
+        mapping={second_connection: 0.5}, name=PrefixedName(name="state")
     )
 
-    tracker = WorldEntityWithIDKwargsTracker.from_world(world)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world=world)
     reconstructed = JointState.from_json(
         data=joint_state.to_json(), **tracker.create_kwargs()
     )
@@ -508,11 +516,11 @@ def test_a_spatial_type_carries_the_frame_it_is_expressed_in():
     A spatial type means nothing without the frame it is expressed in, so the frame
     travels with it and is resolved back to the entity of the reading world.
     """
-    body = Body(name=PrefixedName("reference"))
+    body = Body(name=PrefixedName(name="reference"))
     point = Point3(1.0, 2.0, 3.0, reference_frame=body)
     payload = point.to_json()
 
-    tracker = WorldEntityWithIDKwargsTracker.from_world(World())
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world=World())
     tracker.add(key=body.id, tracked_object=body)
     restored = from_json(payload, **tracker.create_kwargs())
 
@@ -527,10 +535,10 @@ def test_a_degree_of_freedom_survives_a_json_round_trip():
     limits = DegreeOfFreedomLimits.from_position_range_and_speed(
         lower_position=-1.5, upper_position=1.5
     )
-    degree_of_freedom = DegreeOfFreedom(name=PrefixedName("joint"), limits=limits)
+    degree_of_freedom = DegreeOfFreedom(name=PrefixedName(name="joint"), limits=limits)
     payload = degree_of_freedom.to_json()
 
-    tracker = WorldEntityWithIDKwargsTracker.from_world(World())
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world=World())
     restored = from_json(payload, **tracker.create_kwargs())
 
     assert restored.id == degree_of_freedom.id
@@ -597,7 +605,7 @@ def symbolic_pose2d(variable: FloatVariable, frame: Body) -> Pose2D:
 def test_a_spatial_type_over_a_variable_survives_a_json_round_trip(
     build_spatial_type,
 ):
-    frame = Body(name=PrefixedName("reference"))
+    frame = Body(name=PrefixedName(name="reference"))
     variable = FloatVariable(name="muh")
     spatial_type = build_spatial_type(variable, frame)
     tracker = WorldEntityWithIDKwargsTracker()
@@ -616,8 +624,8 @@ def test_a_spatial_type_over_a_variable_survives_a_json_round_trip(
 
 
 def test_a_transformation_over_a_variable_keeps_its_child_frame():
-    reference_frame = Body(name=PrefixedName("reference"))
-    child_frame = Body(name=PrefixedName("child"))
+    reference_frame = Body(name=PrefixedName(name="reference"))
+    child_frame = Body(name=PrefixedName(name="child"))
     # the transformation does not keep its variable alive, so the test has to
     variable = FloatVariable(name="muh")
     transformation = HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -642,9 +650,9 @@ def test_a_degree_of_freedom_variable_is_read_as_the_variable_of_the_reading_wor
     payload = to_json(degree_of_freedom.variables[derivative])
     world_copy = deepcopy(cylinder_bot_world)
     degree_of_freedom_copy = world_copy.get_degree_of_freedom_by_id(
-        degree_of_freedom.id
+        id=degree_of_freedom.id
     )
-    tracker = WorldEntityWithIDKwargsTracker.from_world(world_copy)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world=world_copy)
 
     restored = from_json(payload, **tracker.create_kwargs())
 
@@ -655,17 +663,17 @@ def test_a_forward_kinematics_expression_is_read_over_the_reading_world(
     cylinder_bot_world,
 ):
     root = cylinder_bot_world.root
-    tip = cylinder_bot_world.get_body_by_name("bot")
+    tip = cylinder_bot_world.get_body_by_name(name="bot")
     for position, degree_of_freedom in enumerate(
         cylinder_bot_world.active_degrees_of_freedom, start=1
     ):
         cylinder_bot_world.state[degree_of_freedom.id].position = position / 10
     cylinder_bot_world.notify_state_change()
     payload = to_json(
-        cylinder_bot_world.compose_forward_kinematics_expression(root, tip)
+        cylinder_bot_world.compose_forward_kinematics_expression(root=root, tip=tip)
     )
     world_copy = deepcopy(cylinder_bot_world)
-    tracker = WorldEntityWithIDKwargsTracker.from_world(world_copy)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world=world_copy)
 
     restored = from_json(payload, **tracker.create_kwargs())
 
@@ -677,6 +685,6 @@ def test_a_forward_kinematics_expression_is_read_over_the_reading_world(
     np.testing.assert_allclose(
         restored.evaluate(),
         world_copy.compute_forward_kinematics_np(
-            world_copy.root, world_copy.get_body_by_name("bot")
+            root=world_copy.root, tip=world_copy.get_body_by_name(name="bot")
         ),
     )

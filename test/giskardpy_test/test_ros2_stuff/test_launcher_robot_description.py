@@ -77,7 +77,7 @@ def published_robot_description(init_background_node) -> Iterator[str]:
     """
     description = Path(
         PackageUriResolver().resolve(
-            "package://iai_objects/urdf/simple_two_arm_robot.urdf"
+            uri="package://iai_objects/urdf/simple_two_arm_robot.urdf"
         )
     ).read_text()
     topic = inspect.signature(RosGraph.robot_description).parameters["topic"].default
@@ -135,6 +135,6 @@ def test_a_standalone_launcher_uses_the_description_its_robot_class_declares(
     giskard = launcher.create_giskard(background_node.get_node())
 
     assert urdfs_read_by(giskard.world_source) == [
-        URDFParser.from_file(robot_class.get_ros_file_path()).urdf
+        URDFParser.from_file(file_path=robot_class.get_ros_file_path()).urdf
     ]
     assert robot_classes_of(giskard.world_source) == [robot_class]

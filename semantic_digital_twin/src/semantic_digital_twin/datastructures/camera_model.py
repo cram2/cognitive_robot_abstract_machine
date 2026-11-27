@@ -29,7 +29,7 @@ from semantic_digital_twin.exceptions import (
 # %% Projection models
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CameraModel(ABC):
     """
     Describe how a camera maps viewing rays to an image.
@@ -50,7 +50,7 @@ class CameraModel(ABC):
         """
 
     @staticmethod
-    def _validate_field_of_view(field_of_view: FieldOfView) -> None:
+    def _validate_field_of_view(*, field_of_view: FieldOfView) -> None:
         """
         Validate that both viewing angles lie between zero and pi.
 
@@ -70,7 +70,7 @@ class CameraModel(ABC):
             )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FieldOfViewCameraModel(CameraModel):
     """
     Describe an ideal camera from its angular extent and image resolution.
@@ -92,7 +92,7 @@ class FieldOfViewCameraModel(CameraModel):
         """
         Validate that both viewing angles describe a physical camera.
         """
-        self._validate_field_of_view(self.angular_extent)
+        self._validate_field_of_view(field_of_view=self.angular_extent)
 
     @property
     def field_of_view(self) -> FieldOfView:
@@ -103,7 +103,7 @@ class FieldOfViewCameraModel(CameraModel):
         return self.image_resolution
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PinholeCameraModel(CameraModel):
     """
     Describe a calibrated pinhole projection for one image stream.
@@ -174,6 +174,7 @@ class PinholeCameraModel(CameraModel):
     @classmethod
     def from_field_of_view(
         cls,
+        *,
         resolution: CameraResolution,
         field_of_view: FieldOfView,
         distortion: CameraDistortion | None = None,
@@ -186,7 +187,7 @@ class PinholeCameraModel(CameraModel):
         :param distortion: Lens distortion associated with the image.
         :return: Centered pinhole calibration matching the requested extent.
         """
-        cls._validate_field_of_view(field_of_view)
+        cls._validate_field_of_view(field_of_view=field_of_view)
         focal_length_x = resolution.width / (
             2.0 * math.tan(field_of_view.horizontal_angle / 2.0)
         )
@@ -240,7 +241,7 @@ class PinholeCameraModel(CameraModel):
             ]
         )
 
-    def scaled(self, scale_x: float, scale_y: float) -> PinholeCameraModel:
+    def scaled(self, *, scale_x: float, scale_y: float) -> PinholeCameraModel:
         """
         Return the calibration for an image scaled along both axes.
 
@@ -296,7 +297,7 @@ class CameraDistortionModel(StrEnum):
         """
         Return the number of coefficients defined by this model.
         """
-        return CameraDistortion.get_type_for_model(self).coefficient_count
+        return CameraDistortion.get_type_for_model(model=self).coefficient_count
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -340,14 +341,14 @@ class CameraDistortion(ABC):
     @classmethod
     @abstractmethod
     def _from_ordered_coefficients(
-        cls, ordered_coefficients: tuple[float, ...]
+        cls, *, ordered_coefficients: tuple[float, ...]
     ) -> Self:
         """
         Construct distortion from coefficients with a validated count and ROS order.
         """
 
     @staticmethod
-    def get_type_for_model(model: CameraDistortionModel) -> type[CameraDistortion]:
+    def get_type_for_model(*, model: CameraDistortionModel) -> type[CameraDistortion]:
         """
         Find the concrete distortion implementation declaring the model identifier.
 
@@ -369,6 +370,7 @@ class CameraDistortion(ABC):
 
     @staticmethod
     def from_ordered_coefficients(
+        *,
         model: CameraDistortionModel,
         coefficients: Sequence[float],
     ) -> CameraDistortion:
@@ -381,7 +383,7 @@ class CameraDistortion(ABC):
         :raises InvalidCameraDistortionError: If the coefficient count is invalid or the
             model has no unique concrete implementation.
         """
-        distortion_type = CameraDistortion.get_type_for_model(model)
+        distortion_type = CameraDistortion.get_type_for_model(model=model)
         ordered_coefficients = tuple(coefficients)
         if len(ordered_coefficients) != distortion_type.coefficient_count:
             raise InvalidCameraDistortionError(
@@ -391,7 +393,9 @@ class CameraDistortion(ABC):
                     f"{len(ordered_coefficients)}"
                 ),
             )
-        return distortion_type._from_ordered_coefficients(ordered_coefficients)
+        return distortion_type._from_ordered_coefficients(
+            ordered_coefficients=ordered_coefficients
+        )
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -410,7 +414,7 @@ class NoCameraDistortion(CameraDistortion):
 
     @classmethod
     def _from_ordered_coefficients(
-        cls, ordered_coefficients: tuple[float, ...]
+        cls, *, ordered_coefficients: tuple[float, ...]
     ) -> Self:
         return cls()
 
@@ -482,7 +486,7 @@ class PlumbBobCameraDistortion(RadialTangentialCameraDistortion):
 
     @classmethod
     def _from_ordered_coefficients(
-        cls, ordered_coefficients: tuple[float, ...]
+        cls, *, ordered_coefficients: tuple[float, ...]
     ) -> Self:
         return cls(
             radial_coefficient_1=ordered_coefficients[0],
@@ -527,7 +531,7 @@ class RationalPolynomialCameraDistortion(RadialTangentialCameraDistortion):
 
     @classmethod
     def _from_ordered_coefficients(
-        cls, ordered_coefficients: tuple[float, ...]
+        cls, *, ordered_coefficients: tuple[float, ...]
     ) -> Self:
         return cls(
             radial_coefficient_1=ordered_coefficients[0],
@@ -585,7 +589,7 @@ class EquidistantCameraDistortion(CameraDistortion):
 
     @classmethod
     def _from_ordered_coefficients(
-        cls, ordered_coefficients: tuple[float, ...]
+        cls, *, ordered_coefficients: tuple[float, ...]
     ) -> Self:
         return cls(
             radial_coefficient_1=ordered_coefficients[0],
@@ -603,7 +607,7 @@ class EquidistantCameraDistortion(CameraDistortion):
         )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CameraRange:
     """
     Describe the usable distance interval of a camera.

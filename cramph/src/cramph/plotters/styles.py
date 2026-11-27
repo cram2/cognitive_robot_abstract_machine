@@ -170,7 +170,7 @@ class ObservationDrawingStyle(Enum):
         :param line_width_factor: The multiple of :attr:`DrawingMetrics.line_width` a
             line carrying this value is drawn with.
         """
-        self.color = Color.from_hex(color_hex)
+        self.color = Color.from_hex(hex_color=color_hex)
         self.line_width_factor = line_width_factor
 
     @classmethod

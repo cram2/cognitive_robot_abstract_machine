@@ -111,10 +111,10 @@ class RobotiqGripperActionServerTask(
             )
         return cls(
             action_topic=end_effector.action_topic_serving(
-                configuration.joint_state.state_type
+                state_type=configuration.joint_state.state_type
             ),
             target_position=configuration.joint_state.target_value(
-                end_effector.commanded_connection
+                connection=end_effector.commanded_connection
             ),
         )
 

@@ -93,15 +93,17 @@ class TestFactories(unittest.TestCase):
     """
 
     def test_handle_factory(self):
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
         with world.modify_world():
             returned_handle = Handle.get_annotation_specification(
-                "handle",
-                Handle.get_default_root_kinematic_structure_entity_specification(
-                    scale=Scale(0.1, 0.03, 0.2), thickness=0.03
+                name="handle",
+                root_specification=Handle.get_default_root_kinematic_structure_entity_specification(
+                    scale=Scale(x=0.1, y=0.03, z=0.2), thickness=0.03
                 ),
-            ).spawn(world)
-        semantic_handle_annotations = world.get_semantic_annotations_by_type(Handle)
+            ).spawn(world=world)
+        semantic_handle_annotations = world.get_semantic_annotations_by_type(
+            semantic_annotation_type=Handle
+        )
         self.assertEqual(len(semantic_handle_annotations), 1)
         self.assertTrue(
             isinstance(
@@ -116,7 +118,7 @@ class TestFactories(unittest.TestCase):
         )
 
     def test_active_has_body_factory(self):
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
         with world.modify_world():
             returned_door = Door.create_with_new_body_in_world(
                 name="door",
@@ -136,22 +138,28 @@ class TestFactories(unittest.TestCase):
                     ),
                 ),
             )
-        [queried_door] = world.get_semantic_annotations_by_type(Door)
+        [queried_door] = world.get_semantic_annotations_by_type(
+            semantic_annotation_type=Door
+        )
         self.assertEqual(returned_door, queried_door)
         self.assertEqual(world.root, queried_door.movable_joint.parent)
         assert queried_door.movable_joint.behaves_like_a_revolute_connection
-        [queried_drawer] = world.get_semantic_annotations_by_type(Drawer)
+        [queried_drawer] = world.get_semantic_annotations_by_type(
+            semantic_annotation_type=Drawer
+        )
         self.assertEqual(returned_drawer, queried_drawer)
         self.assertEqual(world.root, queried_drawer.movable_joint.parent)
         assert queried_drawer.movable_joint.behaves_like_a_prismatic_connection
 
     def test_door_factory(self):
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
         with world.modify_world():
             returned_door = Door.create_with_new_body_in_world(
-                name="door", scale=Scale(0.03, 1, 2), world=world
+                name="door", scale=Scale(x=0.03, y=1, z=2), world=world
             )
-        semantic_door_annotations = world.get_semantic_annotations_by_type(Door)
+        semantic_door_annotations = world.get_semantic_annotations_by_type(
+            semantic_annotation_type=Door
+        )
         self.assertEqual(len(semantic_door_annotations), 1)
         self.assertTrue(
             isinstance(
@@ -166,37 +174,37 @@ class TestFactories(unittest.TestCase):
         )
 
     def test_door_fixed_to_its_parent_has_no_joint(self):
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
         with world.modify_world():
             door = Door.create_with_new_body_in_world(
-                name="door", scale=Scale(0.03, 1, 2), world=world
+                name="door", scale=Scale(x=0.03, y=1, z=2), world=world
             )
         assert isinstance(door.root.parent_connection, FixedConnection)
         assert door.movable_joint is None
 
     def test_door_factory_invalid(self):
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
         with world.modify_world():
             with pytest.raises(InvalidPlaneDimensions):
                 Door.create_with_new_body_in_world(
                     name="door",
-                    scale=Scale(1, 1, 2),
+                    scale=Scale(x=1, y=1, z=2),
                     world=world,
                 )
 
             with pytest.raises(InvalidPlaneDimensions):
                 Door.create_with_new_body_in_world(
                     name="door",
-                    scale=Scale(1, 2, 1),
+                    scale=Scale(x=1, y=2, z=1),
                     world=world,
                 )
 
     def test_door_on_hinge_factory(self):
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
         with world.modify_world():
             door = Door.create_with_new_body_in_world(
                 name="door",
-                scale=Scale(0.03, 1, 2),
+                scale=Scale(x=0.03, y=1, z=2),
                 world=world,
                 parent_connection_specification=ScrewAxisConnectionSpecification(
                     screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
@@ -213,13 +221,13 @@ class TestFactories(unittest.TestCase):
         assert door.movable_joint.parent == world.root
 
     def test_bottle_cap_on_screw_factory(self):
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
         screw_pitch = 0.005
         with world.modify_world():
             bottle_cap = BottleCap.create_with_new_body_in_world(
                 name="bottle_cap",
                 world=world,
-                scale=Scale(0.03, 0.03, 0.02),
+                scale=Scale(x=0.03, y=0.03, z=0.02),
                 parent_connection_specification=ScrewAxisConnectionSpecification(
                     screw_axis=ScrewAxisConnection.create_helical_screw_axis(
                         axis=Vector3.Z(), pitch=screw_pitch
@@ -235,12 +243,12 @@ class TestFactories(unittest.TestCase):
         assert bottle_cap.movable_joint.parent == world.root
 
     def test_has_handle_factory(self):
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
         root = world.root
         with world.modify_world():
             door = Door.create_with_new_body_in_world(
                 name="door",
-                scale=Scale(0.03, 1, 2),
+                scale=Scale(x=0.03, y=1, z=2),
                 world=world,
             )
 
@@ -258,51 +266,62 @@ class TestFactories(unittest.TestCase):
         assert door.handle == handle
 
     def test_case_factory(self):
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
         with world.modify_world():
             fridge = Fridge.create_with_new_body_in_world(
                 name="case",
                 world=world,
-                scale=Scale(1, 1, 2.0),
+                scale=Scale(x=1, y=1, z=2.0),
             )
 
         assert isinstance(fridge, HasCaseAsRootBody)
 
-        semantic_container_annotations = world.get_semantic_annotations_by_type(Fridge)
+        semantic_container_annotations = world.get_semantic_annotations_by_type(
+            semantic_annotation_type=Fridge
+        )
         self.assertEqual(len(semantic_container_annotations), 1)
 
-        assert len(world.get_semantic_annotations_by_type(HasCaseAsRootBody)) == 1
+        assert (
+            len(
+                world.get_semantic_annotations_by_type(
+                    semantic_annotation_type=HasCaseAsRootBody
+                )
+            )
+            == 1
+        )
 
     def test_drawer_factory(self):
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
         with world.modify_world():
             drawer = Drawer.create_with_new_body_in_world(
                 name="drawer",
                 world=world,
-                scale=Scale(0.2, 0.3, 0.2),
+                scale=Scale(x=0.2, y=0.3, z=0.2),
             )
         assert isinstance(drawer, HasCaseAsRootBody)
-        semantic_drawer_annotations = world.get_semantic_annotations_by_type(Drawer)
+        semantic_drawer_annotations = world.get_semantic_annotations_by_type(
+            semantic_annotation_type=Drawer
+        )
         self.assertEqual(len(semantic_drawer_annotations), 1)
 
     def test_hole_direction_carries_the_entity_own_root_as_reference_frame(self):
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
         with world.modify_world():
             drawer = Drawer.create_with_new_body_in_world(
                 name="drawer",
                 world=world,
-                scale=Scale(0.2, 0.3, 0.2),
+                scale=Scale(x=0.2, y=0.3, z=0.2),
             )
 
         assert drawer.hole_direction.reference_frame is drawer.root
         np.testing.assert_allclose(drawer.hole_direction.to_np()[:3], [0, 0, 1])
 
     def test_drawer_on_rails_factory(self):
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
         with world.modify_world():
             drawer = Drawer.create_with_new_body_in_world(
                 name="drawer",
-                scale=Scale(0.2, 0.3, 0.2),
+                scale=Scale(x=0.2, y=0.3, z=0.2),
                 world=world,
                 parent_connection_specification=ScrewAxisConnectionSpecification(
                     screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
@@ -315,27 +334,29 @@ class TestFactories(unittest.TestCase):
         assert drawer.movable_joint.parent == world.root
 
     def test_has_drawer_factory(self):
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
         with world.modify_world():
             fridge = Fridge.create_with_new_body_in_world(
                 name="case",
                 world=world,
-                scale=Scale(1, 1, 2.0),
+                scale=Scale(x=1, y=1, z=2.0),
             )
             drawer = Drawer.create_with_new_body_in_world(name="drawer", world=world)
             fridge.add(part=drawer)
 
-        semantic_drawer_annotations = world.get_semantic_annotations_by_type(Drawer)
+        semantic_drawer_annotations = world.get_semantic_annotations_by_type(
+            semantic_annotation_type=Drawer
+        )
         self.assertEqual(len(semantic_drawer_annotations), 1)
         assert fridge.drawers[0] == drawer
 
     def test_has_doors_factory(self):
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
         with world.modify_world():
             fridge = Fridge.create_with_new_body_in_world(
                 name="case",
                 world=world,
-                scale=Scale(1, 1, 2.0),
+                scale=Scale(x=1, y=1, z=2.0),
             )
             door = Door.create_with_new_body_in_world(
                 name="left_door",
@@ -343,55 +364,63 @@ class TestFactories(unittest.TestCase):
             )
             fridge.add(part=door)
 
-        semantic_door_annotations = world.get_semantic_annotations_by_type(Door)
+        semantic_door_annotations = world.get_semantic_annotations_by_type(
+            semantic_annotation_type=Door
+        )
         self.assertEqual(len(semantic_door_annotations), 1)
         assert fridge.doors[0] == door
 
     def test_floor_factory(self):
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
         with world.modify_world():
             floor = Floor.create_with_new_body_in_world(
                 name="floor",
                 world=world,
-                scale=Scale(5, 5, 0.01),
+                scale=Scale(x=5, y=5, z=0.01),
             )
-        semantic_floor_annotations = world.get_semantic_annotations_by_type(Floor)
+        semantic_floor_annotations = world.get_semantic_annotations_by_type(
+            semantic_annotation_type=Floor
+        )
         self.assertEqual(len(semantic_floor_annotations), 1)
         self.assertTrue(isinstance(floor.root.parent_connection, FixedConnection))
         self.assertEqual(floor, semantic_floor_annotations[0])
 
     def test_wall_factory(self):
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
         with world.modify_world():
             wall = Wall.create_with_new_body_in_world(
                 name="wall",
-                scale=Scale(0.1, 4, 2),
+                scale=Scale(x=0.1, y=4, z=2),
                 world=world,
             )
-        semantic_wall_annotations = world.get_semantic_annotations_by_type(Wall)
+        semantic_wall_annotations = world.get_semantic_annotations_by_type(
+            semantic_annotation_type=Wall
+        )
         self.assertEqual(len(semantic_wall_annotations), 1)
         self.assertTrue(isinstance(wall.root.parent_connection, FixedConnection))
         self.assertEqual(wall, semantic_wall_annotations[0])
 
     def test_aperture_factory(self):
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
         with world.modify_world():
             aperture = Aperture.create_with_new_region_in_world(
                 name="wall",
-                scale=Scale(0.1, 4, 2),
+                scale=Scale(x=0.1, y=4, z=2),
                 world=world,
             )
-        semantic_aperture_annotations = world.get_semantic_annotations_by_type(Aperture)
+        semantic_aperture_annotations = world.get_semantic_annotations_by_type(
+            semantic_annotation_type=Aperture
+        )
         self.assertEqual(len(semantic_aperture_annotations), 1)
         self.assertTrue(isinstance(aperture.root.parent_connection, FixedConnection))
         self.assertEqual(aperture, semantic_aperture_annotations[0])
 
     def test_aperture_from_body_factory(self):
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
         with world.modify_world():
             door = Door.create_with_new_body_in_world(
                 name="door",
-                scale=Scale(0.03, 1, 2),
+                scale=Scale(x=0.03, y=1, z=2),
                 world=world,
             )
             aperture = Aperture.create_with_new_region_in_world_from_body(
@@ -399,22 +428,24 @@ class TestFactories(unittest.TestCase):
                 world=world,
                 body=door.root,
             )
-        semantic_aperture_annotations = world.get_semantic_annotations_by_type(Aperture)
+        semantic_aperture_annotations = world.get_semantic_annotations_by_type(
+            semantic_annotation_type=Aperture
+        )
         self.assertEqual(len(semantic_aperture_annotations), 2)
         self.assertIn(aperture, semantic_aperture_annotations)
         self.assertIn(door.entry_way, semantic_aperture_annotations)
 
     def test_has_aperture_factory(self):
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
         with world.modify_world():
             wall = Wall.create_with_new_body_in_world(
                 name="wall",
-                scale=Scale(0.1, 4, 2),
+                scale=Scale(x=0.1, y=4, z=2),
                 world=world,
             )
             door = Door.create_with_new_body_in_world(
                 name="door",
-                scale=Scale(0.03, 1, 2),
+                scale=Scale(x=0.03, y=1, z=2),
                 world=world,
             )
             aperture = Aperture.create_with_new_region_in_world_from_body(
@@ -428,17 +459,17 @@ class TestFactories(unittest.TestCase):
         assert aperture.root.parent_kinematic_structure_entity == wall.root
 
     def _setup_door(self):
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
         with world.modify_world():
             door = Door.create_with_new_body_in_world(
-                name="door", scale=Scale(0.03, 1.0, 2.0), world=world
+                name="door", scale=Scale(x=0.03, y=1.0, z=2.0), world=world
             )
         return world, door
 
     def test_door_movable_joint_needs_a_handle(self):
         world, door = self._setup_door()
         with self.assertRaises(MissingSemanticAnnotationError):
-            door.calculate_self_T_movable_joint(Vector3.Z())
+            door.calculate_self_T_movable_joint(axis=Vector3.Z())
 
     def test_door_movable_joint_is_on_the_vertical_edge_opposite_the_handle(self):
         world, door = self._setup_door()
@@ -453,7 +484,7 @@ class TestFactories(unittest.TestCase):
 
         # Test Z-axis rotation (vertical hinge)
         # handle is at y=0.4, door width is 1.0. Hinge should be at opposite side: y=-0.5
-        door_T_hinge = door.calculate_self_T_movable_joint(Vector3.Z())
+        door_T_hinge = door.calculate_self_T_movable_joint(axis=Vector3.Z())
         np.testing.assert_allclose(
             door_T_hinge.to_np(),
             HomogeneousTransformationMatrix.from_xyz_rpy(y=-0.5).to_np(),
@@ -469,7 +500,7 @@ class TestFactories(unittest.TestCase):
             )
             door.add(part=handle)
 
-        door_T_hinge = door.calculate_self_T_movable_joint(Vector3.Z())
+        door_T_hinge = door.calculate_self_T_movable_joint(axis=Vector3.Z())
         np.testing.assert_allclose(
             door_T_hinge.to_np(),
             HomogeneousTransformationMatrix.from_xyz_rpy(y=0.5).to_np(),
@@ -486,8 +517,8 @@ class TestFactories(unittest.TestCase):
             door.add(part=handle)
 
         np.testing.assert_allclose(
-            door.calculate_self_T_movable_joint(Vector3.NEGATIVE_Z()).to_np(),
-            door.calculate_self_T_movable_joint(Vector3.Z()).to_np(),
+            door.calculate_self_T_movable_joint(axis=Vector3.NEGATIVE_Z()).to_np(),
+            door.calculate_self_T_movable_joint(axis=Vector3.Z()).to_np(),
         )
 
     def test_door_mounts_on_a_hinge_opposite_its_handle(self):
@@ -500,7 +531,9 @@ class TestFactories(unittest.TestCase):
             )
             door.add(part=handle)
         world_T_door = door.root.global_transform
-        world_T_hinge = world_T_door @ door.calculate_self_T_movable_joint(Vector3.Z())
+        world_T_hinge = world_T_door @ door.calculate_self_T_movable_joint(
+            axis=Vector3.Z()
+        )
         limits = DegreeOfFreedomLimits.from_position_range_and_speed(
             lower_position=0.0, upper_position=np.pi / 2
         )
@@ -510,7 +543,7 @@ class TestFactories(unittest.TestCase):
             dof_limits=limits,
         )
 
-        joint = door.mount_on_movable_joint(specification)
+        joint = door.mount_on_movable_joint(connection_specification=specification)
 
         assert joint is door.movable_joint
         assert joint.behaves_like_a_revolute_connection
@@ -547,7 +580,7 @@ class TestFactories(unittest.TestCase):
 
         # Test Y-axis rotation (horizontal hinge)
         # handle z=0. Hinge should be at z=1.0 (opposite of default sign 1 if z=0)
-        door_T_hinge = door.calculate_self_T_movable_joint(Vector3.Y())
+        door_T_hinge = door.calculate_self_T_movable_joint(axis=Vector3.Y())
         np.testing.assert_allclose(
             door_T_hinge.to_np(),
             HomogeneousTransformationMatrix.from_xyz_rpy(z=1.0).to_np(),
@@ -569,7 +602,7 @@ class TestFactories(unittest.TestCase):
         handle.root.parent_connection.parent_T_connection_expression = (
             HomogeneousTransformationMatrix.from_xyz_rpy(z=0.5)
         )
-        door_T_hinge = door.calculate_self_T_movable_joint(Vector3.Y())
+        door_T_hinge = door.calculate_self_T_movable_joint(axis=Vector3.Y())
         np.testing.assert_allclose(
             door_T_hinge.to_np(),
             HomogeneousTransformationMatrix.from_xyz_rpy(z=-1.0).to_np(),
@@ -584,17 +617,17 @@ class TestFactories(unittest.TestCase):
             )
             door.add(part=handle)
         with self.assertRaises(InvalidHingeActiveAxis):
-            door.calculate_self_T_movable_joint(Vector3(1, 1, 0))
+            door.calculate_self_T_movable_joint(axis=Vector3(1, 1, 0))
 
     def test_calculate_supporting_surface(self):
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
         with world.modify_world():
             table = Table.create_with_new_body_in_world(name="table", world=world)
-        table_scale = Scale(1.0, 1.0, 0.1)
+        table_scale = Scale(x=1.0, y=1.0, z=0.1)
         table.root.collision = BoundingBoxCollection.from_event(
-            VolumetricBoundingBox,
-            table.root,
-            table_scale.to_simple_event().as_composite_set(),
+            box_type=VolumetricBoundingBox,
+            reference_frame=table.root,
+            event=table_scale.to_simple_event().as_composite_set(),
         ).as_shapes()
         table.root.visual = table.root.collision
 
@@ -607,18 +640,18 @@ class TestFactories(unittest.TestCase):
         self.assertTrue(len(surface.area.combined_mesh.vertices) > 0)
 
     def test_supporting_surface_position_on_top_of_table(self):
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
         with world.modify_world():
             table = Table.create_with_new_body_in_world(
                 name="table",
                 world=world,
                 world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(z=1.5),
             )
-        table_scale = Scale(1.0, 1.0, 0.5)
+        table_scale = Scale(x=1.0, y=1.0, z=0.5)
         table.root.collision = BoundingBoxCollection.from_event(
-            VolumetricBoundingBox,
-            table.root,
-            table_scale.to_simple_event().as_composite_set(),
+            box_type=VolumetricBoundingBox,
+            reference_frame=table.root,
+            event=table_scale.to_simple_event().as_composite_set(),
         ).as_shapes()
         table.root.visual = table.root.collision
 
@@ -638,7 +671,7 @@ class TestFactories(unittest.TestCase):
         A table whose origin is a corner on the floor, as a scanned or vendor asset
         often has it, still gets its supporting surface on its top.
         """
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
         with world.modify_world():
             table = Table.create_with_new_body_in_world(
                 name="table",
@@ -648,12 +681,12 @@ class TestFactories(unittest.TestCase):
                 ),
             )
         table.root.collision = ShapeCollection(
-            [
+            shapes=[
                 Box(
                     origin=HomogeneousTransformationMatrix.from_xyz_rpy(
                         x=0.5, y=0.3, z=0.25, reference_frame=table.root
                     ),
-                    scale=Scale(1.0, 0.6, 0.5),
+                    scale=Scale(x=1.0, y=0.6, z=0.5),
                 )
             ],
             reference_frame=table.root,
@@ -665,15 +698,17 @@ class TestFactories(unittest.TestCase):
 
         self.assertIsNotNone(surface)
         table_top = Point3(0.5, 0.3, 0.5, reference_frame=table.root)
-        expected = world.transform(table_top, world.root).to_np()[:3]
+        expected = world.transform(
+            spatial_object=table_top, target_frame=world.root
+        ).to_np()[:3]
         np.testing.assert_allclose(
             surface.global_transform.position.to_np()[:3], expected, atol=1e-9
         )
         surface_box = surface.area.as_bounding_box_collection_in_frame(
-            world.root
+            reference_frame=world.root
         ).bounding_box()
         table_box = table.root.collision.as_bounding_box_collection_in_frame(
-            world.root
+            reference_frame=world.root
         ).bounding_box()
         np.testing.assert_allclose(
             [
@@ -687,30 +722,30 @@ class TestFactories(unittest.TestCase):
         )
 
     def test_sample_points_from_surface(self):
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
         with world.modify_world():
             milk = Milk.create_with_new_body_in_world(
                 name="milk",
                 world=world,
-                scale=Scale(0.03, 0.03, 0.1),
+                scale=Scale(x=0.03, y=0.03, z=0.1),
                 world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=0.5),
             )
             cereal = Cereal.create_with_new_body_in_world(
                 name="cereal",
                 world=world,
-                scale=Scale(0.1, 0.03, 0.2),
+                scale=Scale(x=0.1, y=0.03, z=0.2),
                 world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=-0.5),
             )
             table = Table.create_with_new_body_in_world(
-                name="table", world=world, scale=Scale(1.0, 1.0, 0.1)
+                name="table", world=world, scale=Scale(x=1.0, y=1.0, z=0.1)
             )
-            table.add_object(milk)
-            table.add_object(cereal)
+            table.add_object(object=milk)
+            table.add_object(object=cereal)
 
             cereal_to_place = Cereal.create_with_new_body_in_world(
                 name="cereal_to_place",
                 world=world,
-                scale=Scale(0.1, 0.03, 0.2),
+                scale=Scale(x=0.1, y=0.03, z=0.2),
             )
 
         points = table.sample_points_from_surface(
@@ -727,32 +762,32 @@ class TestFactories(unittest.TestCase):
         assert np.allclose([p.z for p in points], 0.0025)
 
     def test_sample_points_from_surface_with_category_of_interest(self):
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
         with world.modify_world():
             milk = Milk.create_with_new_body_in_world(
                 name="milk",
                 world=world,
-                scale=Scale(0.03, 0.03, 0.1),
+                scale=Scale(x=0.03, y=0.03, z=0.1),
                 world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=0.5),
             )
             cereal = Cereal.create_with_new_body_in_world(
                 name="cereal",
                 world=world,
-                scale=Scale(0.1, 0.03, 0.2),
+                scale=Scale(x=0.1, y=0.03, z=0.2),
                 world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=-0.5),
             )
             cereal2 = Cereal.create_with_new_body_in_world(
                 name="cereal",
                 world=world,
-                scale=Scale(0.1, 0.03, 0.2),
+                scale=Scale(x=0.1, y=0.03, z=0.2),
                 world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(y=0.2),
             )
             table = Table.create_with_new_body_in_world(
-                name="table", world=world, scale=Scale(1.0, 1.0, 0.1)
+                name="table", world=world, scale=Scale(x=1.0, y=1.0, z=0.1)
             )
-            table.add_object(milk)
-            table.add_object(cereal)
-            table.add_object(cereal2)
+            table.add_object(object=milk)
+            table.add_object(object=cereal)
+            table.add_object(object=cereal2)
 
         with world.modify_world():
             table.calculate_supporting_surface()
@@ -765,84 +800,89 @@ class TestFactories(unittest.TestCase):
             conditional = sampler.conditional({object_variable: object}).distribution
             expectation = conditional.expectation([x_variable, y_variable])
             surface_T_object = world.transform(
-                object.global_transform, table.supporting_surface
+                spatial_object=object.global_transform,
+                target_frame=table.supporting_surface,
             )
             assert expectation[x_variable] == surface_T_object.x
             assert expectation[y_variable] == surface_T_object.y
 
     def test_remove_objects_from_sampling_event(self):
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
         with world.modify_world():
             milk = Milk.create_with_new_body_in_world(
                 name="milk",
                 world=world,
-                scale=Scale(0.03, 0.03, 0.1),
+                scale=Scale(x=0.03, y=0.03, z=0.1),
                 world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=0.5),
             )
             cereal = Cereal.create_with_new_body_in_world(
                 name="cereal",
                 world=world,
-                scale=Scale(0.1, 0.03, 0.2),
+                scale=Scale(x=0.1, y=0.03, z=0.2),
                 world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=-0.5),
             )
             table = Table.create_with_new_body_in_world(
-                name="table", world=world, scale=Scale(1.0, 1.0, 0.1)
+                name="table", world=world, scale=Scale(x=1.0, y=1.0, z=0.1)
             )
-            table.add_object(milk)
-            table.add_object(cereal)
+            table.add_object(object=milk)
+            table.add_object(object=cereal)
 
         with world.modify_world():
             table.calculate_supporting_surface()
 
-        surface_event: Event = table._2d_surface_sample_space_excluding_objects(0)
+        surface_event: Event = table._2d_surface_sample_space_excluding_objects(
+            object_bloat=0
+        )
 
         surface_P_milk = world.transform(
-            milk.root.global_transform, table.supporting_surface
+            spatial_object=milk.root.global_transform,
+            target_frame=table.supporting_surface,
         ).position
         surface_P_cereal = world.transform(
-            cereal.root.global_transform, table.supporting_surface
+            spatial_object=cereal.root.global_transform,
+            target_frame=table.supporting_surface,
         ).position
 
         assert not surface_event.contains(item=surface_P_milk[:2])
         assert not surface_event.contains(item=surface_P_cereal[:2])
 
     def test_sample_points_from_surface_with_object_and_category_of_interest(self):
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
         with world.modify_world():
             milk = Milk.create_with_new_body_in_world(
                 name="milk",
                 world=world,
-                scale=Scale(0.03, 0.03, 0.1),
+                scale=Scale(x=0.03, y=0.03, z=0.1),
                 world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=0.5),
             )
             cereal = Cereal.create_with_new_body_in_world(
                 name="cereal",
                 world=world,
-                scale=Scale(0.1, 0.03, 0.2),
+                scale=Scale(x=0.1, y=0.03, z=0.2),
                 world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=-0.5),
             )
             cereal2 = Cereal.create_with_new_body_in_world(
                 name="cereal",
                 world=world,
-                scale=Scale(0.1, 0.03, 0.2),
+                scale=Scale(x=0.1, y=0.03, z=0.2),
                 world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(y=0.2),
             )
             table = Table.create_with_new_body_in_world(
-                name="table", world=world, scale=Scale(1.0, 1.0, 0.1)
+                name="table", world=world, scale=Scale(x=1.0, y=1.0, z=0.1)
             )
-            table.add_object(milk)
-            table.add_object(cereal)
-            table.add_object(cereal2)
+            table.add_object(object=milk)
+            table.add_object(object=cereal)
+            table.add_object(object=cereal2)
 
             cereal_to_place = Cereal.create_with_new_body_in_world(
                 name="cereal_to_place",
                 world=world,
-                scale=Scale(0.1, 0.03, 0.2),
+                scale=Scale(x=0.1, y=0.03, z=0.2),
             )
 
         points = table.sample_points_from_surface(
-            cereal_to_place,
-            type(cereal),
+            body_to_sample_for=cereal_to_place,
+            category_of_interest=type(cereal),
             amount=100,
         )
         self.assertEqual(len(points), 100)
@@ -857,7 +897,7 @@ class TestFactories(unittest.TestCase):
 
     def test_floor_polytope(self):
         world = World()
-        root = Body(name=PrefixedName("root"))
+        root = Body(name=PrefixedName(name="root"))
         points = [
             Point3(0, 0, 0, reference_frame=root),
             Point3(1, 0, 0, reference_frame=root),
@@ -865,22 +905,25 @@ class TestFactories(unittest.TestCase):
             Point3(0, 1, 0, reference_frame=root),
         ]
         with world.modify_world():
-            world.add_body(root)
+            world.add_body(body=root)
         with world.modify_world():
             floor = Floor.create_with_new_body_from_polytope_in_world(
                 name="floor", world=world, floor_polytope=points
             )
-        self.assertEqual(len(world.get_semantic_annotations_by_type(Floor)), 1)
+        self.assertEqual(
+            len(world.get_semantic_annotations_by_type(semantic_annotation_type=Floor)),
+            1,
+        )
         self.assertTrue(len(floor.root.collision) > 0)
 
     def test_wall_doors(self):
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
         with world.modify_world():
             wall = Wall.create_with_new_body_in_world(
-                name="wall", scale=Scale(0.1, 4, 2), world=world
+                name="wall", scale=Scale(x=0.1, y=4, z=2), world=world
             )
 
-            door_scale = Scale(0.01, 1, 1)
+            door_scale = Scale(x=0.01, y=1, z=1)
             door = Door.create_with_new_body_in_world(
                 name="door", scale=door_scale, world=world
             )
@@ -897,26 +940,26 @@ class TestFactories(unittest.TestCase):
         self.assertNotIn(door2, doors)
 
     def test_handle_with_thickness(self):
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
         with world.modify_world():
             handle = Handle.get_annotation_specification(
-                "handle",
-                Handle.get_default_root_kinematic_structure_entity_specification(
+                name="handle",
+                root_specification=Handle.get_default_root_kinematic_structure_entity_specification(
                     thickness=0.005
                 ),
-            ).spawn(world)
+            ).spawn(world=world)
         self.assertTrue(len(handle.root.collision) > 1)
 
     def test_add_aperture_geometry(self):
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
         with world.modify_world():
             wall = Wall.create_with_new_body_in_world(
-                name="wall", scale=Scale(0.01, 4, 2), world=world
+                name="wall", scale=Scale(x=0.01, y=4, z=2), world=world
             )
             initial_shapes_count = len(wall.root.collision)
 
             aperture = Aperture.create_with_new_region_in_world(
-                name="aperture", scale=Scale(0.1, 1, 1), world=world
+                name="aperture", scale=Scale(x=0.1, y=1, z=1), world=world
             )
             wall.add(part=aperture)
         self.assertIn(aperture, wall.apertures)
@@ -924,13 +967,13 @@ class TestFactories(unittest.TestCase):
 
     def test_create_with_connection_limits(self):
         world = World()
-        root = Body(name=PrefixedName("root"))
+        root = Body(name=PrefixedName(name="root"))
         limits = DegreeOfFreedomLimits.from_position_range_and_speed(
             lower_position=-0.5, upper_position=0.5
         )
 
         with world.modify_world():
-            world.add_body(root)
+            world.add_body(body=root)
         with world.modify_world():
             Door.create_with_new_body_in_world(
                 name="door",
@@ -948,7 +991,7 @@ class TestFactories(unittest.TestCase):
         self.assertEqual(dof.limits.upper.position, 0.5)
 
     def test_create_with_invalid_connection_limits(self):
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
         limits = DegreeOfFreedomLimits.from_position_range_and_speed(
             lower_position=0.5, upper_position=-0.5
         )
@@ -966,41 +1009,41 @@ class TestFactories(unittest.TestCase):
             )
 
     def test_perceivable_cup(self):
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
         with world.modify_world():
             cup = Cup.create_with_new_body_in_world(name="cup", world=world)
         cup.class_label = "plastic_cup"
         self.assertEqual(cup.class_label, "plastic_cup")
 
     def test_is_storage_space(self):
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
         with world.modify_world():
             cabinet = Cabinet.create_with_new_body_in_world(
-                name="cabinet", world=world, scale=Scale(0.5, 0.5, 1.0)
+                name="cabinet", world=world, scale=Scale(x=0.5, y=0.5, z=1.0)
             )
             cup = Cup.create_with_new_body_in_world(name="cup", world=world)
 
-            cabinet.add_object(cup)
+            cabinet.add_object(object=cup)
 
         self.assertIn(cup, cabinet.objects)
         self.assertEqual(cup.root.parent_kinematic_structure_entity, cabinet.root)
 
     def test_has_objects_mismatching_world(self):
-        world1 = World.create_with_root_body("root1")
+        world1 = World.create_with_root_body(root_body_name="root1")
         with world1.modify_world():
             cabinet = Cabinet.create_with_new_body_in_world(
-                name="cabinet", world=world1, scale=Scale(0.5, 0.5, 1.0)
+                name="cabinet", world=world1, scale=Scale(x=0.5, y=0.5, z=1.0)
             )
-        world2 = World.create_with_root_body("root2")
+        world2 = World.create_with_root_body(root_body_name="root2")
         with world2.modify_world():
             cup = Cup.create_with_new_body_in_world(name="cup", world=world2)
 
         with self.assertRaises(MismatchingWorld):
             with world1.modify_world():
-                cabinet.add_object(cup)
+                cabinet.add_object(object=cup)
 
     def test_double_door_view_point(self):
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
         with world.modify_world():
             door_left = Door.create_with_new_body_in_world(
                 name="door_left",
@@ -1017,21 +1060,27 @@ class TestFactories(unittest.TestCase):
                 ),
             )
             double_door = DoubleDoor(
-                door_0=door_left, door_1=door_right, name=PrefixedName("double_door")
+                door_0=door_left,
+                door_1=door_right,
+                name=PrefixedName(name="double_door"),
             )
-            world.add_semantic_annotation(double_door)
+            world.add_semantic_annotation(semantic_annotation=double_door)
 
         # View point at origin looking forward (identity)
         view_point_front = HomogeneousTransformationMatrix.from_xyz_rpy()
         self.assertEqual(
-            double_door.calculate_left_right_door_from_view_point(view_point_front),
+            double_door.calculate_left_right_door_from_view_point(
+                world_T_view_point=view_point_front
+            ),
             (door_left, door_right),
         )
 
         # View point at x=2 looking back (180 deg around Z)
         view_point_back = HomogeneousTransformationMatrix.from_xyz_rpy(x=2, yaw=np.pi)
         self.assertEqual(
-            double_door.calculate_left_right_door_from_view_point(view_point_back),
+            double_door.calculate_left_right_door_from_view_point(
+                world_T_view_point=view_point_back
+            ),
             (door_right, door_left),
         )
 
@@ -1045,14 +1094,14 @@ class TestFactories(unittest.TestCase):
 
     @staticmethod
     def _world_with_root() -> World:
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
         return world
 
     def test_characterize_base_body_geometry(self):
         world = self._world_with_root()
         with world.modify_world():
             milk = Milk.create_with_new_body_in_world(
-                name="milk", world=world, scale=Scale(0.2, 0.3, 0.4)
+                name="milk", world=world, scale=Scale(x=0.2, y=0.3, z=0.4)
             )
         collision = milk.root.collision
         # base path assigns one collection to both collision and visual
@@ -1067,7 +1116,7 @@ class TestFactories(unittest.TestCase):
         world = self._world_with_root()
         with world.modify_world():
             drawer = Drawer.create_with_new_body_in_world(
-                name="drawer", world=world, scale=Scale(0.3, 0.4, 0.5)
+                name="drawer", world=world, scale=Scale(x=0.3, y=0.4, z=0.5)
             )
         collision = drawer.root.collision
         self.assertIs(collision, drawer.root.visual)
@@ -1083,11 +1132,11 @@ class TestFactories(unittest.TestCase):
         world = self._world_with_root()
         with world.modify_world():
             handle = Handle.get_annotation_specification(
-                "handle",
-                Handle.get_default_root_kinematic_structure_entity_specification(
-                    scale=Scale(0.1, 0.05, 0.05), thickness=0.01
+                name="handle",
+                root_specification=Handle.get_default_root_kinematic_structure_entity_specification(
+                    scale=Scale(x=0.1, y=0.05, z=0.05), thickness=0.01
                 ),
-            ).spawn(world)
+            ).spawn(world=world)
         collision = handle.root.collision
         self.assertIs(collision, handle.root.visual)
         self.assertGreater(len(collision), 1)
@@ -1100,7 +1149,7 @@ class TestFactories(unittest.TestCase):
         world = self._world_with_root()
         with world.modify_world():
             door = Door.create_with_new_body_in_world(
-                name="door", world=world, scale=Scale(0.03, 1, 2)
+                name="door", world=world, scale=Scale(x=0.03, y=1, z=2)
             )
         collision = door.root.collision
         self.assertIs(collision, door.root.visual)
@@ -1115,14 +1164,14 @@ class TestFactories(unittest.TestCase):
         with self.assertRaises(InvalidPlaneDimensions):
             with world.modify_world():
                 Door.create_with_new_body_in_world(
-                    name="door", world=world, scale=Scale(2, 1, 1)
+                    name="door", world=world, scale=Scale(x=2, y=1, z=1)
                 )
 
     def test_characterize_floor_geometry(self):
         world = self._world_with_root()
         with world.modify_world():
             floor = Floor.create_with_new_body_in_world(
-                name="floor", world=world, scale=Scale(2, 2, 0.1)
+                name="floor", world=world, scale=Scale(x=2, y=2, z=0.1)
             )
         collision = floor.root.collision
         self.assertIs(collision, floor.root.visual)
@@ -1137,7 +1186,7 @@ class TestFactories(unittest.TestCase):
         world = self._world_with_root()
         with world.modify_world():
             wall = Wall.create_with_new_body_in_world(
-                name="wall", world=world, scale=Scale(0.1, 4, 2)
+                name="wall", world=world, scale=Scale(x=0.1, y=4, z=2)
             )
         collision = wall.root.collision
         self.assertIs(collision, wall.root.visual)
@@ -1152,14 +1201,14 @@ class TestFactories(unittest.TestCase):
         with self.assertRaises(InvalidPlaneDimensions):
             with world.modify_world():
                 Wall.create_with_new_body_in_world(
-                    name="wall", world=world, scale=Scale(2, 1, 1)
+                    name="wall", world=world, scale=Scale(x=2, y=1, z=1)
                 )
 
     def test_characterize_aperture_region_geometry(self):
         world = self._world_with_root()
         with world.modify_world():
             aperture = Aperture.create_with_new_region_in_world(
-                name="aperture", world=world, scale=Scale(0.1, 1, 2)
+                name="aperture", world=world, scale=Scale(x=0.1, y=1, z=2)
             )
         # region geometry lives on .area, not .collision
         area = aperture.root.area
@@ -1170,26 +1219,26 @@ class TestFactories(unittest.TestCase):
         )
 
     def test_microwave_factory(self):
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
         with world.modify_world():
             microwave = Microwave.create_with_new_body_in_world(
                 name="microwave", world=world
             )
             door = Door.create_with_new_body_in_world(
                 name="microwave_door",
-                scale=Scale(0.03, 0.3, 0.3),
+                scale=Scale(x=0.03, y=0.3, z=0.3),
                 world=world,
             )
             microwave.add(part=door)
 
         semantic_microwave_annotations = world.get_semantic_annotations_by_type(
-            Microwave
+            semantic_annotation_type=Microwave
         )
         self.assertEqual(len(semantic_microwave_annotations), 1)
         self.assertEqual(microwave.doors[0], door)
 
     def test_hood_toaster_coffee_machine_factories(self):
-        world = World.create_with_root_body("root")
+        world = World.create_with_root_body(root_body_name="root")
         with world.modify_world():
             hood = Hood.create_with_new_body_in_world(name="hood", world=world)
             toaster = Toaster.create_with_new_body_in_world(name="toaster", world=world)
@@ -1197,9 +1246,24 @@ class TestFactories(unittest.TestCase):
                 name="coffee_machine", world=world
             )
 
-        self.assertEqual(len(world.get_semantic_annotations_by_type(Hood)), 1)
-        self.assertEqual(len(world.get_semantic_annotations_by_type(Toaster)), 1)
-        self.assertEqual(len(world.get_semantic_annotations_by_type(CoffeeMachine)), 1)
+        self.assertEqual(
+            len(world.get_semantic_annotations_by_type(semantic_annotation_type=Hood)),
+            1,
+        )
+        self.assertEqual(
+            len(
+                world.get_semantic_annotations_by_type(semantic_annotation_type=Toaster)
+            ),
+            1,
+        )
+        self.assertEqual(
+            len(
+                world.get_semantic_annotations_by_type(
+                    semantic_annotation_type=CoffeeMachine
+                )
+            ),
+            1,
+        )
         self.assertEqual(world.root, hood.root.parent_kinematic_structure_entity)
         self.assertEqual(world.root, toaster.root.parent_kinematic_structure_entity)
         self.assertEqual(
@@ -1207,7 +1271,7 @@ class TestFactories(unittest.TestCase):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class _AnnotationWithOverlappingPartWholeRelationshipFields(HasRootBody, HasParts):
     """
     Throwaway whole whose two part-whole relationship fields have overlapping element
@@ -1226,7 +1290,7 @@ class _AnnotationWithOverlappingPartWholeRelationshipFields(HasRootBody, HasPart
 
 
 def _world_with_root() -> World:
-    world = World.create_with_root_body("root")
+    world = World.create_with_root_body(root_body_name="root")
     return world
 
 
@@ -1237,7 +1301,7 @@ def test_add_routes_handle_as_child():
     world = _world_with_root()
     with world.modify_world():
         door = Door.create_with_new_body_in_world(
-            name="door", scale=Scale(0.03, 1, 2), world=world
+            name="door", scale=Scale(x=0.03, y=1, z=2), world=world
         )
         handle = Handle.create_with_new_body_in_world(name="handle", world=world)
         door.add(part=handle)
@@ -1254,11 +1318,11 @@ def test_add_routes_plural_drawer_and_door():
     world = _world_with_root()
     with world.modify_world():
         fridge = Fridge.create_with_new_body_in_world(
-            name="fridge", world=world, scale=Scale(1, 1, 2.0)
+            name="fridge", world=world, scale=Scale(x=1, y=1, z=2.0)
         )
         drawer = Drawer.create_with_new_body_in_world(name="drawer", world=world)
         door = Door.create_with_new_body_in_world(
-            name="door", scale=Scale(0.03, 1, 2), world=world
+            name="door", scale=Scale(x=0.03, y=1, z=2), world=world
         )
         fridge.add(part=drawer)
         fridge.add(part=door)
@@ -1277,10 +1341,10 @@ def test_add_routes_aperture_with_cut():
     world = _world_with_root()
     with world.modify_world():
         wall = Wall.create_with_new_body_in_world(
-            name="wall", scale=Scale(0.1, 4, 2), world=world
+            name="wall", scale=Scale(x=0.1, y=4, z=2), world=world
         )
         door = Door.create_with_new_body_in_world(
-            name="door", scale=Scale(0.03, 1, 2), world=world
+            name="door", scale=Scale(x=0.03, y=1, z=2), world=world
         )
         aperture = Aperture.create_with_new_region_in_world_from_body(
             name="aperture", world=world, body=door.root
@@ -1298,16 +1362,16 @@ def test_add_object_stores_occupants():
     world = _world_with_root()
     with world.modify_world():
         table = Table.create_with_new_body_in_world(
-            name="table", world=world, scale=Scale(1.0, 1.0, 0.1)
+            name="table", world=world, scale=Scale(x=1.0, y=1.0, z=0.1)
         )
         milk = Milk.create_with_new_body_in_world(
-            name="milk", world=world, scale=Scale(0.03, 0.03, 0.1)
+            name="milk", world=world, scale=Scale(x=0.03, y=0.03, z=0.1)
         )
         cereal = Cereal.create_with_new_body_in_world(
-            name="cereal", world=world, scale=Scale(0.1, 0.03, 0.2)
+            name="cereal", world=world, scale=Scale(x=0.1, y=0.03, z=0.2)
         )
-        table.add_object(milk)
-        table.add_object(cereal)
+        table.add_object(object=milk)
+        table.add_object(object=cereal)
 
     assert milk in table.objects
     assert cereal in table.objects
@@ -1322,14 +1386,14 @@ def test_add_does_not_route_occupants():
     world = _world_with_root()
     with world.modify_world():
         fridge = Fridge.create_with_new_body_in_world(
-            name="fridge", world=world, scale=Scale(1, 1, 2.0)
+            name="fridge", world=world, scale=Scale(x=1, y=1, z=2.0)
         )
         milk = Milk.create_with_new_body_in_world(
-            name="milk", world=world, scale=Scale(0.03, 0.03, 0.1)
+            name="milk", world=world, scale=Scale(x=0.03, y=0.03, z=0.1)
         )
         with pytest.raises(NoFieldAcceptsEntity):
             fridge.add(part=milk)
-        fridge.add_object(milk)
+        fridge.add_object(object=milk)
 
     assert milk in fridge.objects
 
@@ -1342,7 +1406,7 @@ def test_add_rejects_unsupported_part_type():
     world = _world_with_root()
     with world.modify_world():
         door = Door.create_with_new_body_in_world(
-            name="door", scale=Scale(0.03, 1, 2), world=world
+            name="door", scale=Scale(x=0.03, y=1, z=2), world=world
         )
         drawer = Drawer.create_with_new_body_in_world(name="drawer", world=world)
         # A Door has handle/entry way part-whole relationship fields but no drawer field.
@@ -1361,7 +1425,7 @@ def test_add_raises_on_ambiguous_part():
             name="whole", world=world
         )
         typed_door = DoorWithType.create_with_new_body_in_world(
-            name="typed_door", scale=Scale(0.03, 1, 2), world=world
+            name="typed_door", scale=Scale(x=0.03, y=1, z=2), world=world
         )
         # A DoorWithType is both a Door (door field) and a DoorWithType (typed_door field).
         with pytest.raises(SeveralFieldsAcceptEntity):
@@ -1379,7 +1443,7 @@ def test_add_field_name_resolves_ambiguity_to_base_field():
             name="whole", world=world
         )
         typed_door = DoorWithType.create_with_new_body_in_world(
-            name="typed_door", scale=Scale(0.03, 1, 2), world=world
+            name="typed_door", scale=Scale(x=0.03, y=1, z=2), world=world
         )
         whole.add(part=typed_door, field_name="door")
     assert whole.door is typed_door
@@ -1396,7 +1460,7 @@ def test_add_field_name_resolves_ambiguity_to_specific_field():
             name="whole", world=world
         )
         typed_door = DoorWithType.create_with_new_body_in_world(
-            name="typed_door", scale=Scale(0.03, 1, 2), world=world
+            name="typed_door", scale=Scale(x=0.03, y=1, z=2), world=world
         )
         whole.add(part=typed_door, field_name="typed_door")
     assert whole.typed_door is typed_door
@@ -1413,7 +1477,7 @@ def test_add_unknown_field_name_raises():
             name="whole", world=world
         )
         typed_door = DoorWithType.create_with_new_body_in_world(
-            name="typed_door", scale=Scale(0.03, 1, 2), world=world
+            name="typed_door", scale=Scale(x=0.03, y=1, z=2), world=world
         )
         with pytest.raises(UnknownSemanticRelationshipField):
             whole.add(part=typed_door, field_name="not_a_field")
@@ -1426,7 +1490,7 @@ def test_add_field_name_with_mismatching_type_raises():
     world = _world_with_root()
     with world.modify_world():
         door = Door.create_with_new_body_in_world(
-            name="door", scale=Scale(0.03, 1, 2), world=world
+            name="door", scale=Scale(x=0.03, y=1, z=2), world=world
         )
         handle = Handle.create_with_new_body_in_world(name="handle", world=world)
         # 'entry_way' is a real part-whole field of Door, but a Handle is not an EntryWay.
@@ -1451,9 +1515,9 @@ def test_containment_only_annotation_has_no_add():
 @pytest.mark.parametrize(
     "annotation_type, scale",
     [
-        (Drawer, Scale(0.4, 0.5, 0.6)),
-        (Elevator, Scale(2, 2, 2)),
-        (BottleCap, Scale(0.02, 0.04, 0.04)),
+        (Drawer, Scale(x=0.4, y=0.5, z=0.6)),
+        (Elevator, Scale(x=2, y=2, z=2)),
+        (BottleCap, Scale(x=0.02, y=0.04, z=0.04)),
     ],
 )
 def test_movable_joint_of_a_part_that_slides_or_screws_sits_at_its_origin(
@@ -1466,7 +1530,7 @@ def test_movable_joint_of_a_part_that_slides_or_screws_sits_at_its_origin(
         )
 
     np.testing.assert_allclose(
-        part.calculate_self_T_movable_joint(Vector3.X()).to_np(),
+        part.calculate_self_T_movable_joint(axis=Vector3.X()).to_np(),
         HomogeneousTransformationMatrix().to_np(),
     )
 
@@ -1477,7 +1541,7 @@ def test_drawer_mounts_on_its_movable_joint_where_it_stands():
         drawer = Drawer.create_with_new_body_in_world(
             name="drawer",
             world=world,
-            scale=Scale(0.4, 0.5, 0.6),
+            scale=Scale(x=0.4, y=0.5, z=0.6),
             world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
                 x=1, yaw=0.3
             ),
@@ -1485,7 +1549,7 @@ def test_drawer_mounts_on_its_movable_joint_where_it_stands():
     world_T_drawer = drawer.root.global_transform
 
     joint = drawer.mount_on_movable_joint(
-        ScrewAxisConnectionSpecification(
+        connection_specification=ScrewAxisConnectionSpecification(
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
                 axis=Vector3.X()
             ),
@@ -1511,7 +1575,7 @@ def door_with_handle_at(*, y: float, z: float) -> tuple[World, Door]:
     with world.modify_world():
         door = Door.create_with_new_body_in_world(
             name="door",
-            scale=Scale(0.03, 1.0, 2.0),
+            scale=Scale(x=0.03, y=1.0, z=2.0),
             world=world,
             world_root_T_self=world_T_door,
         )
@@ -1532,10 +1596,10 @@ def test_a_door_on_a_horizontal_hinge_swings_about_the_edge_opposite_its_handle(
     """
     world, door = door_with_handle_at(y=0.4, z=0.0)
     world_T_door = door.root.global_transform
-    world_T_hinge = world_T_door @ door.calculate_self_T_movable_joint(Vector3.Y())
+    world_T_hinge = world_T_door @ door.calculate_self_T_movable_joint(axis=Vector3.Y())
 
     joint = door.mount_on_movable_joint(
-        ScrewAxisConnectionSpecification(
+        connection_specification=ScrewAxisConnectionSpecification(
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Y())
         )
     )
@@ -1567,7 +1631,7 @@ def test_a_mounted_drawer_slides_along_its_axis():
         drawer = Drawer.create_with_new_body_in_world(
             name="drawer",
             world=world,
-            scale=Scale(0.4, 0.5, 0.6),
+            scale=Scale(x=0.4, y=0.5, z=0.6),
             world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
                 x=1.0, yaw=0.3
             ),
@@ -1575,7 +1639,7 @@ def test_a_mounted_drawer_slides_along_its_axis():
     world_T_drawer = drawer.root.global_transform
 
     joint = drawer.mount_on_movable_joint(
-        ScrewAxisConnectionSpecification(
+        connection_specification=ScrewAxisConnectionSpecification(
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(axis=Vector3.X())
         )
     )
@@ -1599,7 +1663,7 @@ def test_a_mounted_bottle_cap_advances_by_its_pitch_per_turn():
         cap = BottleCap.create_with_new_body_in_world(
             name="cap",
             world=world,
-            scale=Scale(0.03, 0.03, 0.02),
+            scale=Scale(x=0.03, y=0.03, z=0.02),
             world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(
                 x=0.5, z=0.8, roll=0.2
             ),
@@ -1607,7 +1671,7 @@ def test_a_mounted_bottle_cap_advances_by_its_pitch_per_turn():
     world_T_cap = cap.root.global_transform
 
     joint = cap.mount_on_movable_joint(
-        ScrewAxisConnectionSpecification(
+        connection_specification=ScrewAxisConnectionSpecification(
             screw_axis=ScrewAxisConnection.create_helical_screw_axis(
                 axis=Vector3.Z(), pitch=0.004
             )
@@ -1631,14 +1695,14 @@ def test_mounting_a_door_again_replaces_its_joint_and_keeps_it_in_place():
     world, door = door_with_handle_at(y=0.4, z=0.0)
     world_T_door = door.root.global_transform
     first = door.mount_on_movable_joint(
-        ScrewAxisConnectionSpecification(
+        connection_specification=ScrewAxisConnectionSpecification(
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Z())
         )
     )
     connection_count = len(world.connections)
 
     second = door.mount_on_movable_joint(
-        ScrewAxisConnectionSpecification(
+        connection_specification=ScrewAxisConnectionSpecification(
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.Y())
         )
     )
@@ -1659,7 +1723,7 @@ def test_drawer_without_a_movable_joint_has_no_opening_ratio():
     world = _world_with_root()
     with world.modify_world():
         drawer = Drawer.create_with_new_body_in_world(
-            name="drawer", world=world, scale=Scale(0.4, 0.5, 0.6)
+            name="drawer", world=world, scale=Scale(x=0.4, y=0.5, z=0.6)
         )
 
     with pytest.raises(MissingMovableJointError):
@@ -1676,7 +1740,7 @@ def test_a_door_on_its_hinge_reports_how_far_it_stands_open():
         door = Door.create_with_new_body_in_world(
             name="door",
             world=world,
-            scale=Scale(0.03, 1, 2),
+            scale=Scale(x=0.03, y=1, z=2),
             parent_connection_specification=ScrewAxisConnectionSpecification(
                 screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
                     axis=Vector3.Z()
@@ -1703,10 +1767,10 @@ def test_elevator_doors_without_a_movable_joint_cannot_be_operated(operate_doors
     world = _world_with_root()
     with world.modify_world():
         elevator = Elevator.create_with_new_body_in_world(
-            name="elevator", world=world, scale=Scale(2, 2, 2)
+            name="elevator", world=world, scale=Scale(x=2, y=2, z=2)
         )
         door = Door.create_with_new_body_in_world(
-            name="door", world=world, scale=Scale(0.05, 1, 2)
+            name="door", world=world, scale=Scale(x=0.05, y=1, z=2)
         )
         elevator.add(part=door)
 
@@ -1718,11 +1782,11 @@ def test_elevator_without_a_movable_joint_cannot_drive():
     world = _world_with_root()
     with world.modify_world():
         elevator = Elevator.create_with_new_body_in_world(
-            name="elevator", world=world, scale=Scale(2, 2, 2)
+            name="elevator", world=world, scale=Scale(x=2, y=2, z=2)
         )
         ground_floor = GroundFloor.create_with_new_region_in_world(
-            name="ground_floor", world=world, scale=Scale(4, 4, 0.1)
+            name="ground_floor", world=world, scale=Scale(x=4, y=4, z=0.1)
         )
 
     with pytest.raises(MissingMovableJointError):
-        elevator.drive_to_floor(ground_floor)
+        elevator.drive_to_floor(floor=ground_floor)

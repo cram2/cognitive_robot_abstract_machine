@@ -50,9 +50,11 @@ def test_wiggle_insert_reaches_hole(pr2_world_state_reset: World, rclpy_node):
     VizMarkerPublisher(_world=pr2_world_state_reset, node=rclpy_node)
     random.seed(0)
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "r_gripper_tool_frame"
+        name="r_gripper_tool_frame"
     )
-    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name("odom_combined")
+    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        name="odom_combined"
+    )
     hole_point = _hole_at_current_tip(pr2_world_state_reset, tip, root)
 
     executor = StatechartExecutor(
@@ -85,9 +87,11 @@ def test_wiggle_insert_basis_uses_root_frame_hole_normal(pr2_world_state_reset: 
     (root_P_hole).
     """
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "r_gripper_tool_frame"
+        name="r_gripper_tool_frame"
     )
-    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name("odom_combined")
+    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        name="odom_combined"
+    )
     hole_point = _hole_at_current_tip(pr2_world_state_reset, tip, root)
     hole_normal_in_tip_frame = Vector3.Z(reference_frame=tip)
 
@@ -121,9 +125,11 @@ def test_wiggle_insert_on_tick_updates_noise(pr2_world_state_reset: World):
     """
     random.seed(1)
     tip = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
-        "r_gripper_tool_frame"
+        name="r_gripper_tool_frame"
     )
-    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name("odom_combined")
+    root = pr2_world_state_reset.get_kinematic_structure_entity_by_name(
+        name="odom_combined"
+    )
     hole_point = _hole_at_current_tip(pr2_world_state_reset, tip, root)
 
     motion_control = MotionControl()
@@ -169,8 +175,8 @@ def test_wiggle_insert(hsr_world_state_reset):
         HSRBJoint.WRIST_ROLL: 0.0,
     }
 
-    hpl = hsr_world_state_reset.get_body_by_name("hand_gripper_tool_frame")
-    root_link = hsr_world_state_reset.get_body_by_name("map")
+    hpl = hsr_world_state_reset.get_body_by_name(name="hand_gripper_tool_frame")
+    root_link = hsr_world_state_reset.get_body_by_name(name="map")
 
     hole_point = Point3(x=0.5, z=0.3, reference_frame=root_link)
 
@@ -186,7 +192,7 @@ def test_wiggle_insert(hsr_world_state_reset):
                 nodes=[
                     SetSeedConfiguration(
                         seed_configuration=JointState.from_str_dict(
-                            goal_state, world=hsr_world_state_reset
+                            mapping=goal_state, world=hsr_world_state_reset
                         )
                     ),
                     Parallel(

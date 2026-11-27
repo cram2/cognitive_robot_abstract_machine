@@ -83,7 +83,7 @@ class ContentEncoding(StrEnum):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PartFindingAnswer:
     """
     What the server answers a query with.
@@ -110,7 +110,7 @@ class PartFindingAnswer:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PartFindingServerStatus:
     """
     What the server answers a status request with.

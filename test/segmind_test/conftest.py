@@ -50,8 +50,8 @@ def milk_in_the_apartment(_simple_apartment_setup):
     The apartment with its milk and boxes, the milk put back where it stood afterwards.
     """
     world = _simple_apartment_setup
-    milk = world.get_body_by_name("milk.stl")
-    yield world, milk, world.get_body_by_name("box")
+    milk = world.get_body_by_name(name="milk.stl")
+    yield world, milk, world.get_body_by_name(name="box")
     x, y, z = WHERE_THE_MILK_STOOD
     milk.parent_connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
         x, y, z, yaw=np.pi, reference_frame=milk.parent_connection.parent
@@ -108,17 +108,19 @@ class BoxAndTrays:
 
     def __post_init__(self):
         self.world = World()
-        root = Body(name=PrefixedName("root"))
+        root = Body(name=PrefixedName(name="root"))
         self.box = Body(
-            name=PrefixedName("box"),
+            name=PrefixedName(name="box"),
             collision=ShapeCollection(
-                [Box(scale=Scale(self.box_size, self.box_size, self.box_size))]
+                shapes=[
+                    Box(scale=Scale(x=self.box_size, y=self.box_size, z=self.box_size))
+                ]
             ),
         )
         with self.world.modify_world():
-            self.world.add_kinematic_structure_entity(root)
+            self.world.add_kinematic_structure_entity(kinematic_structure_entity=root)
             self.world.add_connection(
-                Connection6DoF.create_with_dofs(
+                connection=Connection6DoF.create_with_dofs(
                     world=self.world, parent=root, child=self.box
                 )
             )
@@ -189,7 +191,9 @@ class BoxAndTrays:
         walls_across_x = [
             Box(
                 scale=Scale(
-                    self.tray_wall_thickness, self.tray_width, self.tray_wall_height
+                    x=self.tray_wall_thickness,
+                    y=self.tray_width,
+                    z=self.tray_wall_height,
                 ),
                 origin=HomogeneousTransformationMatrix.from_xyz_rpy(
                     x=side * self.tray_width / 2, z=self.tray_wall_height / 2
@@ -200,7 +204,9 @@ class BoxAndTrays:
         walls_across_y = [
             Box(
                 scale=Scale(
-                    self.tray_width, self.tray_wall_thickness, self.tray_wall_height
+                    x=self.tray_width,
+                    y=self.tray_wall_thickness,
+                    z=self.tray_wall_height,
                 ),
                 origin=HomogeneousTransformationMatrix.from_xyz_rpy(
                     y=side * self.tray_width / 2, z=self.tray_wall_height / 2
@@ -209,17 +215,19 @@ class BoxAndTrays:
             for side in (-1, 1)
         ]
         floor = Box(
-            scale=Scale(self.tray_width, self.tray_width, self.tray_wall_thickness),
+            scale=Scale(
+                x=self.tray_width, y=self.tray_width, z=self.tray_wall_thickness
+            ),
             origin=HomogeneousTransformationMatrix.from_xyz_rpy(
                 z=self.tray_wall_thickness / 2
             ),
         )
         tray = Body(
-            name=PrefixedName(name),
-            collision=ShapeCollection([floor, *walls_across_x, *walls_across_y]),
+            name=PrefixedName(name=name),
+            collision=ShapeCollection(shapes=[floor, *walls_across_x, *walls_across_y]),
         )
         self.world.add_connection(
-            FixedConnection(
+            connection=FixedConnection(
                 parent=self.world.root,
                 child=tray,
                 parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -244,10 +252,10 @@ def milk_annotated_in_the_apartment(milk_in_the_apartment):
     world, milk, box = milk_in_the_apartment
     annotation = Milk(root=milk)
     with world.modify_world():
-        world.add_semantic_annotation(annotation)
+        world.add_semantic_annotation(semantic_annotation=annotation)
     yield world, annotation, box
     with world.modify_world():
-        world.remove_semantic_annotation(annotation)
+        world.remove_semantic_annotation(semantic_annotation=annotation)
 
 
 # %% the ORM mappers the tests use

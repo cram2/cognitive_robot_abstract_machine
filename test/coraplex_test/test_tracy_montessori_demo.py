@@ -53,27 +53,34 @@ def test_the_closed_pads_stay_clear_of_the_table_at_every_pieces_grasp(demo):
     """
     scene = demo.MontessoriScene()
     world = scene.build_world()
-    [tracy] = world.get_semantic_annotations_by_type(Tracy)
+    [tracy] = world.get_semantic_annotations_by_type(semantic_annotation_type=Tracy)
     gripper = scene.sorting_arm(tracy=tracy).end_effector
     approach_axis = gripper.approach_axis.to_np()[:3]
     with world.reset_state_context():
-        gripper.get_joint_state_by_type(GripperState.CLOSE).apply_to(world)
+        gripper.get_joint_state_by_type(state_type=GripperState.CLOSE).apply_to(
+            world=world
+        )
         pad_reach = max(
             float(corner.to_np()[:3] @ approach_axis)
             for finger in (gripper.thumb, gripper.finger)
             for body in finger.bodies
             if body.has_collision()
             for box in body.collision.as_bounding_box_collection_in_frame(
-                gripper.tool_frame
+                reference_frame=gripper.tool_frame
             ).bounding_boxes
             for corner in box.get_points()
         )
 
     pad_ends = []
-    for piece in world.get_semantic_annotations_by_type(ShapeSortingPiece):
+    for piece in world.get_semantic_annotations_by_type(
+        semantic_annotation_type=ShapeSortingPiece
+    ):
         [grasp] = piece.grasp_candidates()
         world_T_tool = world.transform(
-            gripper.tool_frame_goal_for_grasp(grasp.grasp_pose), world.root
+            spatial_object=gripper.tool_frame_goal_for_grasp(
+                grasp_pose=grasp.grasp_pose
+            ),
+            target_frame=world.root,
         ).to_np()
         pad_ends.append(
             float(

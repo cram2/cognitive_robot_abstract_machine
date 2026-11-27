@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from semantic_digital_twin.world_description.connections import ActiveConnection1DOF
 
 
-@dataclass
+@dataclass(kw_only=True)
 class JointState(SubclassJSONSerializer):
     """
     Represents a specific joint state by mapping a set of connections to target values.
@@ -48,7 +48,7 @@ class JointState(SubclassJSONSerializer):
     A type to better describe this state.
     """
 
-    name: PrefixedName = field(default=PrefixedName("JointState"))
+    name: PrefixedName = field(default=PrefixedName(name="JointState"))
     """
     A Name for this JointState.
     """
@@ -66,7 +66,7 @@ class JointState(SubclassJSONSerializer):
         """
         return hash((self.connections, self.target_values))
 
-    def assign_to_robot(self, robot: AbstractRobot):
+    def assign_to_robot(self, *, robot: AbstractRobot):
         """
         Assigns the joint state to the given robot.
 
@@ -84,7 +84,7 @@ class JointState(SubclassJSONSerializer):
     def items(self):
         return zip(self.connections, self.target_values)
 
-    def target_value(self, connection: ActiveConnection1DOF) -> float:
+    def target_value(self, *, connection: ActiveConnection1DOF) -> float:
         """
         :param connection: One of :attr:`connections`.
         :raises ConnectionNotInJointStateError: If this state sets no target value for
@@ -112,7 +112,7 @@ class JointState(SubclassJSONSerializer):
             ]
         )
 
-    def apply_to(self, world: World) -> None:
+    def apply_to(self, *, world: World) -> None:
         """
         Write the target values of this joint state into the world.
 
@@ -123,16 +123,19 @@ class JointState(SubclassJSONSerializer):
                 connection.position = target_value
 
     @classmethod
-    def from_str_dict(cls, mapping: dict[str, float], world: World):
-        connections = [world.get_connection_by_name(name) for name in mapping.keys()]
-        return cls(connections, list(mapping.values()))
+    def from_str_dict(cls, *, mapping: dict[str, float], world: World):
+        connections = [
+            world.get_connection_by_name(name=name) for name in mapping.keys()
+        ]
+        return cls(connections=connections, target_values=list(mapping.values()))
 
     @classmethod
     def from_mapping(
         cls,
+        *,
         mapping: dict[ActiveConnection1DOF, float],
         state_type: JointStateType = None,
-        name: PrefixedName = PrefixedName("JointState"),
+        name: PrefixedName = PrefixedName(name="JointState"),
     ):
         return cls(
             state_type=state_type,
@@ -142,8 +145,10 @@ class JointState(SubclassJSONSerializer):
         )
 
     @classmethod
-    def from_lists(cls, connections: list[ActiveConnection1DOF], targets: list[float]):
-        return cls(connections, targets)
+    def from_lists(
+        cls, *, connections: list[ActiveConnection1DOF], targets: list[float]
+    ):
+        return cls(connections=connections, target_values=targets)
 
     def to_json(self, **kwargs) -> dict[str, Any]:
         return {
@@ -178,9 +183,14 @@ class JointState(SubclassJSONSerializer):
         target_values = from_json(data["target_values"])
         state_type = from_json(data["joint_state_type"])
         name = from_json(data["name"])
-        return cls(connections, target_values, state_type=state_type, name=name)
+        return cls(
+            connections=connections,
+            target_values=target_values,
+            state_type=state_type,
+            name=name,
+        )
 
-    def copy_for_world(self, world: World):
+    def copy_for_world(self, *, world: World):
         """
         Creates a copy of this JointState for the given world.
 
@@ -188,7 +198,7 @@ class JointState(SubclassJSONSerializer):
         the new world will be different objects.
         """
         return JointState(
-            connections=[c.copy_for_world(world) for c in self.connections],
+            connections=[c.copy_for_world(world=world) for c in self.connections],
             target_values=self.target_values.copy(),
             state_type=self.state_type,
             name=self.name,

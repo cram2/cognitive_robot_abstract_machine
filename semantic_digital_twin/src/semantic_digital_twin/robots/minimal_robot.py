@@ -13,7 +13,7 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class MinimalRobot(AbstractRobot):
     """
     Creates the bare minimum semantic annotation.
@@ -33,7 +33,7 @@ class MinimalRobot(AbstractRobot):
         return ""
 
     @classmethod
-    def from_branch_in_world(cls, branch_root: KinematicStructureEntity) -> Self:
+    def from_branch_in_world(cls, *, branch_root: KinematicStructureEntity) -> Self:
         """
         Creates a robot from a branch in a world.
 
@@ -46,10 +46,10 @@ class MinimalRobot(AbstractRobot):
                 root=branch_root,
             )
             self.bodies_of_branch = world.get_kinematic_structure_entities_of_branch(
-                self.root
+                root=self.root
             )
             self.setup_robot_part_semantic_annotations()
-            world.add_semantic_annotation_recursively(self)
+            world.add_semantic_annotation_recursively(semantic_annotation=self)
             self._setup_hardware_interfaces()
             self._setup_joint_states()
             self._setup_velocity_limits()
@@ -66,7 +66,7 @@ class MinimalRobot(AbstractRobot):
         for connection in self.connections:
             if isinstance(connection, ActiveConnection):
                 self._world.set_dofs_has_hardware_interface(
-                    connection.active_dofs, True
+                    dofs=connection.active_dofs, value=True
                 )
 
     def _setup_joint_states(self):

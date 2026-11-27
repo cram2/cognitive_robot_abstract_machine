@@ -149,7 +149,7 @@ def main() -> None:
             ),
         ],
     )
-    node_registry.register(node1)
+    node_registry.register(node=node1)
     logger.info(f"Created node: {node_name}")
 
     # 5. Create any action servers or supporting nodes
@@ -216,7 +216,7 @@ def main() -> None:
         thread_asrv.join()
 
         # 13. Clean up nodes
-        node_registry.clear(node1)
+        node_registry.clear(expected_node=node1)
         node1.destroy_node()
         query_action_server.destroy_node()
 

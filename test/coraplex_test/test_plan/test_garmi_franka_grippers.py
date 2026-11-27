@@ -68,7 +68,7 @@ def test_garmi_opens_its_gripper_through_the_franka_driver(garmi_extensions) -> 
     gripper opens to.
     """
     gripper = world_of(garmi_extensions).get_semantic_annotations_by_type(
-        GarmiLeftGripper
+        semantic_annotation_type=GarmiLeftGripper
     )[0]
     transformation = DriveGarmiGripperStatesWithTheirFrankaDriver()
 
@@ -77,7 +77,7 @@ def test_garmi_opens_its_gripper_through_the_franka_driver(garmi_extensions) -> 
             nodes=[
                 SetGripperAction(
                     gripper_configuration=gripper.default_configuration(
-                        GripperState.OPEN
+                        state_type=GripperState.OPEN
                     )
                 )
             ]
@@ -104,7 +104,7 @@ def test_garmi_shuts_its_gripper_with_a_grasp_of_the_franka_driver_while_doing_m
     parallel doing more.
     """
     gripper = world_of(garmi_extensions).get_semantic_annotations_by_type(
-        GarmiLeftGripper
+        semantic_annotation_type=GarmiLeftGripper
     )[0]
     expected = DriveGarmiGripperStatesWithTheirFrankaDriver().grasp(gripper=gripper)
 
@@ -115,7 +115,7 @@ def test_garmi_shuts_its_gripper_with_a_grasp_of_the_franka_driver_while_doing_m
                     nodes=[
                         MoveGripper(
                             two_finger_gripper=gripper,
-                            width=gripper.separation_in(GripperState.CLOSE),
+                            width=gripper.separation_in(state_type=GripperState.CLOSE),
                         )
                     ]
                 )
@@ -133,7 +133,7 @@ def test_the_right_gripper_of_garmi_is_driven_in_its_own_namespace(
     garmi_extensions,
 ) -> None:
     gripper = world_of(garmi_extensions).get_semantic_annotations_by_type(
-        GarmiRightGripper
+        semantic_annotation_type=GarmiRightGripper
     )[0]
     transformation = DriveGarmiGripperStatesWithTheirFrankaDriver()
 
@@ -149,7 +149,7 @@ def test_garmi_closes_its_fingers_to_a_width_with_a_grasp_of_the_franka_driver(
     The real Garmi closes its fingers to a width with a grasp of the Franka driver.
     """
     gripper = world_of(garmi_extensions).get_semantic_annotations_by_type(
-        GarmiLeftGripper
+        semantic_annotation_type=GarmiLeftGripper
     )[0]
     expected = CloseGarmiFingersToWidthWithTheirFrankaDriver().grasp(gripper=gripper)
 

@@ -42,7 +42,7 @@ def test_ref_chain_after_copy_with_execute(pr2_apartment_context):
     copy_world.name = "copy_world"
 
     copy_extensions = robot_extensions(
-        copy_world.get_semantic_annotation_by_id(view.id)
+        copy_world.get_semantic_annotation_by_id(id=view.id)
     )
 
     plan = Sequence(
@@ -66,10 +66,10 @@ def test_ref_chain_after_copy_with_execute_complex_plan(pr2_apartment_context):
     copy_world = deepcopy(world)
     copy_world.name = "copy_world"
 
-    copy_robot = copy_world.get_semantic_annotation_by_id(view.id)
+    copy_robot = copy_world.get_semantic_annotation_by_id(id=view.id)
     copy_extensions = robot_extensions(copy_robot)
 
-    milk = copy_world.get_semantic_annotations_by_type(Milk)[0]
+    milk = copy_world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     description = TransportAction.from_graspable_by_closest_grasps(
         graspable=milk,
         goal_pose=Pose.from_xyz_quaternion(

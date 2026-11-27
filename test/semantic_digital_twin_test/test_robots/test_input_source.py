@@ -50,7 +50,7 @@ from semantic_digital_twin.world import World
 # %% stand-ins for the sources a part can be read from
 
 
-@dataclass
+@dataclass(kw_only=True)
 class TopicReadingSource(JointPositionSource):
     """
     A source that stands in for one reading a robot, remembering only the topic it was
@@ -63,7 +63,7 @@ class TopicReadingSource(JointPositionSource):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RewritingSource(JointPositionSource, InputSynchronizer):
     """
     A source that writes what it last read in every cycle, standing in for the reader a
@@ -74,7 +74,7 @@ class RewritingSource(JointPositionSource, InputSynchronizer):
         return False
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AppliedSource(JointPositionSource, InputSynchronizer):
     """
     A source a loop has to apply, standing in for one that writes what a robot reports
@@ -88,7 +88,7 @@ class AppliedSource(JointPositionSource, InputSynchronizer):
         return RewritingSource(world=self.world)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ClosableSource(JointPositionSource):
     """
     A source holding something that has to be released, remembering whether it was.
@@ -106,7 +106,7 @@ class ClosableSource(JointPositionSource):
 # %% stand-ins for the parts that can be told where they are read from
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PartReadFromADeclaredTopic(HasInputSource[JointPositionSource]):
     """
     A part whose description names the topic its robot publishes its state on.
@@ -122,7 +122,7 @@ class PartReadFromADeclaredTopic(HasInputSource[JointPositionSource]):
         return TopicReadingSource(topic_name=self.topic_name)
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PartWithoutADeclaredTopic(PartReadFromADeclaredTopic):
     """
     A part whose description names no topic.
@@ -153,7 +153,7 @@ def test_a_part_is_not_read_from_a_source_of_another_kind():
     part = PartReadFromADeclaredTopic()
 
     with pytest.raises(UnexpectedInputSourceError) as raised:
-        part.use_source(SimulatedBasePoseSource())
+        part.use_source(source=SimulatedBasePoseSource())
 
     assert raised.value.robot_part is part
     assert raised.value.expected_source_family is JointPositionSource
@@ -184,7 +184,7 @@ def test_a_switched_part_reads_the_world_it_stands_in_again():
 def test_a_switched_part_releases_the_source_it_was_read_from():
     part = PartReadFromADeclaredTopic()
     previous_source = ClosableSource()
-    part.use_source(previous_source)
+    part.use_source(source=previous_source)
 
     part.use_simulated_source()
 
@@ -194,9 +194,9 @@ def test_a_switched_part_releases_the_source_it_was_read_from():
 def test_a_part_handed_its_own_source_again_keeps_it_open():
     part = PartReadFromADeclaredTopic()
     source = ClosableSource()
-    part.use_source(source)
+    part.use_source(source=source)
 
-    part.use_source(source)
+    part.use_source(source=source)
 
     assert not source.closed
 
@@ -256,7 +256,9 @@ def annotated_pr2(pr2_world_copy: World) -> PR2:
     """
     The PR2 annotated in a world of its own, which the tests below switch around.
     """
-    return pr2_world_copy.get_semantic_annotations_by_type(PR2)[0]
+    return pr2_world_copy.get_semantic_annotations_by_type(
+        semantic_annotation_type=PR2
+    )[0]
 
 
 def test_every_chain_of_an_annotated_robot_reads_the_world_it_stands_in(annotated_pr2):
@@ -287,14 +289,14 @@ def test_an_annotated_robot_has_nothing_to_apply(annotated_pr2):
 def test_a_part_read_from_the_robot_becomes_an_input_to_apply(annotated_pr2):
     source = AppliedSource(world=annotated_pr2._world)
 
-    annotated_pr2.left_arm.use_source(source)
+    annotated_pr2.left_arm.use_source(source=source)
 
     [synchronizer] = annotated_pr2.get_input_synchronizers()
     assert synchronizer is source
 
 
 def test_a_switched_robot_reads_the_world_it_stands_in_again(annotated_pr2):
-    annotated_pr2.left_arm.use_source(AppliedSource(world=annotated_pr2._world))
+    annotated_pr2.left_arm.use_source(source=AppliedSource(world=annotated_pr2._world))
 
     annotated_pr2.use_simulated_sources()
 
@@ -307,19 +309,19 @@ def test_a_switched_robot_reads_the_world_it_stands_in_again(annotated_pr2):
 
 def test_a_loop_applies_every_source_a_robots_parts_are_read_from(annotated_pr2):
     source = AppliedSource(world=annotated_pr2._world)
-    annotated_pr2.left_arm.use_source(source)
+    annotated_pr2.left_arm.use_source(source=source)
     inputs = WorldStateInputs(world=annotated_pr2._world)
 
-    inputs.add_robot_inputs(annotated_pr2)
+    inputs.add_robot_inputs(robot=annotated_pr2)
 
     assert inputs.synchronizers == [source]
 
 
 def test_a_loop_reapplying_its_inputs_applies_a_rewriting_source(annotated_pr2):
-    annotated_pr2.left_arm.use_source(AppliedSource(world=annotated_pr2._world))
+    annotated_pr2.left_arm.use_source(source=AppliedSource(world=annotated_pr2._world))
     inputs = WorldStateInputs(world=annotated_pr2._world, reapplies_inputs=True)
 
-    inputs.add_robot_inputs(annotated_pr2)
+    inputs.add_robot_inputs(robot=annotated_pr2)
 
     [synchronizer] = inputs.synchronizers
     assert isinstance(synchronizer, RewritingSource)
@@ -328,7 +330,7 @@ def test_a_loop_reapplying_its_inputs_applies_a_rewriting_source(annotated_pr2):
 def test_a_loop_given_a_simulated_robot_applies_nothing(annotated_pr2):
     inputs = WorldStateInputs(world=annotated_pr2._world)
 
-    inputs.add_robot_inputs(annotated_pr2)
+    inputs.add_robot_inputs(robot=annotated_pr2)
 
     assert inputs.synchronizers == []
 
@@ -339,9 +341,9 @@ def test_a_loop_takes_an_input_only_once(annotated_pr2, reapplies_inputs):
     inputs = WorldStateInputs(
         world=annotated_pr2._world, reapplies_inputs=reapplies_inputs
     )
-    inputs.add_input(source)
+    inputs.add_input(synchronizer=source)
 
     with pytest.raises(InputAlreadyAddedError) as raised:
-        inputs.add_input(source)
+        inputs.add_input(synchronizer=source)
 
     assert raised.value.synchronizer is source

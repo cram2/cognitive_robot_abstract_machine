@@ -54,9 +54,9 @@ def carton() -> Milk:
     """
     A box-shaped carton standing on its base, its middle at the origin.
     """
-    body = Body(name=PrefixedName("carton", prefix="surface_grasp"))
+    body = Body(name=PrefixedName(name="carton", prefix="surface_grasp"))
     body.collision = ShapeCollection(
-        [
+        shapes=[
             Mesh.from_trimesh(
                 mesh=trimesh.creation.box(extents=CARTON_EXTENTS),
                 origin=HomogeneousTransformationMatrix(reference_frame=body),
@@ -67,8 +67,8 @@ def carton() -> Milk:
     annotation = Milk(root=body)
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(body)
-        world.add_semantic_annotation(annotation)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=body)
+        world.add_semantic_annotation(semantic_annotation=annotation)
     return annotation
 
 
@@ -187,7 +187,7 @@ def test_drawn_grasps_lie_where_the_statement_allows():
 
 
 def test_drawing_no_grasps_draws_none(carton):
-    assert draw_grasps(carton.grasp_strategy.statement(carton), 0) == []
+    assert draw_grasps(carton.grasp_strategy.statement(graspable=carton), 0) == []
 
 
 def test_every_parameter_of_a_surface_grasp_needs_bounds():
@@ -205,7 +205,7 @@ def test_every_parameter_of_a_surface_grasp_needs_bounds():
 
 
 def test_a_carton_is_grasped_up_to_half_its_narrower_side_deep(carton):
-    allowed = allowed_intervals(carton.grasp_strategy.statement(carton))
+    allowed = allowed_intervals(carton.grasp_strategy.statement(graspable=carton))
 
     assert allowed["depth"].simple_sets[-1].upper == pytest.approx(
         min(CARTON_EXTENTS[:2]) / 2
@@ -220,7 +220,7 @@ def test_a_grasp_from_any_side_lies_within_the_bounds_asked(carton):
         pitch=Bounds(lower=0.1, upper=0.3),
         roll=Bounds(lower=-0.2, upper=0.1),
     )
-    allowed = allowed_intervals(strategy.statement(carton))
+    allowed = allowed_intervals(strategy.statement(graspable=carton))
     narrower_extent = min(CARTON_EXTENTS[:2])
 
     assert allowed["height"].simple_sets[0].lower == pytest.approx(
@@ -270,7 +270,7 @@ def learned_carton_model(carton) -> RelationalCircuitRegistry:
     :return: A model learned from synthetic trials on the carton, in which the grasps
         above :data:`LIFTING_HEIGHT` lift it and the others do not.
     """
-    grasps = draw_grasps(carton.grasp_strategy.statement(carton), 300)
+    grasps = draw_grasps(carton.grasp_strategy.statement(graspable=carton), 300)
     rng = np.random.default_rng(0)
     for grasp in grasps:
         raised = grasp.height > LIFTING_HEIGHT
@@ -289,7 +289,9 @@ def learned_carton_model(carton) -> RelationalCircuitRegistry:
 
 def test_a_learned_model_answers_with_lifting_grasps(carton, learned_carton_model):
     grasps = draw_grasps(
-        carton.grasp_strategy.statement(carton, GraspResult.lifting_pattern),
+        carton.grasp_strategy.statement(
+            graspable=carton, result_pattern=GraspResult.lifting_pattern
+        ),
         50,
         learned_carton_model,
     )
@@ -305,14 +307,19 @@ def test_a_learned_model_answers_with_lifting_grasps(carton, learned_carton_mode
 def test_a_uniform_prior_cannot_answer_for_lifting_grasps(carton):
     with pytest.raises(UnboundedParameterError):
         draw_grasps(
-            carton.grasp_strategy.statement(carton, GraspResult.lifting_pattern), 1
+            carton.grasp_strategy.statement(
+                graspable=carton, result_pattern=GraspResult.lifting_pattern
+            ),
+            1,
         )
 
 
 def test_an_annotation_given_a_model_draws_its_grasps_from_it(
     carton, learned_carton_model
 ):
-    grasps = carton.grasp_candidates(learned_carton_model, GraspResult.lifting_pattern)
+    grasps = carton.grasp_candidates(
+        model_registry=learned_carton_model, result_pattern=GraspResult.lifting_pattern
+    )
     lowest, highest = carton.grasp_surface().bounds
     lifting_height = lowest[2] + LIFTING_HEIGHT * (highest[2] - lowest[2])
 

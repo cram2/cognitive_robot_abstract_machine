@@ -59,7 +59,9 @@ class MoveTorsoAction(SequentialAction, HasTorsoStateParameter):
     """
 
     def create_steps(self) -> list[StatechartNode]:
-        joint_state = self.robot.get_torso().get_joint_state_by_type(self.torso_state)
+        joint_state = self.robot.get_torso().get_joint_state_by_type(
+            state_type=self.torso_state
+        )
         return [JointPositionList(goal_state=joint_state)]
 
 
@@ -157,7 +159,7 @@ class ParkArmsAction(ParallelAction, HasMaxJointVelocityParameter):
         connections = []
         target_values = []
         for arm in self.arms:
-            joint_state = arm.get_joint_state_by_type(StaticJointState.PARK)
+            joint_state = arm.get_joint_state_by_type(state_type=StaticJointState.PARK)
             connections.extend(joint_state.connections)
             target_values.extend(joint_state.target_values)
         return JointState(connections=connections, target_values=target_values)

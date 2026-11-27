@@ -97,15 +97,20 @@ def test_stepped_simulation_pacer_advances_the_physics_one_cycle_per_sleep() -> 
     """
     world = World()
     with world.modify_world():
-        root = Body(name=PrefixedName("root"))
-        world.add_body(root)
-        box = Body(name=PrefixedName("box"))
+        root = Body(name=PrefixedName(name="root"))
+        world.add_body(body=root)
+        box = Body(name=PrefixedName(name="box"))
         box.collision = ShapeCollection(
-            [Box(origin=HomogeneousTransformationMatrix(), scale=Scale(0.1, 0.1, 0.1))],
+            shapes=[
+                Box(
+                    origin=HomogeneousTransformationMatrix(),
+                    scale=Scale(x=0.1, y=0.1, z=0.1),
+                )
+            ],
             reference_frame=box,
         )
         world.add_connection(
-            Connection6DoF.create_with_dofs(
+            connection=Connection6DoF.create_with_dofs(
                 world=world,
                 parent=root,
                 child=box,
@@ -203,10 +208,10 @@ class SimulationOfSettlingJoints:
         world = World()
         for joint_name in self.joints:
             servo = PositionServo(
-                name=PrefixedName(f"{joint_name}_servo"),
+                name=PrefixedName(name=f"{joint_name}_servo"),
                 gains=ServoGains(stiffness=1.0, damping=1.0, torque_limit=1.0),
             )
-            servo.add_dof(DegreeOfFreedom(name=PrefixedName(joint_name)))
+            servo.add_dof(dof=DegreeOfFreedom(name=PrefixedName(name=joint_name)))
             world.actuators.append(servo)
         return world
 
@@ -217,8 +222,7 @@ class SimulationOfSettlingJoints:
         """
         return self
 
-    @called_positionally
-    def step_simulation(self, duration: timedelta) -> None:
+    def step_simulation(self, *, duration: timedelta) -> None:
         """
         :param duration: Ignored; every call is one step of this stand-in.
         """
@@ -309,8 +313,10 @@ def test_waiting_covers_the_servos_moving_a_robots_base() -> None:
     """
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name=PrefixedName("floor")))
-    robot = RobotSpecification(PR2).spawn(world)
+        world.add_kinematic_structure_entity(
+            kinematic_structure_entity=Body(name=PrefixedName(name="floor"))
+        )
+    robot = RobotSpecification(semantic_annotation_type=PR2).spawn(world=world)
     drive = robot.drive
 
     simulation = MujocoSim(world=world, headless=True)
@@ -327,7 +333,7 @@ def test_waiting_covers_the_servos_moving_a_robots_base() -> None:
         waited_until = simulation.simulator.get_body_position(
             body_name=robot.root.name.name
         ).result[0]
-        simulation.step_simulation(timedelta(seconds=1))
+        simulation.step_simulation(duration=timedelta(seconds=1))
         a_second_later = simulation.simulator.get_body_position(
             body_name=robot.root.name.name
         ).result[0]

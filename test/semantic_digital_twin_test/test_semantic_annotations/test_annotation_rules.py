@@ -40,7 +40,7 @@ from semantic_digital_twin.world_description.world_entity import Body
 # %% building small worlds
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FurnitureUnderTest:
     """
     A world holding just enough furniture to exercise one rule, and the bodies of it by
@@ -63,12 +63,14 @@ class FurnitureUnderTest:
         Start a world holding nothing but a root body.
         """
         world = World()
-        root = Body(name=PrefixedName("root", prefix="rules"))
+        root = Body(name=PrefixedName(name="root", prefix="rules"))
         with world.modify_world():
-            world.add_kinematic_structure_entity(root)
-        return cls(world, {"root": root})
+            world.add_kinematic_structure_entity(kinematic_structure_entity=root)
+        return cls(world=world, bodies={"root": root})
 
-    def add(self, name: str, parent: str, connection_type, **connection_kwargs) -> Self:
+    def add(
+        self, *, name: str, parent: str, connection_type, **connection_kwargs
+    ) -> Self:
         """
         Hang a new body carrying geometry off an existing one.
 
@@ -76,35 +78,48 @@ class FurnitureUnderTest:
         :param connection_kwargs: Passed on to the connection's factory, so that a
             ``multiplier`` can make the new body only follow its parent.
         """
-        return self._add(name, parent, connection_type, True, **connection_kwargs)
+        return self._add(
+            name=name,
+            parent=parent,
+            connection_type=connection_type,
+            with_geometry=True,
+            **connection_kwargs,
+        )
 
     def add_without_geometry(
-        self, name: str, parent: str, connection_type, **connection_kwargs
+        self, *, name: str, parent: str, connection_type, **connection_kwargs
     ) -> Self:
         """
         Hang a new shapeless body off an existing one, as world models do to build up a
         compound motion.
         """
-        return self._add(name, parent, connection_type, False, **connection_kwargs)
+        return self._add(
+            name=name,
+            parent=parent,
+            connection_type=connection_type,
+            with_geometry=False,
+            **connection_kwargs,
+        )
 
     def _add(
         self,
+        *,
         name: str,
         parent: str,
         connection_type,
         with_geometry: bool,
         **connection_kwargs,
     ) -> Self:
-        body = Body(name=PrefixedName(name, prefix="rules"))
+        body = Body(name=PrefixedName(name=name, prefix="rules"))
         if with_geometry:
             body.collision = ShapeCollection(
-                [Box(scale=Scale(0.1, 0.1, 0.1))], reference_frame=body
+                shapes=[Box(scale=Scale(x=0.1, y=0.1, z=0.1))], reference_frame=body
             )
         parent_body = self.bodies[parent]
         with self.world.modify_world():
-            self.world.add_kinematic_structure_entity(body)
+            self.world.add_kinematic_structure_entity(kinematic_structure_entity=body)
             self.world.add_connection(
-                connection_type.create_with_dofs(
+                connection=connection_type.create_with_dofs(
                     world=self.world,
                     parent=parent_body,
                     child=body,
@@ -117,12 +132,14 @@ class FurnitureUnderTest:
         self.bodies[name] = body
         return self
 
-    def annotate(self, annotation) -> Self:
+    def annotate(self, *, annotation) -> Self:
         """
         Give the world an annotation it already holds before any rule runs.
         """
         with self.world.modify_world():
-            self.world.add_semantic_annotation_recursively(annotation)
+            self.world.add_semantic_annotation_recursively(
+                semantic_annotation=annotation
+            )
         return self
 
     def apply(self, *rules) -> Self:
@@ -133,7 +150,9 @@ class FurnitureUnderTest:
         for rule in rules:
             for annotation in rule(self.world):
                 with self.world.modify_world():
-                    self.world.add_semantic_annotation_recursively(annotation)
+                    self.world.add_semantic_annotation_recursively(
+                        semantic_annotation=annotation
+                    )
         return self
 
     def root_names(self, *rules) -> set[str]:
@@ -146,7 +165,7 @@ class FurnitureUnderTest:
             for annotation in rule(self.world)
         }
 
-    def name_of(self, key: str) -> str:
+    def name_of(self, *, key: str) -> str:
         """
         The full name of the body built under ``key``.
         """
@@ -160,16 +179,16 @@ def drawer_with_a_grip() -> FurnitureUnderTest:
     """
     return (
         FurnitureUnderTest.build()
-        .add("cabinet", "root", FixedConnection)
+        .add(name="cabinet", parent="root", connection_type=FixedConnection)
         .add(
-            "case",
-            "cabinet",
-            ScrewAxisConnection,
+            name="case",
+            parent="cabinet",
+            connection_type=ScrewAxisConnection,
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
                 axis=Vector3.X()
             ),
         )
-        .add("grip", "case", FixedConnection)
+        .add(name="grip", parent="case", connection_type=FixedConnection)
     )
 
 
@@ -220,7 +239,7 @@ def test_a_grip_fixed_to_a_moving_part_is_a_handle(drawer_with_a_grip):
     all.
     """
     assert drawer_with_a_grip.root_names(handles) == {
-        drawer_with_a_grip.name_of("grip")
+        drawer_with_a_grip.name_of(key="grip")
     }
 
 
@@ -230,8 +249,8 @@ def test_a_body_fixed_to_something_that_cannot_move_is_not_a_handle():
     """
     furniture = (
         FurnitureUnderTest.build()
-        .add("worktop", "root", FixedConnection)
-        .add("appliance", "worktop", FixedConnection)
+        .add(name="worktop", parent="root", connection_type=FixedConnection)
+        .add(name="appliance", parent="worktop", connection_type=FixedConnection)
     )
 
     assert furniture.root_names(handles) == set()
@@ -242,7 +261,9 @@ def test_a_body_the_world_already_identifies_is_not_a_handle(drawer_with_a_grip)
     An object put away in a drawer is jointed exactly as a handle is, and keeps the
     identity the world already holds for it.
     """
-    drawer_with_a_grip.annotate(Spoon(root=drawer_with_a_grip.bodies["grip"]))
+    drawer_with_a_grip.annotate(
+        annotation=Spoon(root=drawer_with_a_grip.bodies["grip"])
+    )
 
     assert drawer_with_a_grip.root_names(handles) == set()
 
@@ -254,16 +275,16 @@ def test_a_body_named_after_furniture_is_not_a_handle():
     """
     furniture = (
         FurnitureUnderTest.build()
-        .add("cabinet", "root", FixedConnection)
+        .add(name="cabinet", parent="root", connection_type=FixedConnection)
         .add(
-            "case",
-            "cabinet",
-            ScrewAxisConnection,
+            name="case",
+            parent="cabinet",
+            connection_type=ScrewAxisConnection,
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
                 axis=Vector3.X()
             ),
         )
-        .add("board", "case", FixedConnection)
+        .add(name="board", parent="case", connection_type=FixedConnection)
     )
 
     assert furniture.root_names(handles) == set()
@@ -289,11 +310,11 @@ def test_a_case_with_nothing_to_pull_it_by_is_still_a_drawer():
     """
     furniture = (
         FurnitureUnderTest.build()
-        .add("cabinet", "root", FixedConnection)
+        .add(name="cabinet", parent="root", connection_type=FixedConnection)
         .add(
-            "case",
-            "cabinet",
-            ScrewAxisConnection,
+            name="case",
+            parent="cabinet",
+            connection_type=ScrewAxisConnection,
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
                 axis=Vector3.X()
             ),
@@ -322,14 +343,14 @@ def test_a_leaf_a_hinge_swings_is_a_door_with_its_grip():
     """
     furniture = (
         FurnitureUnderTest.build()
-        .add("cabinet", "root", FixedConnection)
+        .add(name="cabinet", parent="root", connection_type=FixedConnection)
         .add(
-            "leaf",
-            "cabinet",
-            ScrewAxisConnection,
+            name="leaf",
+            parent="cabinet",
+            connection_type=ScrewAxisConnection,
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.X()),
         )
-        .add("grip", "leaf", FixedConnection)
+        .add(name="grip", parent="leaf", connection_type=FixedConnection)
         .apply(handles)
     )
 
@@ -345,26 +366,26 @@ def test_a_leaf_another_follows_is_opened_by_that_leafs_handle():
     """
     furniture = (
         FurnitureUnderTest.build()
-        .add("cabinet", "root", FixedConnection)
+        .add(name="cabinet", parent="root", connection_type=FixedConnection)
         .add(
-            "upper_leaf",
-            "cabinet",
-            ScrewAxisConnection,
+            name="upper_leaf",
+            parent="cabinet",
+            connection_type=ScrewAxisConnection,
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.X()),
         )
         .add(
-            "lower_leaf",
-            "upper_leaf",
-            ScrewAxisConnection,
+            name="lower_leaf",
+            parent="upper_leaf",
+            connection_type=ScrewAxisConnection,
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.X()),
             multiplier=1.2,
         )
-        .add("grip", "lower_leaf", FixedConnection)
+        .add(name="grip", parent="lower_leaf", connection_type=FixedConnection)
         .apply(handles)
     )
 
     assert furniture.root_names(doors_without_a_handle) == {
-        furniture.name_of("upper_leaf")
+        furniture.name_of(key="upper_leaf")
     }
 
 
@@ -375,25 +396,25 @@ def test_a_container_is_not_opened_by_the_handle_on_its_own_door():
     """
     furniture = (
         FurnitureUnderTest.build()
-        .add("cabinet", "root", FixedConnection)
+        .add(name="cabinet", parent="root", connection_type=FixedConnection)
         .add(
-            "appliance",
-            "cabinet",
-            ScrewAxisConnection,
+            name="appliance",
+            parent="cabinet",
+            connection_type=ScrewAxisConnection,
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.X()),
         )
         .add(
-            "leaf",
-            "appliance",
-            ScrewAxisConnection,
+            name="leaf",
+            parent="appliance",
+            connection_type=ScrewAxisConnection,
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.X()),
         )
-        .add("grip", "leaf", FixedConnection)
+        .add(name="grip", parent="leaf", connection_type=FixedConnection)
         .apply(handles)
     )
 
     assert furniture.root_names(doors_with_a_handle, doors_without_a_handle) == {
-        furniture.name_of("leaf")
+        furniture.name_of(key="leaf")
     }
 
 
@@ -404,17 +425,17 @@ def test_a_linkage_with_no_grip_anywhere_holds_no_door():
     """
     furniture = (
         FurnitureUnderTest.build()
-        .add("basin", "root", FixedConnection)
+        .add(name="basin", parent="root", connection_type=FixedConnection)
         .add(
-            "spout",
-            "basin",
-            ScrewAxisConnection,
+            name="spout",
+            parent="basin",
+            connection_type=ScrewAxisConnection,
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.X()),
         )
         .add(
-            "lever",
-            "spout",
-            ScrewAxisConnection,
+            name="lever",
+            parent="spout",
+            connection_type=ScrewAxisConnection,
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.X()),
         )
         .apply(handles)
@@ -431,7 +452,7 @@ def test_a_robots_own_parts_are_not_furniture(drawer_with_a_grip):
     A robot is jointed exactly like a drawer with a handle on it, so only knowing that
     the branch is a robot keeps the rules off it.
     """
-    MinimalRobot.from_branch_in_world(drawer_with_a_grip.bodies["cabinet"])
+    MinimalRobot.from_branch_in_world(branch_root=drawer_with_a_grip.bodies["cabinet"])
 
     assert drawer_with_a_grip.root_names(handles) == set()
     assert (
@@ -464,22 +485,22 @@ def test_a_container_holds_a_part_reached_through_a_shapeless_helper():
     """
     furniture = (
         FurnitureUnderTest.build()
-        .add("cabinet", "root", FixedConnection)
+        .add(name="cabinet", parent="root", connection_type=FixedConnection)
         .add_without_geometry(
-            "popout",
-            "cabinet",
-            ScrewAxisConnection,
+            name="popout",
+            parent="cabinet",
+            connection_type=ScrewAxisConnection,
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
                 axis=Vector3.X()
             ),
         )
         .add(
-            "leaf",
-            "popout",
-            ScrewAxisConnection,
+            name="leaf",
+            parent="popout",
+            connection_type=ScrewAxisConnection,
             screw_axis=ScrewAxisConnection.create_revolute_screw_axis(axis=Vector3.X()),
         )
-        .add("grip", "leaf", FixedConnection)
+        .add(name="grip", parent="leaf", connection_type=FixedConnection)
         .apply(handles, doors_with_a_handle)
     )
 
@@ -495,11 +516,11 @@ def test_a_container_takes_its_kind_from_the_part_that_names_it():
     """
     furniture = (
         FurnitureUnderTest.build()
-        .add("unit", "root", FixedConnection)
+        .add(name="unit", parent="root", connection_type=FixedConnection)
         .add(
-            "dishwasher_front",
-            "unit",
-            ScrewAxisConnection,
+            name="dishwasher_front",
+            parent="unit",
+            connection_type=ScrewAxisConnection,
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
                 axis=Vector3.X()
             ),
@@ -510,7 +531,7 @@ def test_a_container_takes_its_kind_from_the_part_that_names_it():
     assert (
         NamedContainerKind(body=furniture.bodies["unit"])() is ContainerKind.DISHWASHER
     )
-    assert furniture.root_names(dishwashers) == {furniture.name_of("unit")}
+    assert furniture.root_names(dishwashers) == {furniture.name_of(key="unit")}
     assert furniture.root_names(cabinets) == set()
 
 
@@ -520,11 +541,11 @@ def test_a_container_naming_no_kind_is_a_plain_cabinet():
     """
     furniture = (
         FurnitureUnderTest.build()
-        .add("unit", "root", FixedConnection)
+        .add(name="unit", parent="root", connection_type=FixedConnection)
         .add(
-            "case",
-            "unit",
-            ScrewAxisConnection,
+            name="case",
+            parent="unit",
+            connection_type=ScrewAxisConnection,
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
                 axis=Vector3.X()
             ),
@@ -533,4 +554,4 @@ def test_a_container_naming_no_kind_is_a_plain_cabinet():
     )
 
     assert NamedContainerKind(body=furniture.bodies["unit"])() is None
-    assert furniture.root_names(cabinets) == {furniture.name_of("unit")}
+    assert furniture.root_names(cabinets) == {furniture.name_of(key="unit")}

@@ -170,7 +170,7 @@ def _name_words(body: Body, word_separator: str = "_") -> list[str]:
     ]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NameMatch:
     """
     What a body's name says about one kind.
@@ -209,7 +209,9 @@ def _match_name(words: Sequence[str], kind: AnnotationKind) -> NameMatch | None:
         return None
     vocabulary = class_words | annotation_type._synonyms
     matched = [index for index, word in enumerate(words) if word in vocabulary]
-    return NameMatch(kind, len(matched), max(matched))
+    return NameMatch(
+        kind=kind, covered_words=len(matched), last_word_index=max(matched)
+    )
 
 
 def asserted_kind(
@@ -243,7 +245,7 @@ def asserted_kind(
     ).kind
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class IsNamedAfter(Predicate):
     """
     Whether the body's name settles on one annotation type rather than on any other kind
@@ -277,7 +279,7 @@ class IsNamedAfter(Predicate):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class NamesARecognisedKind(Predicate):
     """
     Whether the body's name claims one of the kinds the rules recognise by name.
@@ -304,7 +306,7 @@ class NamesARecognisedKind(Predicate):
         return predicate_clause(cls, Noun(content=fields["body"]))
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class IsNamedAfterFurniture(Predicate):
     """
     Whether the body's name claims a kind of furniture.
@@ -334,7 +336,7 @@ class IsNamedAfterFurniture(Predicate):
         return predicate_clause(cls, Noun(content=fields["body"]))
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class NamedContainerKind(SymbolicFunction):
     """
     The kind of container the names give away - the body's own and those of its parts -
@@ -348,7 +350,7 @@ class NamedContainerKind(SymbolicFunction):
 
     def __call__(self) -> ContainerKind | None:
         for part in self.body._world.get_kinematic_structure_entities_of_branch(
-            self.body
+            root=self.body
         ):
             kind = asserted_kind(_name_words(part), ContainerKind)
             if kind is not None:
@@ -371,7 +373,7 @@ class NamedContainerKind(SymbolicFunction):
 # %% what the rules leave alone
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class IsPartOfARobot(Predicate):
     """
     Whether the body belongs to a robot rather than to the environment.
@@ -391,7 +393,7 @@ class IsPartOfARobot(Predicate):
         robot_roots = {
             robot.root
             for robot in self.body._world.get_semantic_annotations_by_type(
-                AbstractRobot
+                semantic_annotation_type=AbstractRobot
             )
         }
         ancestor = self.body
@@ -415,7 +417,7 @@ class IsPartOfARobot(Predicate):
 # %% the geometry a body carries
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasCollisionGeometry(Predicate):
     """
     Whether the body carries collision geometry of its own.
@@ -446,7 +448,7 @@ class HasCollisionGeometry(Predicate):
 # %% identities the world already holds
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasAnotherAnnotation(Predicate):
     """
     Whether something other than one annotation type has been annotated on the body.
@@ -561,7 +563,7 @@ def doors_of(body: Body, annotations: Sequence[SemanticAnnotation]) -> list[Door
     return _parts_held_by(body, annotations, Door)
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HoldsOpenableParts(Predicate):
     """
     Whether anything opens out of the body, which is what makes it a container.

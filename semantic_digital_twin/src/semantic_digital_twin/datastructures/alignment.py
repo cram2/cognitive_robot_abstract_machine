@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from krrood_spatial_math.spatial_types import Vector3
 
 
-@dataclass
+@dataclass(kw_only=True)
 class AlignmentPair:
     """
     A pair of normals that should be aligned during a tool motion: the normal of the

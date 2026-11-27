@@ -64,7 +64,7 @@ def test_a_box_must_implement_contains():
     the method is promised -- a box that does not answer it is not a box.
     """
 
-    @dataclass(eq=False)
+    @dataclass(eq=False, kw_only=True)
     class BoxWithoutContains(AxisAlignedBox[Point2]):
         @classmethod
         def axes(cls) -> tuple[SpatialVariables, ...]:

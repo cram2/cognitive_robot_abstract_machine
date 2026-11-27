@@ -69,7 +69,11 @@ class DAiSyTester(GiskardTester):
     def setup_giskard(self) -> Giskard:
         return Giskard(
             world_source=WorldSpecification(
-                robots=[RobotSpecification.specify_real_robot(DAiSy)]
+                robots=[
+                    RobotSpecification.specify_real_robot(
+                        semantic_annotation_type=DAiSy
+                    )
+                ]
             ),
             robot_interface_config=StandAloneRobotInterfaceConfig(),
             server_config=GiskardServerConfig(),
@@ -99,12 +103,12 @@ def test_joints1(giskard: DAiSyTester) -> None:
         node=(
             joint_goal := JointPositionList(
                 goal_state=JointState.from_str_dict(
-                    {
+                    mapping={
                         "left_wrist_1_joint": 1.23,
                         "left_wrist_2_joint": 1.23,
                         "left_wrist_3_joint": 1.23,
                     },
-                    giskard.api.world,
+                    world=giskard.api.world,
                 )
             )
         ),
@@ -114,9 +118,9 @@ def test_joints1(giskard: DAiSyTester) -> None:
     giskard.api.compile(statechart=statechart)
     giskard.api.execute()
 
-    base = giskard.world.get_kinematic_structure_entity_by_name("left_base_link")
+    base = giskard.world.get_kinematic_structure_entity_by_name(name="left_base_link")
     finger_tip = giskard.world.get_kinematic_structure_entity_by_name(
-        "left_gripper_left_finger_tip_link"
+        name="left_gripper_left_finger_tip_link"
     )
     base_T_finger_current = giskard.world.compute_forward_kinematics(
         root=base, tip=finger_tip

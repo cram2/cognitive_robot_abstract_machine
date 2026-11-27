@@ -258,7 +258,7 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
             )
             return None
         bounding_box = shape_collection.as_bounding_box_collection_in_frame(
-            body
+            reference_frame=body
         ).bounding_box()
         bounding_box_scale = bounding_box.scale
         body_T_bounding_box = (
@@ -383,7 +383,7 @@ class StaticObjectDetectorAnnotator(BaseAnnotator):
         camera_T_world = None
         if self.descriptor.parameters.mode == StaticObjectMode.WORLD_DESCRIPTOR:
             predefined_object_annotations = self.world.get_semantic_annotations_by_type(
-                PredefinedObject
+                semantic_annotation_type=PredefinedObject
             )
             object_bodies = [
                 annotation.body

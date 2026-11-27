@@ -10,7 +10,7 @@ from krrood.exceptions import DataclassException
 
 
 # %% Ray query inputs
-@dataclass
+@dataclass(kw_only=True)
 class RayPointShapeMismatch(DataclassException):
     """
     Ray origins and targets describe different numbers of spatial points.
@@ -20,6 +20,7 @@ class RayPointShapeMismatch(DataclassException):
     """
     Shape of the ray-origin point array.
     """
+
     target_shape: tuple[int, ...]
     """
     Shape of the ray-target point array.
@@ -39,7 +40,7 @@ class RayPointShapeMismatch(DataclassException):
 
 
 # %% Camera rendering inputs
-@dataclass
+@dataclass(kw_only=True)
 class UnsupportedCameraProjection(DataclassException):
     """
     The requested projection cannot be represented by the rendering mode.

@@ -64,16 +64,16 @@ Your goal:
 
 ```{code-cell} ipython3
 :tags: [example-solution]
-world = URDFParser.from_file(table_urdf).create_world()
+world = URDFParser.from_file(file_path=table_urdf).create_world()
 # Find the table surface body named "top"
 top = [b for b in world.bodies if b.name.name == "top"][0]
 # Create a thin region at the table surface and attach it to the body "top"
-surface_region = Region(name=PrefixedName("table_surface"))
-surface_shape = Box(origin=HomogeneousTransformationMatrix(reference_frame=surface_region), scale=Scale(1.0, 1.0, 0.001))
+surface_region = Region(name=PrefixedName(name="table_surface"))
+surface_shape = Box(origin=HomogeneousTransformationMatrix(reference_frame=surface_region), scale=Scale(x=1.0, y=1.0, z=0.001))
 surface_region.area = [surface_shape]
 with world.modify_world():
-    world.add_kinematic_structure_entity(surface_region)
-    world.add_connection(FixedConnection(parent=top, child=surface_region))
+    world.add_kinematic_structure_entity(kinematic_structure_entity=surface_region)
+    world.add_connection(connection=FixedConnection(parent=top, child=surface_region))
 # Remember the initial pose
 before_pos = surface_region.global_pose.position.to_np()[:3]
 ```
@@ -96,10 +96,10 @@ Your goal:
 
 ```{code-cell} ipython3
 :tags: [example-solution]
-new_root = Body(name=PrefixedName("root"))
+new_root = Body(name=PrefixedName(name="root"))
 with world.modify_world():
     root_to_table = Connection6DoF.create_with_dofs(parent=new_root, child=world.root, world=world)
-    world.add_connection(root_to_table)
+    world.add_connection(connection=root_to_table)
 with world.modify_world():
     root_to_table.origin = HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0, y=2.0, reference_frame=world.root)
 ```
@@ -107,5 +107,5 @@ with world.modify_world():
 ```{code-cell} ipython3
 :tags: [verify-solution, remove-input]
 after_pos = surface_region.global_pose.position.to_np()[:3]
-if not (before_pos != after_pos).any(): raise ExerciseVerificationFailed("The region pose should change when the table moves.")
+if not (before_pos != after_pos).any(): raise ExerciseVerificationFailed(requirement="The region pose should change when the table moves.")
 ```

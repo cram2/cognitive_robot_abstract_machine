@@ -47,7 +47,7 @@ class SetSeedConfiguration(SucceedsOnObservingTrue, MotionStatechartNode):
         return NodeArtifacts(observation=sm.Scalar.const_true())
 
     def on_start(self) -> None:
-        self.seed_configuration.apply_to(self.context.world)
+        self.seed_configuration.apply_to(world=self.context.world)
 
 
 @dataclass(eq=False, repr=False, kw_only=True)
@@ -121,7 +121,7 @@ class SetOdometry(SucceedsOnObservingTrue, MotionStatechartNode, MobileBasePoseG
             return self.odom_connection.child.parent_connection
 
         drive_connections = self.context.world.get_connections_by_type(
-            self._odom_joints
+            connection_type=self._odom_joints
         )
         if len(drive_connections) != 1:
             raise UnexpectedWorldEntityCountError(
@@ -135,7 +135,7 @@ class SetOdometry(SucceedsOnObservingTrue, MotionStatechartNode, MobileBasePoseG
     def on_start(self) -> None:
         parent_T_pose_ref = HomogeneousTransformationMatrix(
             self.context.world.compute_forward_kinematics_np(
-                self.odom_connection.parent, self.base_pose.reference_frame
+                root=self.odom_connection.parent, tip=self.base_pose.reference_frame
             )
         )
         parent_T_pose = parent_T_pose_ref @ self.base_pose

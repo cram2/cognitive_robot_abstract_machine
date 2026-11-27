@@ -162,12 +162,12 @@ class BaseWorldDescriptor:
                         self._center_mesh_origin(mesh=mesh)
                     box = mesh.local_frame_bounding_box.as_shape()
                     shapes = [box, mesh]
-                    collision = ShapeCollection([box])
+                    collision = ShapeCollection(shapes=[box])
                 else:
                     if spec.box_scale is not None:
                         box = Box(scale=spec.box_scale, color=spec.color)
                         shapes = [box]
-                        collision = ShapeCollection([box])
+                        collision = ShapeCollection(shapes=[box])
                     elif (
                         spec.cylinder_width is not None
                         and spec.cylinder_height is not None
@@ -178,20 +178,22 @@ class BaseWorldDescriptor:
                             color=spec.color,
                         )
                         shapes = [cylinder]
-                        collision = ShapeCollection([cylinder])
+                        collision = ShapeCollection(shapes=[cylinder])
                     else:
                         raise ObjectGeometryMissing(object_name=spec.name)
 
                 body = Body(
                     name=PrefixedName(name=spec.name),
-                    visual=ShapeCollection(shapes),
+                    visual=ShapeCollection(shapes=shapes),
                     collision=collision,
                 )
                 connection = Connection6DoF.create_with_dofs(
                     parent=root, child=body, world=self.world
                 )
-                self.world.add_connection(connection)
-                self.world.add_semantic_annotation(PredefinedObject(body=body))
+                self.world.add_connection(connection=connection)
+                self.world.add_semantic_annotation(
+                    semantic_annotation=PredefinedObject(body=body)
+                )
                 connections[spec.name] = connection
 
         # Set origins in a separate modification block so FK is compiled first
@@ -215,12 +217,14 @@ class BaseWorldDescriptor:
                 region = Region(name=PrefixedName(name=spec.name))
                 area = ShapeCollection()
                 area.reference_frame = region
-                area.append(box)
+                area.append(shape=box)
                 region.area = area
 
                 parent = root
                 if spec.parent_name is not None:
-                    parent_candidates = self.world.get_bodies_by_name(spec.parent_name)
+                    parent_candidates = self.world.get_bodies_by_name(
+                        name=spec.parent_name
+                    )
                     if len(parent_candidates) == 0:
                         raise RegionParentMissing(
                             region_name=spec.name, parent_name=spec.parent_name
@@ -230,7 +234,7 @@ class BaseWorldDescriptor:
                 connection = Connection6DoF.create_with_dofs(
                     parent=parent, child=region, world=self.world
                 )
-                self.world.add_connection(connection)
+                self.world.add_connection(connection=connection)
                 connections[spec.name] = connection
 
         # Set origins in a separate modification block so FK is compiled first
@@ -255,8 +259,8 @@ class BaseWorldDescriptor:
                 child=camera.root,
                 world=self.world,
             )
-            self.world.add_connection(connection)
-            self.world.add_semantic_annotation(camera)
+            self.world.add_connection(connection=connection)
+            self.world.add_semantic_annotation(semantic_annotation=camera)
 
         with self.world.modify_world():
             connection.origin = HomogeneousTransformationMatrix(
@@ -271,7 +275,7 @@ class BaseWorldDescriptor:
         Get list of pre-defined objects.
         """
         predefined_object_annotations = self.world.get_semantic_annotations_by_type(
-            PredefinedObject
+            semantic_annotation_type=PredefinedObject
         )
         return list(
             [

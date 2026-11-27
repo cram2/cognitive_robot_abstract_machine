@@ -118,7 +118,7 @@ def control_cycles_to_reach_joint_goal(world: World, with_floor: bool) -> int:
     )
     motion_statechart = Statechart(context=executor.context)
     joint_goal = JointPositionList(
-        goal_state=JointState.from_mapping({connection: 0.9})
+        goal_state=JointState.from_mapping(mapping={connection: 0.9})
     )
     motion_statechart.add_node(node=joint_goal)
     if with_floor:
@@ -169,7 +169,7 @@ def cruise_speed_of_a_far_joint_goal(
     motion_statechart = Statechart(context=executor.context)
     motion_statechart.add_node(
         node=JointPositionList(
-            goal_state=JointState.from_mapping({connection: 500.0}),
+            goal_state=JointState.from_mapping(mapping={connection: 500.0}),
             cruise_velocity=cruise_velocity,
         )
     )
@@ -249,7 +249,7 @@ def penetration_into_ceiling(
     motion_statechart.add_node(
         node=JointPositionList(
             goal_state=JointState.from_mapping(
-                {connection: ceiling_position + goal_above_ceiling}
+                mapping={connection: ceiling_position + goal_above_ceiling}
             ),
             cruise_velocity=goal_cruise_velocity,
         )

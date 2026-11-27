@@ -57,11 +57,13 @@ def test_the_milk_ends_where_it_is_set_down_on_the_table(hsr_demo):
 
     world = demonstration.run()
 
-    [milk] = world.get_semantic_annotations_by_type(Milk)
+    [milk] = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)
     set_down_at = demonstration._milk_pose_on(
-        surface=world.get_body_by_name(hsr_demo.SceneBody.TABLE), milk=milk
+        surface=world.get_body_by_name(name=hsr_demo.SceneBody.TABLE), milk=milk
     )
-    position = world.compute_forward_kinematics_np(world.root, milk.root)[:3, 3]
+    position = world.compute_forward_kinematics_np(root=world.root, tip=milk.root)[
+        :3, 3
+    ]
     assert list(position) == pytest.approx(
         [float(set_down_at.x), float(set_down_at.y), float(set_down_at.z)], abs=0.02
     )

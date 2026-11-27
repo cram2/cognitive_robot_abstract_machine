@@ -98,7 +98,7 @@ class DAiSyJoint(JointName):
     RIGHT_GRIPPER_RIGHT_FINGER = "right_gripper_right_finger_joint"
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class DAiSyLeftGripperLeftFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -108,19 +108,19 @@ class DAiSyLeftGripperLeftFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "left_gripper_left_finger_link"
+                branch_root=robot_root, name="left_gripper_left_finger_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "left_gripper_left_finger_tip_link"
+                branch_root=robot_root, name="left_gripper_left_finger_tip_link"
             ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class DAiSyLeftGripperRightFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -130,19 +130,19 @@ class DAiSyLeftGripperRightFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "left_gripper_right_finger_link"
+                branch_root=robot_root, name="left_gripper_right_finger_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "left_gripper_right_finger_tip_link"
+                branch_root=robot_root, name="left_gripper_right_finger_tip_link"
             ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class DAiSyRightGripperLeftFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -152,19 +152,19 @@ class DAiSyRightGripperLeftFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "right_gripper_left_finger_link"
+                branch_root=robot_root, name="right_gripper_left_finger_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "right_gripper_left_finger_tip_link"
+                branch_root=robot_root, name="right_gripper_left_finger_tip_link"
             ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class DAiSyRightGripperRightFinger(Finger):
     def setup_hardware_interfaces(self) -> None:
         pass
@@ -174,19 +174,19 @@ class DAiSyRightGripperRightFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "right_gripper_right_finger_link"
+                branch_root=robot_root, name="right_gripper_right_finger_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "right_gripper_right_finger_tip_link"
+                branch_root=robot_root, name="right_gripper_right_finger_tip_link"
             ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class DAiSyLeftGripper(
     GriplinkGripper,
     HasTwoFingers[DAiSyLeftGripperLeftFinger, DAiSyLeftGripperRightFinger],
@@ -223,17 +223,17 @@ class DAiSyLeftGripper(
         carries the fingers past each other.
         """
         left_gripper_joints = [
-            self._world.get_connection_by_name(DAiSyJoint.LEFT_GRIPPER_FINGER),
+            self._world.get_connection_by_name(name=DAiSyJoint.LEFT_GRIPPER_FINGER),
         ]
 
         gripper_open = JointState.from_mapping(
-            name=PrefixedName("left_gripper_open", prefix=self.name.name),
+            name=PrefixedName(name="left_gripper_open", prefix=self.name.name),
             mapping=dict(zip(left_gripper_joints, [0.0])),
             state_type=GripperState.OPEN,
         )
 
         gripper_close = JointState.from_mapping(
-            name=PrefixedName("left_gripper_close", prefix=self.name.name),
+            name=PrefixedName(name="left_gripper_close", prefix=self.name.name),
             mapping=dict(zip(left_gripper_joints, [0.028])),
             state_type=GripperState.CLOSE,
         )
@@ -249,19 +249,19 @@ class DAiSyLeftGripper(
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "left_gripper_base_link"
+                branch_root=robot_root, name="left_gripper_base_link"
             ),
             tool_frame=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "left_gripper_tool_frame"
+                branch_root=robot_root, name="left_gripper_tool_frame"
             ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class DAiSyRightGripper(
     GriplinkGripper,
     HasTwoFingers[DAiSyRightGripperLeftFinger, DAiSyRightGripperRightFinger],
@@ -298,17 +298,17 @@ class DAiSyRightGripper(
         carries the fingers past each other.
         """
         right_gripper_joints = [
-            self._world.get_connection_by_name(DAiSyJoint.RIGHT_GRIPPER_FINGER),
+            self._world.get_connection_by_name(name=DAiSyJoint.RIGHT_GRIPPER_FINGER),
         ]
 
         gripper_open = JointState.from_mapping(
-            name=PrefixedName("right_gripper_open", prefix=self.name.name),
+            name=PrefixedName(name="right_gripper_open", prefix=self.name.name),
             mapping=dict(zip(right_gripper_joints, [0.0])),
             state_type=GripperState.OPEN,
         )
 
         gripper_close = JointState.from_mapping(
-            name=PrefixedName("right_gripper_close", prefix=self.name.name),
+            name=PrefixedName(name="right_gripper_close", prefix=self.name.name),
             mapping=dict(zip(right_gripper_joints, [0.028])),
             state_type=GripperState.CLOSE,
         )
@@ -325,19 +325,19 @@ class DAiSyRightGripper(
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "right_gripper_base_link"
+                branch_root=robot_root, name="right_gripper_base_link"
             ),
             tool_frame=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "right_gripper_tool_frame"
+                branch_root=robot_root, name="right_gripper_tool_frame"
             ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class DAiSyLeftArm(Arm[DAiSyLeftGripper]):
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
@@ -345,7 +345,7 @@ class DAiSyLeftArm(Arm[DAiSyLeftGripper]):
     def setup_joint_states(self) -> list[JointState]:
         connections = self.active_connections
         arm_park = JointState.from_mapping(
-            name=PrefixedName("left_arm_park", prefix=self.name.name),
+            name=PrefixedName(name="left_arm_park", prefix=self.name.name),
             mapping=dict(
                 zip(
                     connections,
@@ -365,19 +365,19 @@ class DAiSyLeftArm(Arm[DAiSyLeftGripper]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "table_center"
+                branch_root=robot_root, name="table_center"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "left_wrist_3_link"
+                branch_root=robot_root, name="left_wrist_3_link"
             ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class DAiSyRightArm(Arm[DAiSyRightGripper]):
     def setup_hardware_interfaces(self) -> None:
         self._setup_hardware_interfaces_for_active_connections()
@@ -385,7 +385,7 @@ class DAiSyRightArm(Arm[DAiSyRightGripper]):
     def setup_joint_states(self) -> list[JointState]:
         connections = self.active_connections
         arm_park = JointState.from_mapping(
-            name=PrefixedName("right_arm_park", prefix=self.name.name),
+            name=PrefixedName(name="right_arm_park", prefix=self.name.name),
             mapping=dict(
                 zip(
                     connections,
@@ -405,19 +405,19 @@ class DAiSyRightArm(Arm[DAiSyRightGripper]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "table_center"
+                branch_root=robot_root, name="table_center"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "right_wrist_3_link"
+                branch_root=robot_root, name="right_wrist_3_link"
             ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class DAiSyCamera(RobotCamera[FieldOfViewCameraModel]):
     """
     DAiSy does not currently have a dedicated camera.
@@ -433,12 +433,14 @@ class DAiSyCamera(RobotCamera[FieldOfViewCameraModel]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=cls.create_optical_body(
-                robot_root._world.get_body_in_branch_by_name(robot_root, "camera_link"),
-                HomogeneousTransformationMatrix(),
+                mounting_body=robot_root._world.get_body_in_branch_by_name(
+                    branch_root=robot_root, name="camera_link"
+                ),
+                parent_T_optical=HomogeneousTransformationMatrix(),
             ),
             camera_model=FieldOfViewCameraModel(
                 angular_extent=FieldOfView(horizontal_angle=1.047, vertical_angle=0.785)
@@ -449,7 +451,7 @@ class DAiSyCamera(RobotCamera[FieldOfViewCameraModel]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class DAiSy(AbstractRobot, HasLeftRightArm[DAiSyLeftArm, DAiSyRightArm]):
     """
     Represents two UR5 Arms mounted on a table.
@@ -473,7 +475,9 @@ class DAiSy(AbstractRobot, HasLeftRightArm[DAiSyLeftArm, DAiSyRightArm]):
             "daisy.srdf",
         )
         self._world.collision_manager.add_ignore_collision_rule(
-            SelfCollisionMatrixRule.from_collision_srdf(srdf_path, self._world)
+            rule=SelfCollisionMatrixRule.from_collision_srdf(
+                file_path=srdf_path, world=self._world
+            )
         )
 
         forearm_gripper_collision_body_pairs = [
@@ -483,7 +487,7 @@ class DAiSy(AbstractRobot, HasLeftRightArm[DAiSyLeftArm, DAiSyRightArm]):
             ("right_forearm_link", "left_gripper_side_cylinder_link"),
         ]
         self._world.collision_manager.extend_default_rules(
-            [
+            rules=[
                 AvoidExternalCollisions(
                     buffer_zone_distance=0.05, violated_distance=0.0, robot=self
                 ),
@@ -496,8 +500,8 @@ class DAiSy(AbstractRobot, HasLeftRightArm[DAiSyLeftArm, DAiSyRightArm]):
                     AvoidCollisionBetweenGroups(
                         buffer_zone_distance=0.015,
                         violated_distance=0.0,
-                        body_group_a=[self._world.get_body_by_name(forearm_name)],
-                        body_group_b=[self._world.get_body_by_name(gripper_name)],
+                        body_group_a=[self._world.get_body_by_name(name=forearm_name)],
+                        body_group_b=[self._world.get_body_by_name(name=gripper_name)],
                     )
                     for forearm_name, gripper_name in forearm_gripper_collision_body_pairs
                 ),

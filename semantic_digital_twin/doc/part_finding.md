@@ -37,7 +37,7 @@ on each piece:
 from semantic_digital_twin.pipeline.mesh_decomposition.coacd import COACDMeshDecomposer
 
 AnnotationPartFinder().find_parts(whole=mug)
-COACDMeshDecomposer().apply(mug._world)
+COACDMeshDecomposer().apply(world=mug._world)
 ```
 
 or let the finder decompose the pieces again:

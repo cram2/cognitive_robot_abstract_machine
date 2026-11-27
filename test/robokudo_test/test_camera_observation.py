@@ -42,7 +42,7 @@ def test_cas_exposes_camera_observation_without_copying_camera():
     world = World()
     root = Body(name=PrefixedName(name="world"))
     with world.modify_world():
-        world.add_body(root)
+        world.add_body(body=root)
     model = PinholeCameraModel.from_field_of_view(
         resolution=CameraResolution(width=640, height=480),
         field_of_view=FieldOfView(
@@ -89,7 +89,7 @@ def test_camera_observation_requires_pose_for_spatial_access():
     world = World()
     root = Body(name=PrefixedName(name="world"))
     with world.modify_world():
-        world.add_body(root)
+        world.add_body(body=root)
     model = PinholeCameraModel.from_field_of_view(
         resolution=CameraResolution(width=640, height=480),
         field_of_view=FieldOfView(),
@@ -119,7 +119,7 @@ def test_camera_observation_returns_copy_with_pose():
     world = World()
     root = Body(name=PrefixedName(name="world"))
     with world.modify_world():
-        world.add_body(root)
+        world.add_body(body=root)
     model = PinholeCameraModel.from_field_of_view(
         resolution=CameraResolution(width=640, height=480),
         field_of_view=FieldOfView(),
@@ -266,11 +266,13 @@ def test_decoded_observation_rejects_invalid_pose_frames(
     other_camera = Body(name=PrefixedName(name="another_camera"))
     with world.modify_world():
         for body in (reference, observation.camera.root, other_camera):
-            world.add_body(body)
+            world.add_body(body=body)
         for child in (observation.camera.root, other_camera):
-            world.add_connection(FixedConnection(parent=reference, child=child))
-        world.add_semantic_annotation(observation.camera)
-    tracker = WorldEntityWithIDKwargsTracker.from_world(world)
+            world.add_connection(
+                connection=FixedConnection(parent=reference, child=child)
+            )
+        world.add_semantic_annotation(semantic_annotation=observation.camera)
+    tracker = WorldEntityWithIDKwargsTracker.from_world(world=world)
     codec = CameraObservationCodec()
     payload = codec.encode(value=observation)
     recorded = RecordedCameraObservation(

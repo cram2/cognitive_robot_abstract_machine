@@ -62,7 +62,10 @@ class HasParts(HasRootKinematicStructureEntity, HasSemanticRelationships, Mixin)
             field_name=field_name,
         )
         part._mount_strategy(
-            self, IsPartWholeRelationship.of_wrapped_field(wrapped_field=wrapped_field)
+            main_has_root_body_annotation=self,
+            relationship=IsPartWholeRelationship.of_wrapped_field(
+                wrapped_field=wrapped_field
+            ),
         )
         self._store_in_field(entity=part, wrapped_field=wrapped_field)
 

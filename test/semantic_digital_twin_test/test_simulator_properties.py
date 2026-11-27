@@ -19,31 +19,31 @@ from semantic_digital_twin.world_description.world_entity import Body
 
 @pytest.fixture
 def body() -> Body:
-    return Body(name=PrefixedName("body"))
+    return Body(name=PrefixedName(name="body"))
 
 
 def test_no_property_of_a_type_is_none(body):
-    assert body.get_simulator_property_of_type(MujocoBody) is None
+    assert body.get_simulator_property_of_type(property_type=MujocoBody) is None
 
 
 def test_the_attached_property_is_found(body):
     attached = MujocoBody(motion_capture=True)
-    body.add_simulator_property(attached)
+    body.add_simulator_property(simulator_property=attached)
 
-    assert body.get_simulator_property_of_type(MujocoBody) is attached
+    assert body.get_simulator_property_of_type(property_type=MujocoBody) is attached
 
 
 def test_a_property_of_another_type_is_ignored(body):
-    body.add_simulator_property(MujocoGeom())
+    body.add_simulator_property(simulator_property=MujocoGeom())
 
-    assert body.get_simulator_property_of_type(MujocoBody) is None
+    assert body.get_simulator_property_of_type(property_type=MujocoBody) is None
 
 
 def test_attaching_a_second_unique_property_of_one_type_raises(body):
-    body.add_simulator_property(MujocoBody())
+    body.add_simulator_property(simulator_property=MujocoBody())
 
     with pytest.raises(DuplicateSimulatorPropertyError) as raised:
-        body.add_simulator_property(MujocoBody())
+        body.add_simulator_property(simulator_property=MujocoBody())
     assert raised.value.property_type is MujocoBody
     assert body.simulator_additional_properties == [MujocoBody()]
 
@@ -54,8 +54,8 @@ def test_a_property_an_entity_may_carry_several_of_is_attached_again(body):
     """
     first, second = MujocoCamera(), MujocoCamera()
 
-    body.add_simulator_property(first)
-    body.add_simulator_property(second)
+    body.add_simulator_property(simulator_property=first)
+    body.add_simulator_property(simulator_property=second)
 
     assert body.simulator_additional_properties == [first, second]
 
@@ -68,4 +68,4 @@ def test_lookup_returns_the_first_of_two_properties_handed_in_whole(body):
     first, second = MujocoBody(), MujocoBody(motion_capture=True)
     body.simulator_additional_properties = [first, second]
 
-    assert body.get_simulator_property_of_type(MujocoBody) is first
+    assert body.get_simulator_property_of_type(property_type=MujocoBody) is first

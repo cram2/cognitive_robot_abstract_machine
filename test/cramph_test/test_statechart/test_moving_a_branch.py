@@ -54,11 +54,11 @@ class SlidingWorld:
 @pytest.fixture()
 def sliding_world() -> SlidingWorld:
     world = World()
-    root = Body(name=PrefixedName("root"))
-    slider = Body(name=PrefixedName("slider"))
-    box = Body(name=PrefixedName("box"))
+    root = Body(name=PrefixedName(name="root"))
+    slider = Body(name=PrefixedName(name="slider"))
+    box = Body(name=PrefixedName(name="box"))
     with world.modify_world():
-        world.add_kinematic_structure_entity(root)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=root)
         slider_connection = ScrewAxisConnection.create_with_dofs(
             screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
                 axis=Vector3.X()
@@ -67,8 +67,8 @@ def sliding_world() -> SlidingWorld:
             parent=root,
             child=slider,
         )
-        world.add_connection(slider_connection)
-        world.add_connection(FixedConnection(parent=root, child=box))
+        world.add_connection(connection=slider_connection)
+        world.add_connection(connection=FixedConnection(parent=root, child=box))
     return SlidingWorld(
         world=world, slider=slider, box=box, slider_connection=slider_connection
     )
@@ -145,7 +145,7 @@ class NodeObservingABodyPastAPosition(EndedByOwner, StatechartNode):
 
     def build_artifacts(self) -> NodeArtifacts:
         root_T_body = self.context.world.compose_forward_kinematics_expression(
-            self.context.world.root, self.body
+            root=self.context.world.root, tip=self.body
         )
         return NodeArtifacts(observation=root_T_body.position.x >= self.position)
 
@@ -219,7 +219,9 @@ def test_a_node_reading_a_moved_body_reads_it_below_its_new_parent(
     )
     _compile(sliding_executor, observer)
 
-    sliding_world.world.move_branch(sliding_world.box, sliding_world.slider)
+    sliding_world.world.move_branch(
+        branch_root=sliding_world.box, new_parent=sliding_world.slider
+    )
     sliding_world.slider_connection.position = 1.0
     sliding_executor.tick()
 
@@ -232,7 +234,9 @@ def test_every_node_is_built_again_once_the_world_structure_changed(
     counting = NodeCountingItsBuilds(name="counting")
     _compile(sliding_executor, counting)
 
-    sliding_world.world.move_branch(sliding_world.box, sliding_world.slider)
+    sliding_world.world.move_branch(
+        branch_root=sliding_world.box, new_parent=sliding_world.slider
+    )
     sliding_executor.tick()
 
     assert counting.build_count == 2
@@ -244,7 +248,9 @@ def test_a_node_is_set_up_once_however_often_it_is_built(
     counting = NodeCountingItsBuilds(name="counting")
     _compile(sliding_executor, counting)
 
-    sliding_world.world.move_branch(sliding_world.box, sliding_world.slider)
+    sliding_world.world.move_branch(
+        branch_root=sliding_world.box, new_parent=sliding_world.slider
+    )
     sliding_executor.tick()
 
     assert counting.set_up_count == 1
@@ -259,7 +265,9 @@ def test_a_running_node_keeps_running_and_the_history_goes_on_across_a_rebuild(
     ticks_before = sliding_executor.tick_count
     history_before = list(statechart.state_history.items)
 
-    sliding_world.world.move_branch(sliding_world.box, sliding_world.slider)
+    sliding_world.world.move_branch(
+        branch_root=sliding_world.box, new_parent=sliding_world.slider
+    )
     sliding_executor.tick()
 
     assert counting.life_cycle_state == LifeCycleValue.RUNNING
@@ -275,7 +283,9 @@ def test_extensions_are_told_before_and_after_a_rebuild(
     _compile(recording_executor, NodeCountingItsBuilds(name="counting"))
     recording.events.clear()
 
-    sliding_world.world.move_branch(sliding_world.box, sliding_world.slider)
+    sliding_world.world.move_branch(
+        branch_root=sliding_world.box, new_parent=sliding_world.slider
+    )
     recording_executor.tick()
 
     assert recording.events == [
@@ -301,7 +311,9 @@ def test_nodes_joining_after_the_world_structure_changed_have_every_node_built_a
     counting = NodeCountingItsBuilds(name="counting")
     statechart = _compile(sliding_executor, counting)
 
-    sliding_world.world.move_branch(sliding_world.box, sliding_world.slider)
+    sliding_world.world.move_branch(
+        branch_root=sliding_world.box, new_parent=sliding_world.slider
+    )
     with statechart.modify():
         statechart.add_node(node=NodeCountingItsBuilds(name="joining"))
 

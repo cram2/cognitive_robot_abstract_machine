@@ -59,7 +59,7 @@ def test_camera_placement_registers_supplied_annotation_and_root(
     )
     assert camera is camera_placement.camera
     assert camera.root is root
-    assert table_world.get_semantic_annotation_by_id(camera.id) is camera
+    assert table_world.get_semantic_annotation_by_id(id=camera.id) is camera
 
 
 # %% Optical poses
@@ -96,7 +96,7 @@ def test_camera_placement_follows_parent_motion(
         connection = Connection6DoF.create_with_dofs(
             parent=table_world.root, child=parent, world=table_world
         )
-        table_world.add_connection(connection)
+        table_world.add_connection(connection=connection)
     camera = BaseWorldDescriptor(world=table_world).build_camera(
         parent=parent, placement=camera_placement
     )

@@ -13,7 +13,7 @@ from semantic_digital_twin.mixin import (
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PropertyWithOneRenamedField(SimulatorAdditionalProperty):
     """
     A property of which one field is spelled differently by the simulator.
@@ -22,7 +22,7 @@ class PropertyWithOneRenamedField(SimulatorAdditionalProperty):
     spelled_alike: int = 1
 
     spelled_differently: int = field(
-        default=2, metadata=SimulatorAttributeName("diff").as_dict()
+        default=2, metadata=SimulatorAttributeName(attribute_name="diff").as_dict()
     )
 
 

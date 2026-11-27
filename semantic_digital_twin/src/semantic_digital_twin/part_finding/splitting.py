@@ -37,7 +37,7 @@ T = TypeVar("T")
 # %% splitting a mesh
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MeshSplit:
     """
     A mesh cut into a part and the rest of it.
@@ -55,7 +55,7 @@ class MeshSplit:
 
     @classmethod
     def from_mesh(
-        cls, mesh: trimesh.Trimesh, belongs_to_part_mask: NDArray[np.bool_]
+        cls, *, mesh: trimesh.Trimesh, belongs_to_part_mask: NDArray[np.bool_]
     ) -> MeshSplit | None:
         """
         :param mesh: The mesh to split.
@@ -103,7 +103,7 @@ class PartFinder(ABC):
     """
 
     @abstractmethod
-    def split(self, mesh: trimesh.Trimesh) -> MeshSplit | None:
+    def split(self, *, mesh: trimesh.Trimesh) -> MeshSplit | None:
         """
         :param mesh: The object's mesh, in its root body's frame.
         :return: ``mesh`` split into the part and the rest; ``None`` if the mesh has
@@ -114,7 +114,7 @@ class PartFinder(ABC):
 # %% splitting a part off a body
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PartSplitter:
     """
     Splits a part off the shape of a body into a new body fixed to it, optionally
@@ -178,17 +178,17 @@ class PartSplitter:
         )
         if relationship.is_filled_in(whole=whole) and not relationship.holds_many:
             return None
-        cut = self._cut(whole.root)
+        cut = self._cut(body=whole.root)
         if cut is None:
             return None
         world = whole.root._world
         with world.modify_world():
             part = self.part_type(root=cut.apply())
-            world.add_semantic_annotation(part)
+            world.add_semantic_annotation(semantic_annotation=part)
             whole.add(part=part, field_name=relationship.name)
         return part
 
-    def split_body(self, body: Body) -> Body | None:
+    def split_body(self, *, body: Body) -> Body | None:
         """
         Split the part off the shape of a body, without annotating either of them.
 
@@ -196,13 +196,13 @@ class PartSplitter:
         :return: The new body of the part, fixed to ``body`` in its world; ``None`` if
             the finder finds none or the body has no shape.
         """
-        cut = self._cut(body)
+        cut = self._cut(body=body)
         if cut is None:
             return None
         with body._world.modify_world():
             return cut.apply()
 
-    def _cut(self, body: Body) -> CutBody | None:
+    def _cut(self, *, body: Body) -> CutBody | None:
         """
         :param body: The body whose shape is split.
         :return: The part's body and the rest of the shape, not yet in the world;
@@ -213,19 +213,19 @@ class PartSplitter:
         shapes = body.visual or body.collision
         if not shapes:
             return None
-        has_own_collision = self._has_own_collision(body)
+        has_own_collision = self._has_own_collision(body=body)
         if has_own_collision and self.decomposer is None:
-            raise CollisionDiffersFromVisualError(body.name)
+            raise CollisionDiffersFromVisualError(body_name=body.name)
         colored = ColoredShape(shapes=shapes)
-        split = self.finder.split(colored.mesh)
+        split = self.finder.split(mesh=colored.mesh)
         if split is None:
             return None
-        part = Body(name=self._part_name(body), inertial=Inertial.negligible())
-        part.visual = colored.piece(split.part_faces, part)
-        rest = colored.piece(split.rest_faces, body)
+        part = Body(name=self._part_name(body=body), inertial=Inertial.negligible())
+        part.visual = colored.piece(faces=split.part_faces, body=part)
+        rest = colored.piece(faces=split.rest_faces, body=body)
         if has_own_collision:
-            part.collision = self._decomposed(part.visual, part)
-            rest_collision = self._decomposed(rest, body)
+            part.collision = self._decomposed(shapes=part.visual, body=part)
+            rest_collision = self._decomposed(shapes=rest, body=body)
         elif body.collision:
             part.collision = part.visual
             rest_collision = rest
@@ -234,7 +234,7 @@ class PartSplitter:
         return CutBody(body=body, part=part, visual=rest, collision=rest_collision)
 
     @staticmethod
-    def _has_own_collision(body: Body) -> bool:
+    def _has_own_collision(*, body: Body) -> bool:
         """
         :param body: A body.
         :return: Whether it has both visual and collision shapes, and they differ.
@@ -251,30 +251,30 @@ class PartSplitter:
             and np.array_equal(visual.faces, collision.faces)
         )
 
-    def _decomposed(self, shapes: ShapeCollection, body: Body) -> ShapeCollection:
+    def _decomposed(self, *, shapes: ShapeCollection, body: Body) -> ShapeCollection:
         """
         :param shapes: The visual shapes of a piece.
         :param body: The body the piece belongs to.
         :return: The collision shapes :attr:`decomposer` makes of them.
         """
         return ShapeCollection(
-            [
+            shapes=[
                 convex
                 for shape in shapes
-                for convex in self.decomposer.apply_to_shape(shape)
+                for convex in self.decomposer.apply_to_shape(shape=shape)
             ],
             reference_frame=body,
         )
 
-    def _part_name(self, body: Body) -> PrefixedName:
+    def _part_name(self, *, body: Body) -> PrefixedName:
         """
         :param body: The body the part is split off.
         :return: The part's type, under the body's name.
         """
-        return PrefixedName(self.part_type.__name__.lower(), str(body.name))
+        return PrefixedName(name=self.part_type.__name__.lower(), prefix=str(body.name))
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CutBody:
     """
     A body's shape cut into the part's body and the rest, to be applied to the world.
@@ -310,12 +310,12 @@ class CutBody:
         """
         self.body.update_shapes(visual=self.visual, collision=self.collision)
         self.body._world.add_connection(
-            FixedConnection(parent=self.body, child=self.part)
+            connection=FixedConnection(parent=self.body, child=self.part)
         )
         return self.part
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ColoredShape:
     """
     The shapes of a body as one mesh whose faces keep the colors of the shapes, so that
@@ -342,7 +342,7 @@ class ColoredShape:
                 trimesh.transform_points(shape.mesh.vertices, shape.origin.to_np())
             )
             faces.append(shape.mesh.faces + vertex_count)
-            face_colors.append(self._face_colors(shape))
+            face_colors.append(self._face_colors(shape=shape))
             vertex_count += len(shape.mesh.vertices)
         return trimesh.Trimesh(
             vertices=np.concatenate(vertices),
@@ -352,7 +352,7 @@ class ColoredShape:
         )
 
     @staticmethod
-    def _face_colors(shape: Shape) -> NDArray[np.uint8]:
+    def _face_colors(*, shape: Shape) -> NDArray[np.uint8]:
         """
         :param shape: One of :attr:`shapes`.
         :return: The RGBA colour of each face of the shape's mesh, as the shape looks.
@@ -396,7 +396,7 @@ class ColoredShape:
         """
         return np.asarray(self.mesh.visual.face_colors).view(np.ndarray)
 
-    def piece(self, faces: NDArray[np.int64], body: Body) -> ShapeCollection:
+    def piece(self, *, faces: NDArray[np.int64], body: Body) -> ShapeCollection:
         """
         :param faces: The indices of the faces of :attr:`mesh` that make up the piece.
         :param body: The body the piece belongs to, whose frame is the frame of
@@ -417,14 +417,15 @@ class ColoredShape:
         shape = Mesh.from_trimesh(
             mesh=mesh,
             origin=HomogeneousTransformationMatrix(reference_frame=body),
-            finish=self.shared(lambda shape: shape.finish),
+            finish=self.shared(attribute=lambda shape: shape.finish),
         )
         shape.simulator_additional_properties = list(
-            self.shared(lambda shape: shape.simulator_additional_properties) or []
+            self.shared(attribute=lambda shape: shape.simulator_additional_properties)
+            or []
         )
-        return ShapeCollection([shape], reference_frame=body)
+        return ShapeCollection(shapes=[shape], reference_frame=body)
 
-    def shared(self, attribute: Callable[[Shape], T]) -> T | None:
+    def shared(self, *, attribute: Callable[[Shape], T]) -> T | None:
         """
         :param attribute: Reads an attribute of a shape.
         :return: The attribute's value, if all :attr:`shapes` have the same; otherwise

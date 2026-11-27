@@ -52,31 +52,31 @@ when creating the semantic annotation or let semantic_digital_twin generate a un
 ```{code-cell} ipython3
 world = World()
 with world.modify_world():
-    root = Body(name=PrefixedName("root"))
+    root = Body(name=PrefixedName(name="root"))
 
     # Our first apple
-    apple_body = Body(name=PrefixedName("apple_body"))
+    apple_body = Body(name=PrefixedName(name="apple_body"))
     sphere = Sphere(radius=0.15, origin=HomogeneousTransformationMatrix(reference_frame=apple_body))
     apple_body.collision = [sphere]
     apple_body.visual = [sphere]
 
-    world.add_connection(Connection6DoF.create_with_dofs(parent=root, child=apple_body, world=world))
-    world.add_semantic_annotation(Apple(root=apple_body, name=PrefixedName("apple1")))
+    world.add_connection(connection=Connection6DoF.create_with_dofs(parent=root, child=apple_body, world=world))
+    world.add_semantic_annotation(semantic_annotation=Apple(root=apple_body, name=PrefixedName(name="apple1")))
 
     # Our second apple
-    apple_body_2 = Body(name=PrefixedName("apple_body_2"))
+    apple_body_2 = Body(name=PrefixedName(name="apple_body_2"))
     sphere2 = Sphere(radius=0.15, origin=HomogeneousTransformationMatrix(reference_frame=apple_body_2))
     apple_body_2.collision = [sphere2]
     apple_body_2.visual = [sphere2]
     c2 = Connection6DoF.create_with_dofs(parent=root, child=apple_body_2, world=world)
-    world.add_connection(c2)
+    world.add_connection(connection=c2)
     # Move it a bit so we can see both
     world.state[c2.x.id].position = 0.3
     world.state[c2.y.id].position = 0.2
-    world.add_semantic_annotation(Apple(root=apple_body_2, name=PrefixedName("apple2")))
+    world.add_semantic_annotation(semantic_annotation=Apple(root=apple_body_2, name=PrefixedName(name="apple2")))
 
-print(world.get_semantic_annotations_by_type(Apple))
-rt = RayTracer(world)
+print(world.get_semantic_annotations_by_type(semantic_annotation_type=Apple))
+rt = RayTracer(world=world)
 rt.update_scene()
 rt.scene.show("jupyter")
 ```
@@ -117,14 +117,14 @@ with world.modify_world():
     # To learn more about how cool SemanticAnnotationFactories are, please visit the appropriate guide!
     produce_box_with_apples = ProduceBox.create_with_new_body_in_world(
         name="produce_box_with_apples",
-        scale=Scale(1.0, 1.0, 0.3),
+        scale=Scale(x=1.0, y=1.0, z=0.3),
         world=world,
         world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=0.3),
     )
-    produce_box_with_apples.produces = world.get_semantic_annotations_by_type(Apple)
+    produce_box_with_apples.produces = world.get_semantic_annotations_by_type(semantic_annotation_type=Apple)
 
 print(f"produce box with {len(produce_box_with_apples.produces)} produces")
-rt = RayTracer(world)
+rt = RayTracer(world=world)
 rt.update_scene()
 rt.scene.show("jupyter")
 ```
@@ -141,12 +141,12 @@ To demonstrate this, let's first create another ProduceBox, but which is empty t
 with world.modify_world():
     empty_produce_box = ProduceBox.create_with_new_body_in_world(
         name="empty_produce_box",
-        scale=Scale(1.0, 1.0, 0.3),
+        scale=Scale(x=1.0, y=1.0, z=0.3),
         world=world,
         world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=0.3),
     )
 
-rt = RayTracer(world)
+rt = RayTracer(world=world)
 rt.update_scene()
 rt.scene.show("jupyter")
 ```

@@ -38,7 +38,7 @@ pytestmark = [
 def get_artvip_object(name: str) -> ArtVipObject | None:
     try:
         loader = ArtVipDatasetLoader()
-        return loader.load(ArtVipCategory.IKEA_FURNITURE, name)
+        return loader.load(category=ArtVipCategory.IKEA_FURNITURE, name=name)
     except HfHubHTTPError:
         return None
 
@@ -121,5 +121,8 @@ def test_hinged_door_is_reachable_as_an_active_connection_from_its_body(door_obj
     ]
 
     assert (
-        hinge.child.get_first_parent_connection_of_type(ActiveConnection1DOF) is hinge
+        hinge.child.get_first_parent_connection_of_type(
+            connection_type=ActiveConnection1DOF
+        )
+        is hinge
     )

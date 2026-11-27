@@ -100,9 +100,9 @@ class ControllerManager:
             loaded but does not run.
         """
         controllers = self.ros_graph.call_service(
-            ListControllers,
-            f"{self.name}/list_controllers",
-            ListControllers.Request(),
+            service_type=ListControllers,
+            service_name=f"{self.name}/list_controllers",
+            request=ListControllers.Request(),
         ).controller
         if whitelist is not None:
             loaded_controllers = {controller.name for controller in controllers}

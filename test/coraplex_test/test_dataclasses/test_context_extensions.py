@@ -76,9 +76,9 @@ def test_the_robot_of_a_copied_world_is_its_own_copy(pr2_apartment_context) -> N
     world, robot, _ = pr2_apartment_context
     copy = world.__deepcopy__({})
 
-    copied_access = copy.rebind_world_entities(RobotAccess(robot=robot))
+    copied_access = copy.rebind_world_entities(obj=RobotAccess(robot=robot))
 
-    assert copied_access.robot is copy.get_semantic_annotation_by_id(robot.id)
+    assert copied_access.robot is copy.get_semantic_annotation_by_id(id=robot.id)
 
 
 @dataclass(kw_only=True)
@@ -113,7 +113,7 @@ def test_a_copied_plan_rewriting_offers_the_nodes_offered_already_again(
     statechart_of(simulated_executor(extensions), torso)
     rewriting.rewrite(root=torso)
 
-    world.rebind_world_entities(rewriting).rewrite(root=torso)
+    world.rebind_world_entities(obj=rewriting).rewrite(root=torso)
 
     assert counting.applications == 2
 

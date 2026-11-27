@@ -39,9 +39,9 @@ Now to set up the environment, we will use URDF files for the robot and the envi
 from semantic_digital_twin.adapters.mesh import STLParser
 from semantic_digital_twin.adapters.urdf import URDFParser
 
-apartment_world = URDFParser.from_file("package://iai_apartment/urdf/apartment.urdf").create_world()
-milk_world = STLParser("package://iai_objects/objects/milk.stl").create_world()
-pr2_world = URDFParser.from_file("package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro").create_world()
+apartment_world = URDFParser.from_file(file_path="package://iai_apartment/urdf/apartment.urdf").create_world()
+milk_world = STLParser(file_path="package://iai_objects/objects/milk.stl").create_world()
+pr2_world = URDFParser.from_file(file_path="package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro").create_world()
 ```
 
 ```{note}
@@ -69,10 +69,10 @@ need to use the modify_world context manager.
 from semantic_digital_twin.world_description.connections import OmniDrive
 
 with world.modify_world():
-    pr2_root = pr2_world.get_body_by_name("base_footprint")
+    pr2_root = pr2_world.get_body_by_name(name="base_footprint")
     world_root = world.root
     drive_connection = OmniDrive.create_with_dofs(parent=world_root, child=pr2_root, world=world)
-    world.merge_world(pr2_world, drive_connection)
+    world.merge_world(other=pr2_world, root_connection=drive_connection)
 ```
 
 Now we have a semantic digital twin that contains the apartment, the milk bottle and the PR2 robot. You can visualize it
@@ -120,16 +120,16 @@ from coraplex.robot_plans.actions.core.placing import PlaceAction
 from cramph.composites import Sequence
 from cramph.statechart import Statechart
 
-pr2 = PR2.from_world(world)
+pr2 = PR2.from_world(world=world)
 executor = KinematicallySimulatedPlanExecutor(
     context=StatechartContext.with_extensions(world=world, extensions=[RobotAccess(robot=pr2)])
 )
-milk_body = world.get_body_by_name("milk.stl")
+milk_body = world.get_body_by_name(name="milk.stl")
 
 # The pick-up is told what it is grasping, so annotate the parsed mesh as milk.
 with world.modify_world():
     milk = Milk(root=milk_body)
-    world.add_semantic_annotation(milk)
+    world.add_semantic_annotation(semantic_annotation=milk)
 
 plan = Sequence(
     nodes=[

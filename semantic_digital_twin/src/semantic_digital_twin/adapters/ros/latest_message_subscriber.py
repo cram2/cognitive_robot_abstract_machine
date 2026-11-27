@@ -15,15 +15,15 @@ MessageType = TypeVar("MessageType")
 # %% handing one subscription's messages to every reader of a topic
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class TopicMessageDistributor:
     """
     The callback of a subscription that several readers of a topic share.
     """
 
-    receivers: list[Callable[[Any], None]] = field(default_factory=list)
+    receivers: list[Callable[..., None]] = field(default_factory=list)
     """
-    What each message of the subscription is handed to.
+    What each message of the subscription is handed to, as ``message``.
     """
 
     def __call__(self, message: Any) -> None:
@@ -33,13 +33,13 @@ class TopicMessageDistributor:
         :param message: The message the subscription received.
         """
         for receiver in tuple(self.receivers):
-            receiver(message)
+            receiver(message=message)
 
 
 # %% keeping the latest message of a topic
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LatestMessageSubscriber(
     Generic[MessageType], SubClassSafeGeneric, HasROS2Node, ABC
 ):
@@ -108,7 +108,7 @@ class LatestMessageSubscriber(
             raise UnboundMessageTypeError(subscriber_type=cls)
         return message_types[0]
 
-    def buffer_message(self, message: MessageType) -> None:
+    def buffer_message(self, *, message: MessageType) -> None:
         """
         Keep the message as the most recently received one.
         """

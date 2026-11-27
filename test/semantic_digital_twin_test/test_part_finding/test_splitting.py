@@ -85,7 +85,7 @@ def located(belongs_to_part_mask: NDArray[np.bool_]) -> LocatedFacesFinder:
 
 
 def test_a_shape_is_split_at_the_located_faces():
-    split = located(handle_faces()).split(mug())
+    split = located(handle_faces()).split(mesh=mug())
 
     lowest, highest = split.part.bounds
     assert lowest[0] == pytest.approx(BODY_OUTER_RADIUS)
@@ -95,11 +95,11 @@ def test_a_shape_is_split_at_the_located_faces():
 
 
 def test_a_part_with_no_located_faces_is_not_split_off():
-    assert located(np.zeros(len(mug().faces), dtype=bool)).split(mug()) is None
+    assert located(np.zeros(len(mug().faces), dtype=bool)).split(mesh=mug()) is None
 
 
 def test_a_part_that_is_the_whole_shape_is_not_split_off():
-    assert located(np.ones(len(mug().faces), dtype=bool)).split(mug()) is None
+    assert located(np.ones(len(mug().faces), dtype=bool)).split(mesh=mug()) is None
 
 
 # %% splitting a part off an annotation in a world
@@ -111,9 +111,9 @@ def annotated_mug(world: World | None = None) -> Mug:
     :return: A mug, alone in its world, whose handle is still part of its body's shape.
     """
     world = world or World()
-    body = Body(name=PrefixedName("mug"))
+    body = Body(name=PrefixedName(name="mug"))
     shapes = ShapeCollection(
-        [
+        shapes=[
             Mesh.from_trimesh(
                 mesh=mug(), origin=HomogeneousTransformationMatrix(reference_frame=body)
             )
@@ -124,8 +124,8 @@ def annotated_mug(world: World | None = None) -> Mug:
     body.collision = shapes
     annotation = Mug(root=body)
     with world.modify_world():
-        world.add_kinematic_structure_entity(body)
-        world.add_semantic_annotation(annotation)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=body)
+        world.add_semantic_annotation(semantic_annotation=annotation)
     return annotation
 
 
@@ -176,8 +176,8 @@ def test_a_field_of_many_handles_gets_every_handle_split_off():
     world = annotation._world
     pot = Pot(root=annotation.root)
     with world.modify_world():
-        world.remove_semantic_annotation(annotation)
-        world.add_semantic_annotation(pot)
+        world.remove_semantic_annotation(semantic_annotation=annotation)
+        world.add_semantic_annotation(semantic_annotation=pot)
     bottom = mug().triangles_center[:, 2] < 0.0
 
     first = handle_splitter().split(whole=pot)
@@ -193,10 +193,10 @@ def test_applying_the_split_again_leaves_the_world_as_it_is():
     world = annotation._world
     step = SplitPartFromShape(whole_type=Mug, splitter=handle_splitter())
 
-    step.apply(world)
+    step.apply(world=world)
     assert annotation.handle is not None
     faces = len(annotation.root.collision.combined_mesh.faces)
-    step.apply(world)
+    step.apply(world=world)
 
     assert len(world.bodies) == 2
     assert len(annotation.root.collision.combined_mesh.faces) == faces
@@ -227,11 +227,11 @@ def test_a_split_is_reproduced_in_a_synchronized_world():
 
     copy = World()
     for block in world.modification_history:
-        kwargs = WorldEntityWithIDKwargsTracker.from_world(copy).create_kwargs()
+        kwargs = WorldEntityWithIDKwargsTracker.from_world(world=copy).create_kwargs()
         with copy.modify_world():
             from_json(to_json(block), **kwargs).apply(world=copy)
 
-    root = copy.get_kinematic_structure_entity_by_id(annotation.root.id)
+    root = copy.get_kinematic_structure_entity_by_id(id=annotation.root.id)
     assert len(copy.bodies) == 2
     assert root.collision.reference_frame is root
     assert len(root.collision.combined_mesh.faces) == len(
@@ -244,7 +244,7 @@ def test_a_part_is_split_off_a_single_body_without_annotating_it():
     annotation = annotated_mug()
     world = annotation._world
 
-    part = handle_splitter().split_body(annotation.root)
+    part = handle_splitter().split_body(body=annotation.root)
 
     assert part.parent_kinematic_structure_entity is annotation.root
     assert annotation.handle is None
@@ -260,7 +260,7 @@ def test_a_part_is_split_off_a_single_body_without_annotating_it():
 def test_the_pieces_keep_the_color_of_the_shape():
     annotation = annotated_mug()
     red = Color.from_rgba(red=1.0, green=0.0, blue=0.0, opacity=1.0)
-    annotation.root.visual.dye_shapes(red)
+    annotation.root.visual.dye_shapes(color=red)
 
     handle = split_handle(annotation)
 
@@ -271,12 +271,12 @@ def test_the_pieces_keep_the_color_of_the_shape():
 
 def test_the_pieces_keep_the_colors_of_the_faces_they_were_cut_from():
     annotation = annotated_mug()
-    split = MeshSplit.from_mesh(mug(), handle_faces())
+    split = MeshSplit.from_mesh(mesh=mug(), belongs_to_part_mask=handle_faces())
     split.part.visual.face_colors = [0, 255, 0, 255]
     split.rest.visual.face_colors = [0, 0, 255, 255]
     mesh = trimesh.util.concatenate([split.part, split.rest])
     shapes = ShapeCollection(
-        [
+        shapes=[
             Mesh.from_trimesh(
                 mesh=mesh,
                 origin=HomogeneousTransformationMatrix(reference_frame=annotation.root),
@@ -298,10 +298,10 @@ def test_the_pieces_keep_the_colors_of_the_faces_they_were_cut_from():
 def test_parts_of_the_same_type_split_off_the_same_body_share_a_name():
     annotation = annotated_mug()
     bottom = mug().triangles_center[:, 2] < 0.0
-    first = handle_splitter().split_body(annotation.root)
+    first = handle_splitter().split_body(body=annotation.root)
     second = PartSplitter(
         part_type=Handle, finder=located(bottom & ~handle_faces())
-    ).split_body(annotation.root)
+    ).split_body(body=annotation.root)
 
     assert str(first.name) == str(second.name) == "mug/handle"
     assert len(annotation._world.bodies) == 3
@@ -309,7 +309,7 @@ def test_parts_of_the_same_type_split_off_the_same_body_share_a_name():
 
 def test_shapes_without_a_reference_frame_are_taken_relative_to_the_body():
     annotation = annotated_mug()
-    shapes = ShapeCollection([Mesh.from_trimesh(mesh=mug())])
+    shapes = ShapeCollection(shapes=[Mesh.from_trimesh(mesh=mug())])
 
     with annotation._world.modify_world():
         annotation.root.update_shapes(visual=shapes, collision=shapes)
@@ -325,13 +325,13 @@ def test_the_mesh_pieces_are_cut_from_copies_none_of_the_shapes(monkeypatch):
     Copying a mesh with per-vertex colours makes trimesh convert its colours, which for
     a scanned scene costs seconds and the memory of the whole scan.
     """
-    body = Body(name=PrefixedName("body"))
+    body = Body(name=PrefixedName(name="body"))
     source = trimesh.creation.box()
     source.visual.vertex_colors = np.tile([200, 50, 50, 255], (len(source.vertices), 1))
     shape = Mesh.from_trimesh(
         mesh=source, origin=HomogeneousTransformationMatrix(reference_frame=body)
     )
-    colored = ColoredShape(shapes=ShapeCollection([shape], reference_frame=body))
+    colored = ColoredShape(shapes=ShapeCollection(shapes=[shape], reference_frame=body))
     shape.mesh
 
     def copy(mesh: trimesh.Trimesh, **kwargs) -> trimesh.Trimesh:
@@ -345,7 +345,7 @@ def test_the_mesh_pieces_are_cut_from_copies_none_of_the_shapes(monkeypatch):
 def test_the_faces_of_a_textured_shape_take_the_colour_of_its_texture(tmp_path):
     texture_file = tmp_path / "red.png"
     Image.new("RGB", (4, 4), color=(255, 0, 0)).save(texture_file)
-    body = Body(name=PrefixedName("body"))
+    body = Body(name=PrefixedName(name="body"))
     box = trimesh.creation.box()
     corner_uv = np.tile([[0.0, 0.0], [1.0, 0.0], [0.0, 1.0]], (len(box.faces), 1))
     shape = Mesh.from_trimesh(
@@ -355,7 +355,7 @@ def test_the_faces_of_a_textured_shape_take_the_colour_of_its_texture(tmp_path):
         origin=HomogeneousTransformationMatrix(reference_frame=body),
     )
 
-    colored = ColoredShape(shapes=ShapeCollection([shape], reference_frame=body))
+    colored = ColoredShape(shapes=ShapeCollection(shapes=[shape], reference_frame=body))
 
     assert (colored.mesh.visual.face_colors == [255, 0, 0, 255]).all()
 
@@ -368,11 +368,11 @@ class ConvexHullDecomposer(MeshDecomposer):
     Decomposes a mesh into its convex hull: a stand-in for a real decomposer.
     """
 
-    def apply_to_mesh(self, mesh: Mesh) -> list[Shape]:
+    def apply_to_mesh(self, *, mesh: Mesh) -> list[Shape]:
         return [Mesh.from_trimesh(mesh=mesh.mesh.convex_hull, origin=mesh.origin)]
 
-    def apply_to_mesh_and_save(self, mesh: Mesh, output_path: str) -> str:
-        self.apply_to_mesh(mesh)[0].mesh.export(output_path, file_type="obj")
+    def apply_to_mesh_and_save(self, *, mesh: Mesh, output_path: str) -> str:
+        self.apply_to_mesh(mesh=mesh)[0].mesh.export(output_path, file_type="obj")
         return output_path
 
 
@@ -383,7 +383,7 @@ def mug_with_own_collision() -> Mug:
     annotation = annotated_mug()
     body = annotation.root
     hull = ShapeCollection(
-        [
+        shapes=[
             Mesh.from_trimesh(
                 mesh=mug().convex_hull,
                 origin=HomogeneousTransformationMatrix(reference_frame=body),
@@ -431,8 +431,8 @@ def test_splitting_before_decomposing_decomposes_each_piece():
     annotation = annotated_mug()
     world = annotation._world
 
-    SplitPartFromShape(whole_type=Mug, splitter=handle_splitter()).apply(world)
-    ConvexHullDecomposer().apply(world)
+    SplitPartFromShape(whole_type=Mug, splitter=handle_splitter()).apply(world=world)
+    ConvexHullDecomposer().apply(world=world)
 
     assert annotation.handle.root.collision.combined_mesh.is_convex
     assert annotation.root.collision.combined_mesh.bounds[1][0] == pytest.approx(

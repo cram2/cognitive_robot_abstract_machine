@@ -127,7 +127,9 @@ def left_gripper_of(world: World) -> DAiSyLeftGripper:
     """
     :return: The left gripper of the DAiSy in `world`.
     """
-    return world.get_semantic_annotations_by_type(DAiSy)[0].left_arm.end_effector
+    return world.get_semantic_annotations_by_type(semantic_annotation_type=DAiSy)[
+        0
+    ].left_arm.end_effector
 
 
 # %% the ROS action of each griplink command
@@ -148,9 +150,11 @@ def test_a_preset_configuration_is_reached_through_the_endpoint_of_its_state(
 ) -> None:
     gripper = left_gripper_of(daisy_world)
     configuration = GriplinkPresetConfiguration.from_state_type(
-        gripper, GripperState.CLOSE, grip_preset=GriplinkGripPreset.PRESET_3
+        end_effector=gripper,
+        state_type=GripperState.CLOSE,
+        grip_preset=GriplinkGripPreset.PRESET_3,
     )
-    endpoint = gripper.griplink_endpoint(GripperState.CLOSE)
+    endpoint = gripper.griplink_endpoint(state_type=GripperState.CLOSE)
 
     task = GriplinkActionServerTask.create_gripper_goal(configuration=configuration)
 
@@ -167,14 +171,14 @@ def test_a_flex_configuration_is_reached_with_its_hardware_parameters(
 ) -> None:
     gripper = left_gripper_of(daisy_world)
     configuration = GriplinkFlexConfiguration.from_state_type(
-        gripper,
-        GripperState.FLEXCLOSE,
+        end_effector=gripper,
+        state_type=GripperState.FLEXCLOSE,
         grip_position=0.05,
         grip_force=120.0,
         grip_velocity=0.1,
         grip_acceleration=1.0,
     )
-    endpoint = gripper.griplink_endpoint(GripperState.FLEXCLOSE)
+    endpoint = gripper.griplink_endpoint(state_type=GripperState.FLEXCLOSE)
 
     task = GriplinkActionServerTask.create_gripper_goal(configuration=configuration)
 
@@ -200,7 +204,7 @@ def test_a_configuration_of_no_griplink_kind_is_reached_with_a_finger_goal(
     daisy_world,
 ) -> None:
     configuration = GripperStateConfiguration.from_state_type(
-        left_gripper_of(daisy_world), GripperState.CLOSE
+        end_effector=left_gripper_of(daisy_world), state_type=GripperState.CLOSE
     )
 
     goal = GriplinkActionServerTask.create_gripper_goal(configuration=configuration)
@@ -215,7 +219,7 @@ def test_a_state_served_by_an_action_of_the_other_kind_has_no_endpoint(
 ) -> None:
     gripper = left_gripper_of(daisy_world)
     flex_close_state = GriplinkFlexConfiguration.from_state_type(
-        gripper, GripperState.FLEXCLOSE
+        end_effector=gripper, state_type=GripperState.FLEXCLOSE
     ).joint_state
 
     with pytest.raises(NoGriplinkEndpoint):

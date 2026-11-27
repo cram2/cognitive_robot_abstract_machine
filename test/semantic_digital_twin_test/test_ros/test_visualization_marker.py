@@ -36,7 +36,7 @@ from semantic_digital_twin.world_description.shape_collection import ShapeCollec
 from semantic_digital_twin.world_description.world_entity import Body, Region
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Callback:
     last_msg: MarkerArray = field(init=False, default=None)
 
@@ -53,8 +53,8 @@ def test_visualization_marker(rclpy_node, cylinder_bot_world):
         shape_source=ShapeSource.COLLISION_ONLY,
     )
     tf_wrapper.wait_for_transform(
-        "map",
-        "bot",
+        target_frame="map",
+        source_frame="bot",
         timeout=Duration(seconds=1.0),
         time=Time(),
     )
@@ -79,12 +79,12 @@ def test_visualization_marker(rclpy_node, cylinder_bot_world):
 
     callback.last_msg = None
 
-    drive = cylinder_bot_world.get_connections_by_type(OmniDrive)[0]
+    drive = cylinder_bot_world.get_connections_by_type(connection_type=OmniDrive)[0]
     new_pose = HomogeneousTransformationMatrix.from_xyz_rpy(1, 1)
     drive.origin = new_pose
 
     for i in range(30):
-        transform = tf_wrapper.lookup_transform("map", "bot")
+        transform = tf_wrapper.lookup_transform(target_frame="map", source_frame="bot")
         sleep(0.1)
         if (
             transform.transform.translation.x == 1
@@ -105,8 +105,8 @@ def test_visualization_marker_pr2(rclpy_node, pr2_world_state_reset):
         shape_source=ShapeSource.COLLISION_ONLY,
     )
     tf_wrapper.wait_for_transform(
-        "odom_combined",
-        "base_footprint",
+        target_frame="odom_combined",
+        source_frame="base_footprint",
         timeout=Duration(seconds=1.0),
         time=Time(),
     )
@@ -151,7 +151,7 @@ def test_visualization_marker_tracy(rclpy_node, tracy_world, ros_publishers):
         assert False, "Callback timed out"
 
     # table has no texture, so the color its URDF material gives it should be used
-    table = tracy_world.get_body_by_name("table")
+    table = tracy_world.get_body_by_name(name="table")
     table_color = table.visual.shapes[0].color
     assert table_color != Color()
     for marker in callback.last_msg.markers:
@@ -166,7 +166,9 @@ def test_visualization_marker_tracy(rclpy_node, tracy_world, ros_publishers):
 
     # ur5 has texture, 0,0,0,0 must be used for correct visualization
     for marker in callback.last_msg.markers:
-        if marker.ns == str(tracy_world.get_body_by_name("left_forearm_link").name):
+        if marker.ns == str(
+            tracy_world.get_body_by_name(name="left_forearm_link").name
+        ):
             assert marker.color.r == 0.0
             assert marker.color.g == 0.0
             assert marker.color.b == 0.0
@@ -178,15 +180,19 @@ def test_visualization_marker_tracy(rclpy_node, tracy_world, ros_publishers):
 
 def test_visualization_marker_regions_are_transparent(rclpy_node, cylinder_bot_world):
     region = Region(
-        name=PrefixedName("region"),
+        name=PrefixedName(name="region"),
         area=ShapeCollection(
-            shapes=[Box(scale=Scale(0.1, 0.1, 0.1), color=Color.from_rgba(opacity=1.0))]
+            shapes=[
+                Box(
+                    scale=Scale(x=0.1, y=0.1, z=0.1), color=Color.from_rgba(opacity=1.0)
+                )
+            ]
         ),
     )
     connection = FixedConnection(parent=cylinder_bot_world.root, child=region)
     with cylinder_bot_world.modify_world():
-        cylinder_bot_world.add_region(region)
-        cylinder_bot_world.add_connection(connection)
+        cylinder_bot_world.add_region(region=region)
+        cylinder_bot_world.add_connection(connection=connection)
 
     tf_wrapper = TFWrapper(node=rclpy_node)
     tf_publisher = TFPublisher(node=rclpy_node, _world=cylinder_bot_world)
@@ -225,20 +231,20 @@ def test_trimesh(rclpy_node):
     """
     The frame of a body added to a world parsed from an STL file is published.
     """
-    world = STLParser("package://iai_objects/objects/milk.stl").create_world()
+    world = STLParser(file_path="package://iai_objects/objects/milk.stl").create_world()
     visual: Mesh = world.root.visual.shapes[0]
     world.root.visual.shapes[0] = visual
     with world.modify_world():
-        body2 = Body(name=PrefixedName("body2"))
+        body2 = Body(name=PrefixedName(name="body2"))
         body_C_body2 = FixedConnection(parent=world.root, child=body2)
-        world.add_connection(body_C_body2)
+        world.add_connection(connection=body_C_body2)
     tf_wrapper = TFWrapper(node=rclpy_node)
     tf_publisher = TFPublisher(node=rclpy_node, _world=world)
     viz = VizMarkerPublisher(_world=world, node=rclpy_node)
 
     assert tf_wrapper.wait_for_transform(
-        str(world.root.name),
-        str(body2.name),
+        target_frame=str(world.root.name),
+        source_frame=str(body2.name),
         timeout=Duration(seconds=1.0),
         time=Time(),
     )
@@ -252,18 +258,18 @@ def world_with_visible_bodies(*names: str) -> tuple[World, list[Body]]:
     Build a world whose root carries one body with a visual shape per given name.
     """
     world = World()
-    root = Body(name=PrefixedName("map"))
+    root = Body(name=PrefixedName(name="map"))
     bodies = [
         Body(
-            name=PrefixedName(name),
-            visual=ShapeCollection(shapes=[Box(scale=Scale(0.1, 0.1, 0.1))]),
+            name=PrefixedName(name=name),
+            visual=ShapeCollection(shapes=[Box(scale=Scale(x=0.1, y=0.1, z=0.1))]),
         )
         for name in names
     ]
     with world.modify_world():
-        world.add_body(root)
+        world.add_body(body=root)
         for body in bodies:
-            world.add_connection(FixedConnection(parent=root, child=body))
+            world.add_connection(connection=FixedConnection(parent=root, child=body))
     return world, bodies
 
 
@@ -308,7 +314,10 @@ def test_markers_of_equally_named_bodies_do_not_replace_each_other(rclpy_node):
     viz = VizMarkerPublisher(_world=world, node=rclpy_node)
 
     assert sorted((marker.ns, marker.id) for marker in viz.markers.markers) == sorted(
-        (viz.tf_publisher.tf_model_callback.frame_names.assign(body), shape_index)
+        (
+            viz.tf_publisher.tf_model_callback.frame_names.assign(entity=body),
+            shape_index,
+        )
         for body in bodies
         for shape_index, _ in enumerate(body.visual.shapes)
     )
@@ -328,7 +337,7 @@ def test_a_tf_publisher_is_started_while_nothing_publishes_tf(rclpy_node):
 
     viz = VizMarkerPublisher(_world=world, node=rclpy_node)
 
-    assert TFPublisher.all_callbacks_of_this_type_from_world(world) == [
+    assert TFPublisher.all_callbacks_of_this_type_from_world(world=world) == [
         viz.tf_publisher
     ]
 
@@ -359,20 +368,20 @@ def test_markers_are_stamped_by_the_tf_publisher_the_marker_publisher_starts(
     a different body for the plain name unless they share one assignment.
     """
     world = World()
-    root = Body(name=PrefixedName("map"))
+    root = Body(name=PrefixedName(name="map"))
     bodies = [
         Body(
-            name=PrefixedName("milk"),
-            visual=ShapeCollection(shapes=[Box(scale=Scale(0.1, 0.1, 0.1))]),
+            name=PrefixedName(name="milk"),
+            visual=ShapeCollection(shapes=[Box(scale=Scale(x=0.1, y=0.1, z=0.1))]),
         )
         for _ in range(2)
     ]
     with world.modify_world():
-        world.add_body(root)
+        world.add_body(body=root)
         for body in bodies:
-            world.add_body(body)
+            world.add_body(body=body)
         for body in reversed(bodies):
-            world.add_connection(FixedConnection(parent=root, child=body))
+            world.add_connection(connection=FixedConnection(parent=root, child=body))
 
     viz = VizMarkerPublisher(_world=world, node=rclpy_node)
 
@@ -385,11 +394,13 @@ def test_a_body_added_later_reaches_both_publishers_under_one_name(rclpy_node):
 
     with world.modify_world():
         world.add_connection(
-            FixedConnection(
+            connection=FixedConnection(
                 parent=world.root,
                 child=Body(
-                    name=PrefixedName("milk"),
-                    visual=ShapeCollection(shapes=[Box(scale=Scale(0.1, 0.1, 0.1))]),
+                    name=PrefixedName(name="milk"),
+                    visual=ShapeCollection(
+                        shapes=[Box(scale=Scale(x=0.1, y=0.1, z=0.1))]
+                    ),
                 ),
             )
         )
@@ -400,12 +411,14 @@ def test_a_body_added_later_reaches_both_publishers_under_one_name(rclpy_node):
 def test_region_markers_are_stamped_like_the_frames_they_share_a_name_with(rclpy_node):
     world, _ = world_with_visible_bodies("table")
     region = Region(
-        name=PrefixedName("table"),
-        area=ShapeCollection(shapes=[Box(scale=Scale(0.1, 0.1, 0.1))]),
+        name=PrefixedName(name="table"),
+        area=ShapeCollection(shapes=[Box(scale=Scale(x=0.1, y=0.1, z=0.1))]),
     )
     with world.modify_world():
-        world.add_region(region)
-        world.add_connection(FixedConnection(parent=world.root, child=region))
+        world.add_region(region=region)
+        world.add_connection(
+            connection=FixedConnection(parent=world.root, child=region)
+        )
 
     viz = VizMarkerPublisher(_world=world, node=rclpy_node)
 
@@ -432,7 +445,7 @@ def test_a_stopped_marker_publisher_is_no_longer_notified(rclpy_node):
 
     viz.stop()
 
-    assert VizMarkerPublisher.all_callbacks_of_this_type_from_world(world) == []
+    assert VizMarkerPublisher.all_callbacks_of_this_type_from_world(world=world) == []
 
 
 def test_stopping_the_marker_publisher_stops_the_tf_publisher_it_started(rclpy_node):
@@ -441,7 +454,7 @@ def test_stopping_the_marker_publisher_stops_the_tf_publisher_it_started(rclpy_n
 
     viz.stop()
 
-    assert TFPublisher.all_callbacks_of_this_type_from_world(world) == []
+    assert TFPublisher.all_callbacks_of_this_type_from_world(world=world) == []
 
 
 def test_stopping_the_marker_publisher_keeps_the_tf_publisher_it_was_given(rclpy_node):
@@ -451,7 +464,9 @@ def test_stopping_the_marker_publisher_keeps_the_tf_publisher_it_was_given(rclpy
 
     viz.stop()
 
-    assert TFPublisher.all_callbacks_of_this_type_from_world(world) == [tf_publisher]
+    assert TFPublisher.all_callbacks_of_this_type_from_world(world=world) == [
+        tf_publisher
+    ]
 
 
 # %% meshes RViz cannot load as they are
@@ -483,7 +498,9 @@ def world_showing(mesh: Mesh) -> World:
     world = World()
     with world.modify_world():
         world.add_body(
-            Body(name=PrefixedName("grid"), visual=ShapeCollection(shapes=[mesh]))
+            body=Body(
+                name=PrefixedName(name="grid"), visual=ShapeCollection(shapes=[mesh])
+            )
         )
     return world
 

@@ -126,7 +126,7 @@ class GripperIsOpen(SucceedsOnObservingTrue, FailsOnObservingFalse, StatechartNo
 
     def on_tick(self) -> ObservationStateValue:
         open_state = self.end_effector.default_configuration(
-            GripperState.OPEN
+            state_type=GripperState.OPEN
         ).joint_state
         is_open = all(
             abs(connection.position - target_value) < self.tolerance
@@ -171,7 +171,7 @@ class OpenGripperBeforeReadingIt(SequentialInsertion[GripperIsOpen]):
     def nodes_to_insert(self, *, plan_node: GripperIsOpen) -> list[StatechartNode]:
         action = SetGripperAction(
             gripper_configuration=plan_node.end_effector.default_configuration(
-                self.gripper_state
+                state_type=self.gripper_state
             )
         )
         self.inserted_actions.append(action)
@@ -243,7 +243,7 @@ class CloseGripperBeforeAFailingStep(SequentialInsertion[StepFailingItsFirstRuns
         return [
             SetGripperAction(
                 gripper_configuration=self.end_effector.default_configuration(
-                    GripperState.CLOSE
+                    state_type=GripperState.CLOSE
                 )
             )
         ]
@@ -257,7 +257,9 @@ def _closed_gripper(end_effector: EndEffector) -> SetGripperAction:
     :return: An action closing the gripper of `end_effector`.
     """
     return SetGripperAction(
-        gripper_configuration=end_effector.default_configuration(GripperState.CLOSE)
+        gripper_configuration=end_effector.default_configuration(
+            state_type=GripperState.CLOSE
+        )
     )
 
 
@@ -268,7 +270,7 @@ def _pick_up_of_the_milk(
     :return: A plan driving to the counter and picking up the milk with the right arm,
         recovering from a failure with `recovery`, its pick-up, and the milk.
     """
-    milk = world.get_semantic_annotations_by_type(Milk)[0]
+    milk = world.get_semantic_annotations_by_type(semantic_annotation_type=Milk)[0]
     pick_up = PickUpAction(
         grasp_candidate=milk.grasp_candidates()[0], arm=robot.right_arm
     )

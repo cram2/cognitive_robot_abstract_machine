@@ -90,7 +90,7 @@ class ArticulateGraspedMechanism(EndedByOwner, CompositeNode, HasTipLinkParamete
         clipped to the joint's limits, while the tip keeps holding the handle.
         """
         self.connection = self.environment_link.get_first_parent_connection_of_type(
-            ActiveConnection1DOF
+            connection_type=ActiveConnection1DOF
         )
         limits = self.connection.dof.limits
         self.goal_position = float(
@@ -110,7 +110,7 @@ class ArticulateGraspedMechanism(EndedByOwner, CompositeNode, HasTipLinkParamete
                 JointPositionList(
                     name="hinge goal",
                     goal_state=JointState.from_mapping(
-                        {self.connection: self.goal_position}
+                        mapping={self.connection: self.goal_position}
                     ),
                     weight=self.mechanism_weight,
                 ),

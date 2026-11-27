@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 # %% base classes
 
 
-@dataclass
+@dataclass(kw_only=True)
 class InputSynchronizer(ABC):
     """
     Writes an external source of truth, e.g. a robot's joint states, into the world
@@ -54,7 +54,7 @@ class InputSynchronizer(ABC):
         return None
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldStateInputs:
     """
     All inputs that one loop applies before it computes anything.
@@ -82,7 +82,7 @@ class WorldStateInputs:
     applied.
     """
 
-    def add_robot_inputs(self, robot: AbstractRobot) -> None:
+    def add_robot_inputs(self, *, robot: AbstractRobot) -> None:
         """
         Apply everything the parts of a robot are read from in this loop from now on.
 
@@ -92,9 +92,9 @@ class WorldStateInputs:
         :param robot: The robot whose inputs are added.
         """
         for synchronizer in robot.get_input_synchronizers():
-            self.add_input(synchronizer)
+            self.add_input(synchronizer=synchronizer)
 
-    def add_robot_part_input(self, robot_part: HasInputSource) -> None:
+    def add_robot_part_input(self, *, robot_part: HasInputSource) -> None:
         """
         Apply what one part of a robot is read from in this loop from now on.
 
@@ -105,9 +105,9 @@ class WorldStateInputs:
         """
         if not isinstance(robot_part.source, InputSynchronizer):
             return
-        self.add_input(robot_part.source)
+        self.add_input(synchronizer=robot_part.source)
 
-    def add_input(self, synchronizer: InputSynchronizer) -> None:
+    def add_input(self, *, synchronizer: InputSynchronizer) -> None:
         """
         Apply the given input in this loop from now on, in the way this loop needs it.
 

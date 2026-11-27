@@ -103,7 +103,7 @@ class SdfJointType(StrEnum):
         return ScrewAxisConnection.create_revolute_screw_axis(axis=direction)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GazeboParser(WorldModelParser):
     """
     Parses Gazebo SDF model and world descriptions into worlds.
@@ -171,6 +171,7 @@ class GazeboParser(WorldModelParser):
     @classmethod
     def from_file(
         cls,
+        *,
         file_path: str,
         prefix: str | None = None,
         path_resolver: PathResolver | None = None,
@@ -188,8 +189,8 @@ class GazeboParser(WorldModelParser):
         :return: A parser for the described world.
         """
         file_locator = path_resolver or CompositePathResolver()
-        resolved_path = file_locator.resolve(file_path)
-        path_resolver = path_resolver or cls.resolver_for_file(resolved_path)
+        resolved_path = file_locator.resolve(uri=file_path)
+        path_resolver = path_resolver or cls.resolver_for_file(file_path=resolved_path)
         with open(resolved_path, "r") as file:
             sdf = file.read()
         parser = cls(sdf=sdf, prefix=prefix)
@@ -197,7 +198,7 @@ class GazeboParser(WorldModelParser):
         return parser
 
     @staticmethod
-    def resolver_for_file(file_path: str) -> CompositePathResolver:
+    def resolver_for_file(*, file_path: str) -> CompositePathResolver:
         """
         Builds a resolver that searches for models and assets in the usual places
         relative to a description file, covering both flat and nested world directory
@@ -217,7 +218,7 @@ class GazeboParser(WorldModelParser):
             os.path.normpath(os.path.join(directory, "..", "..")),
         ]
         return CompositePathResolver(
-            [
+            resolvers=[
                 ModelUriResolver(
                     model_directories=[
                         os.path.join(root, "models") for root in root_directories
@@ -244,17 +245,20 @@ class GazeboParser(WorldModelParser):
 
         world_element = self.root_element.find("world")
         if world_element is not None:
-            return self.parse_world(world_element)
+            return self.parse_world(element=world_element)
 
         model_element = self.root_element.find("model")
         if model_element is None:
             raise MissingRootElement(expected_elements=["world", "model"])
 
-        return self.parse_model(model_element, self.prefix or model_element.get("name"))
+        return self.parse_model(
+            element=model_element,
+            instance_name=self.prefix or model_element.get("name"),
+        )
 
     # %% worlds
 
-    def parse_world(self, element: ElementTree.Element) -> World:
+    def parse_world(self, *, element: ElementTree.Element) -> World:
         """
         Parses a ``world`` element into a world with an explicit root body that all
         contained models are attached to.
@@ -266,13 +270,15 @@ class GazeboParser(WorldModelParser):
         world = World()
         world.name = world_name
         with world.modify_world():
-            world.add_kinematic_structure_entity(Body(name=PrefixedName(world_name)))
+            world.add_kinematic_structure_entity(
+                kinematic_structure_entity=Body(name=PrefixedName(name=world_name))
+            )
 
-        self.attach_contained_models(world, element)
+        self.attach_contained_models(world=world, container=element)
         return world
 
     def attach_contained_models(
-        self, world: World, container: ElementTree.Element
+        self, *, world: World, container: ElementTree.Element
     ) -> None:
         """
         Attaches every model the container references to the root of the world, whether
@@ -286,26 +292,30 @@ class GazeboParser(WorldModelParser):
         :param container: The ``world`` or ``model`` element holding the references.
         """
         for include_element in container.findall("include"):
-            self.attach_included_model(world, include_element, instance_name=None)
+            self.attach_included_model(
+                world=world, include_element=include_element, instance_name=None
+            )
 
         for model_element in container.findall("model"):
             instance_name = model_element.get("name")
             include_element = model_element.find("include")
             if include_element is not None:
                 self.attach_included_model(
-                    world,
-                    include_element,
+                    world=world,
+                    include_element=include_element,
                     instance_name=instance_name,
-                    wrapper_pose=self.parse_pose(model_element.find("pose")),
+                    wrapper_pose=self.parse_pose(element=model_element.find("pose")),
                 )
                 continue
 
-            sub_world = self.parse_model(model_element, instance_name)
+            sub_world = self.parse_model(
+                element=model_element, instance_name=instance_name
+            )
             self.merge_at_pose(
-                world,
-                sub_world,
-                self.parse_pose(model_element.find("pose")),
-                self.parse_boolean(model_element.find("static")),
+                world=world,
+                sub_world=sub_world,
+                pose=self.parse_pose(element=model_element.find("pose")),
+                is_static=self.parse_boolean(element=model_element.find("static")),
             )
 
         for skipped_element in container:
@@ -315,6 +325,7 @@ class GazeboParser(WorldModelParser):
 
     def attach_included_model(
         self,
+        *,
         world: World,
         include_element: ElementTree.Element,
         instance_name: str | None,
@@ -331,14 +342,14 @@ class GazeboParser(WorldModelParser):
             of the include is expressed in.
         """
         uri = include_element.findtext("uri").strip()
-        model_element = self.load_model_element(uri)
+        model_element = self.load_model_element(uri=uri)
         name = (
             include_element.findtext("name")
             or instance_name
             or model_element.get("name")
         )
 
-        pose = self.parse_pose(include_element.find("pose"))
+        pose = self.parse_pose(element=include_element.find("pose"))
         if wrapper_pose is not None:
             pose = wrapper_pose @ pose
 
@@ -346,11 +357,17 @@ class GazeboParser(WorldModelParser):
         if static_element is None:
             static_element = model_element.find("static")
 
-        sub_world = self.parse_model(model_element, name.strip())
-        self.merge_at_pose(world, sub_world, pose, self.parse_boolean(static_element))
+        sub_world = self.parse_model(element=model_element, instance_name=name.strip())
+        self.merge_at_pose(
+            world=world,
+            sub_world=sub_world,
+            pose=pose,
+            is_static=self.parse_boolean(element=static_element),
+        )
 
     def merge_at_pose(
         self,
+        *,
         world: World,
         sub_world: World,
         pose: HomogeneousTransformationMatrix,
@@ -368,20 +385,20 @@ class GazeboParser(WorldModelParser):
         :param is_static: Whether the model is declared static.
         """
         if not is_static:
-            world.merge_world_at_pose(sub_world, pose)
+            world.merge_world_at_pose(other=sub_world, pose=pose)
             return
 
         root_connection = FixedConnection(
-            name=PrefixedName("root", sub_world.root.name.prefix),
+            name=PrefixedName(name="root", prefix=sub_world.root.name.prefix),
             parent=world.root,
             child=sub_world.root,
             parent_T_connection_expression=pose,
         )
-        world.merge_world(sub_world, root_connection)
+        world.merge_world(other=sub_world, root_connection=root_connection)
 
     # %% model files
 
-    def load_model_element(self, uri: str) -> ElementTree.Element:
+    def load_model_element(self, *, uri: str) -> ElementTree.Element:
         """
         Loads the ``model`` element a ``model://`` URI refers to.
 
@@ -391,8 +408,8 @@ class GazeboParser(WorldModelParser):
         :param uri: The URI of the model directory.
         :return: The ``model`` element of the model's description file.
         """
-        model_directory = self.path_resolver.resolve(uri)
-        model_file = self.model_file_of_directory(model_directory)
+        model_directory = self.path_resolver.resolve(uri=uri)
+        model_file = self.model_file_of_directory(model_directory=model_directory)
         if model_file in self.model_element_cache:
             return self.model_element_cache[model_file]
 
@@ -404,7 +421,7 @@ class GazeboParser(WorldModelParser):
         self.model_element_cache[model_file] = model_element
         return model_element
 
-    def model_file_of_directory(self, model_directory: str) -> str:
+    def model_file_of_directory(self, *, model_directory: str) -> str:
         """
         Reads the ``model.config`` of a model directory and returns the description file
         it points at, preferring the highest declared version.
@@ -423,7 +440,7 @@ class GazeboParser(WorldModelParser):
 
         candidates = [
             (
-                self.version_of(sdf_element.get("version", "0")),
+                self.version_of(version=sdf_element.get("version", "0")),
                 "-" not in os.path.basename(sdf_element.text.strip()),
                 sdf_element.text.strip(),
             )
@@ -438,7 +455,7 @@ class GazeboParser(WorldModelParser):
         return os.path.join(model_directory, max(candidates)[2])
 
     @staticmethod
-    def version_of(version: str) -> tuple[int, ...]:
+    def version_of(*, version: str) -> tuple[int, ...]:
         """
         :param version: A dotted version such as ``1.6``.
         :return: The version as a tuple that orders like the version does.
@@ -447,7 +464,7 @@ class GazeboParser(WorldModelParser):
 
     # %% models
 
-    def parse_model(self, element: ElementTree.Element, instance_name: str) -> World:
+    def parse_model(self, *, element: ElementTree.Element, instance_name: str) -> World:
         """
         Parses a ``model`` element into a world of its own, whose root is the model's
         root link.
@@ -464,53 +481,61 @@ class GazeboParser(WorldModelParser):
         model_T_link = {}
         for link_element in element.findall("link"):
             link_name = link_element.get("name")
-            bodies[link_name] = self.parse_link(link_element, instance_name)
-            model_T_link[link_name] = self.parse_pose(link_element.find("pose"))
+            bodies[link_name] = self.parse_link(
+                element=link_element, prefix=instance_name
+            )
+            model_T_link[link_name] = self.parse_pose(element=link_element.find("pose"))
 
         joint_elements = [
             joint_element
             for joint_element in element.findall("joint")
-            if self.is_attached_to_a_link(joint_element)
+            if self.is_attached_to_a_link(joint_element=joint_element)
         ]
         child_link_names = {
             joint_element.findtext("child").strip() for joint_element in joint_elements
         }
-        is_static = self.parse_boolean(element.find("static"))
+        is_static = self.parse_boolean(element=element.find("static"))
 
         connection_specifications_with_endpoints = [
-            self.parse_joint(joint_element, bodies, model_T_link)
+            self.parse_joint(
+                element=joint_element, bodies=bodies, model_T_link=model_T_link
+            )
             for joint_element in joint_elements
         ]
 
         world = World()
         world.name = instance_name
-        root_body = self.root_body_of(bodies, child_link_names, instance_name)
+        root_body = self.root_body_of(
+            bodies=bodies,
+            child_link_names=child_link_names,
+            instance_name=instance_name,
+        )
 
         with world.modify_world():
-            world.add_kinematic_structure_entity(root_body)
+            world.add_kinematic_structure_entity(kinematic_structure_entity=root_body)
             for (
                 connection_specification_with_endpoints
             ) in connection_specifications_with_endpoints:
-                connection_specification_with_endpoints.connect(world)
+                connection_specification_with_endpoints.connect(world=world)
 
             model_T_root = model_T_link[root_body.name.name]
             for link_name, body in bodies.items():
                 if body is root_body or link_name in child_link_names:
                     continue
                 self.attach_unjointed_link(
-                    world,
-                    root_body,
-                    body,
-                    model_T_root.inverse() @ model_T_link[link_name],
-                    is_static,
+                    world=world,
+                    root_body=root_body,
+                    body=body,
+                    root_T_link=model_T_root.inverse() @ model_T_link[link_name],
+                    is_static=is_static,
                 )
 
-        self.attach_contained_models(world, element)
+        self.attach_contained_models(world=world, container=element)
         return world
 
     @staticmethod
     def root_body_of(
-        bodies: dict[str, Body], child_link_names: set, instance_name: str
+        *, bodies: dict[str, Body], child_link_names: set, instance_name: str
     ) -> Body:
         """
         Determines the root link of a model, which is the first link no joint moves.
@@ -523,10 +548,11 @@ class GazeboParser(WorldModelParser):
         for link_name, body in bodies.items():
             if link_name not in child_link_names:
                 return body
-        return Body(name=PrefixedName(instance_name))
+        return Body(name=PrefixedName(name=instance_name))
 
     def attach_unjointed_link(
         self,
+        *,
         world: World,
         root_body: Body,
         body: Body,
@@ -547,8 +573,8 @@ class GazeboParser(WorldModelParser):
         """
         if is_static:
             world.add_connection(
-                FixedConnection(
-                    name=PrefixedName(body.name.name, body.name.prefix),
+                connection=FixedConnection(
+                    name=PrefixedName(name=body.name.name, prefix=body.name.prefix),
                     parent=root_body,
                     child=body,
                     parent_T_connection_expression=root_T_link,
@@ -559,10 +585,10 @@ class GazeboParser(WorldModelParser):
         connection = Connection6DoF.create_with_dofs(
             parent=root_body, child=body, world=world
         )
-        world.add_connection(connection)
+        world.add_connection(connection=connection)
         connection.origin = root_T_link
 
-    def is_attached_to_a_link(self, joint_element: ElementTree.Element) -> bool:
+    def is_attached_to_a_link(self, *, joint_element: ElementTree.Element) -> bool:
         """
         :param joint_element: The ``joint`` element to check.
         :return: Whether both ends of the joint are links of the model rather than the
@@ -583,7 +609,7 @@ class GazeboParser(WorldModelParser):
 
     # %% links
 
-    def parse_link(self, element: ElementTree.Element, prefix: str) -> Body:
+    def parse_link(self, *, element: ElementTree.Element, prefix: str) -> Body:
         """
         Parses a ``link`` element into a body with its shapes and inertial properties.
 
@@ -591,17 +617,19 @@ class GazeboParser(WorldModelParser):
         :param prefix: The prefix of the name of the body.
         :return: The body describing the link.
         """
-        body = Body(name=PrefixedName(element.get("name"), prefix))
-        body.visual = self.parse_shapes(element.findall("visual"), body)
-        body.collision = self.parse_shapes(element.findall("collision"), body)
+        body = Body(name=PrefixedName(name=element.get("name"), prefix=prefix))
+        body.visual = self.parse_shapes(elements=element.findall("visual"), body=body)
+        body.collision = self.parse_shapes(
+            elements=element.findall("collision"), body=body
+        )
 
-        inertial = self.parse_inertial(element.find("inertial"), body)
+        inertial = self.parse_inertial(element=element.find("inertial"), body=body)
         if inertial is not None:
             body.inertial = inertial
         return body
 
     def parse_inertial(
-        self, element: ElementTree.Element | None, body: Body
+        self, *, element: ElementTree.Element | None, body: Body
     ) -> Inertial | None:
         """
         Parses an ``inertial`` element.
@@ -616,22 +644,22 @@ class GazeboParser(WorldModelParser):
         if element is None:
             return None
 
-        link_T_inertial = self.parse_pose(element.find("pose")).to_np()
+        link_T_inertial = self.parse_pose(element=element.find("pose")).to_np()
         inertia_element = element.find("inertia")
         inertia_in_inertial_frame = InertiaTensor.from_values(
-            ixx=self.parse_float(inertia_element, "ixx", 0.0),
-            iyy=self.parse_float(inertia_element, "iyy", 0.0),
-            izz=self.parse_float(inertia_element, "izz", 0.0),
-            ixy=self.parse_float(inertia_element, "ixy", 0.0),
-            ixz=self.parse_float(inertia_element, "ixz", 0.0),
-            iyz=self.parse_float(inertia_element, "iyz", 0.0),
+            ixx=self.parse_float(element=inertia_element, name="ixx", default=0.0),
+            iyy=self.parse_float(element=inertia_element, name="iyy", default=0.0),
+            izz=self.parse_float(element=inertia_element, name="izz", default=0.0),
+            ixy=self.parse_float(element=inertia_element, name="ixy", default=0.0),
+            ixz=self.parse_float(element=inertia_element, name="ixz", default=0.0),
+            iyz=self.parse_float(element=inertia_element, name="iyz", default=0.0),
         )
 
         link_R_inertial = link_T_inertial[:3, :3]
         inertia = link_R_inertial @ inertia_in_inertial_frame.data @ link_R_inertial.T
 
         return Inertial(
-            mass=self.parse_float(element, "mass", 1.0),
+            mass=self.parse_float(element=element, name="mass", default=1.0),
             center_of_mass=Point3(*link_T_inertial[:3, 3], reference_frame=body),
             inertia=InertiaTensor(data=inertia),
         )
@@ -639,7 +667,7 @@ class GazeboParser(WorldModelParser):
     # %% shapes
 
     def parse_shapes(
-        self, elements: list[ElementTree.Element], body: Body
+        self, *, elements: list[ElementTree.Element], body: Body
     ) -> ShapeCollection:
         """
         Parses the ``visual`` or ``collision`` elements of a link.
@@ -650,17 +678,20 @@ class GazeboParser(WorldModelParser):
         """
         shapes = [
             self.parse_geometry(
-                element.find("geometry"),
-                self.parse_pose(element.find("pose"), reference_frame=body),
-                self.parse_color(element.find("material")),
+                element=element.find("geometry"),
+                origin=self.parse_pose(
+                    element=element.find("pose"), reference_frame=body
+                ),
+                color=self.parse_color(element=element.find("material")),
             )
             for element in elements
             if element.find("geometry") is not None
         ]
-        return ShapeCollection(shapes, reference_frame=body)
+        return ShapeCollection(shapes=shapes, reference_frame=body)
 
     def parse_geometry(
         self,
+        *,
         element: ElementTree.Element,
         origin: HomogeneousTransformationMatrix,
         color: Color,
@@ -675,33 +706,43 @@ class GazeboParser(WorldModelParser):
         """
         box_element = element.find("box")
         if box_element is not None:
-            size = self.parse_vector(box_element.findtext("size"))
-            return Box(origin=origin, scale=Scale(*size), color=color)
+            x, y, z = self.parse_vector(text=box_element.findtext("size"))
+            return Box(origin=origin, scale=Scale(x=x, y=y, z=z), color=color)
 
         sphere_element = element.find("sphere")
         if sphere_element is not None:
-            radius = self.parse_float(sphere_element, "radius", 0.5)
+            radius = self.parse_float(
+                element=sphere_element, name="radius", default=0.5
+            )
             return Sphere(origin=origin, radius=radius, color=color)
 
         cylinder_element = element.find("cylinder")
         if cylinder_element is not None:
-            radius = self.parse_float(cylinder_element, "radius", 0.5)
+            radius = self.parse_float(
+                element=cylinder_element, name="radius", default=0.5
+            )
             return Cylinder(
                 origin=origin,
                 width=radius * 2,
-                height=self.parse_float(cylinder_element, "length", 0.5),
+                height=self.parse_float(
+                    element=cylinder_element, name="length", default=0.5
+                ),
                 color=color,
             )
 
         mesh_element = element.find("mesh")
         if mesh_element is not None:
             scale = mesh_element.findtext("scale")
+            mesh_scale = Scale()
+            if scale:
+                x, y, z = self.parse_vector(text=scale)
+                mesh_scale = Scale(x=x, y=y, z=z)
             return Mesh(
                 origin=origin,
                 filename=self.path_resolver.resolve(
-                    mesh_element.findtext("uri").strip()
+                    uri=mesh_element.findtext("uri").strip()
                 ),
-                scale=Scale(*self.parse_vector(scale)) if scale else Scale(),
+                scale=mesh_scale,
                 color=color,
             )
 
@@ -711,7 +752,7 @@ class GazeboParser(WorldModelParser):
             supported_types=["box", "cylinder", "mesh", "sphere"],
         )
 
-    def parse_color(self, element: ElementTree.Element | None) -> Color:
+    def parse_color(self, *, element: ElementTree.Element | None) -> Color:
         """
         Parses the diffuse color of a ``material`` element.
 
@@ -725,12 +766,13 @@ class GazeboParser(WorldModelParser):
         if diffuse is None:
             return Color()
 
-        return Color.from_rgba(*(float(value) for value in diffuse.split()))
+        return Color.from_list(color=[float(value) for value in diffuse.split()])
 
     # %% joints
 
     def parse_joint(
         self,
+        *,
         element: ElementTree.Element,
         bodies: dict[str, Body],
         model_T_link: dict[str, HomogeneousTransformationMatrix],
@@ -760,7 +802,7 @@ class GazeboParser(WorldModelParser):
 
         parent_name = element.findtext("parent").strip()
         child_name = element.findtext("child").strip()
-        child_T_connection = self.parse_pose(element.find("pose"))
+        child_T_connection = self.parse_pose(element=element.find("pose"))
         parent_T_connection = (
             model_T_link[parent_name].inverse()
             @ model_T_link[child_name]
@@ -772,10 +814,16 @@ class GazeboParser(WorldModelParser):
                 name=joint_name,
                 connection_T_child=child_T_connection.inverse(),
                 screw_axis=joint_type.create_screw_axis(
-                    direction=self.parse_axis(element, joint_name, bodies[parent_name])
+                    direction=self.parse_axis(
+                        element=element,
+                        joint_name=joint_name,
+                        parent_body=bodies[parent_name],
+                    )
                 ),
-                dof_limits=self.parse_limits(element, joint_type, joint_name),
-                dynamics=self.parse_dynamics(element.find("axis/dynamics")),
+                dof_limits=self.parse_limits(
+                    element=element, joint_type=joint_type, joint_name=joint_name
+                ),
+                dynamics=self.parse_dynamics(element=element.find("axis/dynamics")),
             )
         else:
             specification = specification_type(
@@ -789,7 +837,7 @@ class GazeboParser(WorldModelParser):
         )
 
     def parse_axis(
-        self, element: ElementTree.Element, joint_name: str, parent_body: Body
+        self, *, element: ElementTree.Element, joint_name: str, parent_body: Body
     ) -> Vector3:
         """
         Parses the axis of a ``joint`` element.
@@ -825,13 +873,13 @@ class GazeboParser(WorldModelParser):
             )
 
         axis = Vector3(
-            *self.parse_vector(xyz_element.text), reference_frame=parent_body
+            *self.parse_vector(text=xyz_element.text), reference_frame=parent_body
         )
         axis.scale(a=1)
         return axis
 
     def parse_limits(
-        self, element: ElementTree.Element, joint_type: SdfJointType, joint_name: str
+        self, *, element: ElementTree.Element, joint_type: SdfJointType, joint_name: str
     ) -> DegreeOfFreedomLimits:
         """
         Parses the limits of a ``joint`` element.
@@ -850,10 +898,14 @@ class GazeboParser(WorldModelParser):
         lower_position = None
         upper_position = None
         if joint_type != SdfJointType.CONTINUOUS:
-            lower_position = self.parse_optional_float(limit_element, "lower")
-            upper_position = self.parse_optional_float(limit_element, "upper")
+            lower_position = self.parse_optional_float(
+                element=limit_element, name="lower"
+            )
+            upper_position = self.parse_optional_float(
+                element=limit_element, name="upper"
+            )
 
-        velocity = self.parse_optional_float(limit_element, "velocity")
+        velocity = self.parse_optional_float(element=limit_element, name="velocity")
         if velocity is not None and velocity < 0:
             raise NegativeConnectionVelocity(
                 connection_name=joint_name, velocity=velocity
@@ -865,7 +917,7 @@ class GazeboParser(WorldModelParser):
             maximum_speed=velocity,
         )
 
-    def parse_dynamics(self, element: ElementTree.Element | None) -> JointDynamics:
+    def parse_dynamics(self, *, element: ElementTree.Element | None) -> JointDynamics:
         """
         Parses a ``dynamics`` element.
 
@@ -878,14 +930,17 @@ class GazeboParser(WorldModelParser):
             return JointDynamics()
 
         return JointDynamics(
-            damping=self.parse_float(element, "damping", 0.0),
-            dry_friction=self.parse_float(element, "friction", 0.0),
+            damping=self.parse_float(element=element, name="damping", default=0.0),
+            dry_friction=self.parse_float(
+                element=element, name="friction", default=0.0
+            ),
         )
 
     # %% primitives
 
     def parse_pose(
         self,
+        *,
         element: ElementTree.Element | None,
         reference_frame: Body | None = None,
     ) -> HomogeneousTransformationMatrix:
@@ -920,7 +975,7 @@ class GazeboParser(WorldModelParser):
         )
 
     @staticmethod
-    def parse_vector(text: str | None) -> list[float]:
+    def parse_vector(*, text: str | None) -> list[float]:
         """
         :param text: Whitespace separated numbers.
         :return: The numbers the text holds.
@@ -928,7 +983,7 @@ class GazeboParser(WorldModelParser):
         return [float(value) for value in (text or "").split()]
 
     @classmethod
-    def parse_boolean(cls, element: ElementTree.Element | None) -> bool:
+    def parse_boolean(cls, *, element: ElementTree.Element | None) -> bool:
         """
         :param element: The element holding the flag.
         :return: Whether the element is present and set.
@@ -939,7 +994,7 @@ class GazeboParser(WorldModelParser):
 
     @staticmethod
     def parse_float(
-        element: ElementTree.Element | None, name: str, default: float
+        *, element: ElementTree.Element | None, name: str, default: float
     ) -> float:
         """
         :param element: The element holding the value as a child.
@@ -953,7 +1008,9 @@ class GazeboParser(WorldModelParser):
         return float(text) if text is not None else default
 
     @staticmethod
-    def parse_optional_float(element: ElementTree.Element, name: str) -> float | None:
+    def parse_optional_float(
+        *, element: ElementTree.Element, name: str
+    ) -> float | None:
         """
         :param element: The element holding the value as a child.
         :param name: The name of the child element.
@@ -963,7 +1020,7 @@ class GazeboParser(WorldModelParser):
         return float(text) if text is not None else None
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MissingRootElement(ParsingError):
     """
     Raised when a description file contains none of the expected root elements.
@@ -981,7 +1038,7 @@ class MissingRootElement(ParsingError):
         return ""
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MalformedPose(ParsingError):
     """
     Raised when a pose does not consist of a position and roll-pitch-yaw triple.
@@ -999,7 +1056,7 @@ class MalformedPose(ParsingError):
         return "Write the pose as 'x y z roll pitch yaw'."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnsupportedJointType(ParsingError):
     """
     Raised when a parsed joint uses a type that has no connection counterpart.
@@ -1029,7 +1086,7 @@ class UnsupportedJointType(ParsingError):
         return f"Use one of the supported types: {', '.join(sorted(self.supported_types))}."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnsupportedGeometryType(ParsingError):
     """
     Raised when a parsed geometry uses a shape that has no counterpart.
@@ -1054,7 +1111,7 @@ class UnsupportedGeometryType(ParsingError):
         return f"Use one of the supported types: {', '.join(sorted(self.supported_types))}."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnsupportedPoseReference(ParsingError):
     """
     Raised when a pose is expressed relative to a named frame.
@@ -1083,7 +1140,7 @@ class UnsupportedPoseReference(ParsingError):
         return f"Express the pose in its default frame and drop the '{self.attribute}' attribute."
 
 
-@dataclass
+@dataclass(kw_only=True)
 class UnsupportedAxisReference(ParsingError):
     """
     Raised when a joint axis is expressed in a frame other than the joint frame.

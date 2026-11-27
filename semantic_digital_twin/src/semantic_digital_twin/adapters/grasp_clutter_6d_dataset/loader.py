@@ -76,7 +76,7 @@ class GraspClutter6DSplit(StrEnum):
     TEST = "test"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class GraspClutter6DDatasetLoader:
     """
     Loader for scenes of the GraspClutter6D dataset
@@ -131,7 +131,7 @@ class GraspClutter6DDatasetLoader:
     because Hugging Face Hub caps individual file size.
     """
 
-    def _download_archive(self, filename: str) -> Path:
+    def _download_archive(self, *, filename: str) -> Path:
         """
         :param filename: The archive's path within the repository, e.g.
             ``"models_eval.7z"``.
@@ -150,7 +150,7 @@ class GraspClutter6DDatasetLoader:
 
     @staticmethod
     def _extract_archive(
-        archive_path: Path, extraction_root: Path, expected_name: str
+        *, archive_path: Path, extraction_root: Path, expected_name: str
     ) -> Path:
         """
         Extract a (possibly multi-volume) 7z archive into `extraction_root`, returning
@@ -201,11 +201,15 @@ class GraspClutter6DDatasetLoader:
 
         :return: The extracted `split_info` directory.
         """
-        archive_path = self._download_archive("split_info.7z")
-        return self._extract_archive(archive_path, self.directory, "split_info")
+        archive_path = self._download_archive(filename="split_info.7z")
+        return self._extract_archive(
+            archive_path=archive_path,
+            extraction_root=self.directory,
+            expected_name="split_info",
+        )
 
     def download_models(
-        self, variant: GraspClutter6DModelVariant = GraspClutter6DModelVariant.EVAL
+        self, *, variant: GraspClutter6DModelVariant = GraspClutter6DModelVariant.EVAL
     ) -> Path:
         """
         Download and extract one of the dataset's model archives.
@@ -219,8 +223,12 @@ class GraspClutter6DDatasetLoader:
         :return: The extracted directory, containing `obj_%06d.ply`/`.obj` files and
             `models_info.json`.
         """
-        archive_path = self._download_archive(f"{variant.value}.7z")
-        return self._extract_archive(archive_path, self.directory, variant.value)
+        archive_path = self._download_archive(filename=f"{variant.value}.7z")
+        return self._extract_archive(
+            archive_path=archive_path,
+            extraction_root=self.directory,
+            expected_name=variant.value,
+        )
 
     def download_scenes(self) -> Path:
         """
@@ -236,12 +244,17 @@ class GraspClutter6DDatasetLoader:
         if expected_directory.exists():
             return expected_directory
         part_paths = [
-            self._download_archive(name) for name in self._scenes_archive_parts
+            self._download_archive(filename=name) for name in self._scenes_archive_parts
         ]
-        return self._extract_archive(part_paths[0], self.directory, "scenes")
+        return self._extract_archive(
+            archive_path=part_paths[0],
+            extraction_root=self.directory,
+            expected_name="scenes",
+        )
 
     def available_scene_ids(
         self,
+        *,
         object_set: GraspClutter6DObjectSet = GraspClutter6DObjectSet.GRASP,
         split: GraspClutter6DSplit = GraspClutter6DSplit.TRAIN,
     ) -> tuple[str, ...]:
@@ -258,7 +271,7 @@ class GraspClutter6DDatasetLoader:
         )
         return tuple(json.loads(file_path.read_text()))
 
-    def object_ids_for_scene(self, scene_id: str) -> tuple[int, ...]:
+    def object_ids_for_scene(self, *, scene_id: str) -> tuple[int, ...]:
         """
         :param scene_id: A scene id, e.g. ``"000005"``.
         :return: The object ids present anywhere in that scene, from
@@ -276,7 +289,7 @@ class GraspClutter6DDatasetLoader:
         data = json.loads(file_path.read_text())
         return tuple(data[str(int(scene_id))])
 
-    def load_scene(self, scene_id: str) -> GraspClutter6DScene:
+    def load_scene(self, *, scene_id: str) -> GraspClutter6DScene:
         """
         Load one scene's annotations from the already-downloaded/extracted scenes
         directory (see :meth:`download_scenes`).

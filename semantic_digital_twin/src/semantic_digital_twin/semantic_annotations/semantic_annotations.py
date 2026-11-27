@@ -114,14 +114,14 @@ if TYPE_CHECKING:
     )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Furniture(SemanticAnnotation, ABC):
     """
     A semantic annotation that represents a piece of furniture.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Handle(IsGraspable):
     """
     A handle is a physical entity that can be grasped by a hand or a robotic gripper to
@@ -134,7 +134,7 @@ class Handle(IsGraspable):
 
     @classmethod
     def _create_handle_geometry(
-        cls, scale: Scale, thickness: float = 0.0
+        cls, *, scale: Scale, thickness: float = 0.0
     ) -> SimpleEvent:
         """
         Create a box event representing the handle.
@@ -160,10 +160,10 @@ class Handle(IsGraspable):
     @classmethod
     def get_default_root_kinematic_structure_entity_specification(
         cls,
+        *,
         name: str | None = None,
         scale: Scale | None = None,
         connection_specification: ConnectionSpecification | None = None,
-        *,
         thickness: float = 0.005,
     ) -> BodySpecification:
         """
@@ -179,7 +179,7 @@ class Handle(IsGraspable):
         :return: A body specification with the handle geometry.
         :raises HandleWiderThanLong: If the width of ``scale`` exceeds its length.
         """
-        scale = scale or Scale(0.05, 0.02, 0.1)
+        scale = scale or Scale(x=0.05, y=0.02, z=0.1)
         if scale.y > scale.z:
             raise HandleWiderThanLong(scale=scale)
         handle_event = cls._create_handle_geometry(scale=scale).as_composite_set()
@@ -189,7 +189,9 @@ class Handle(IsGraspable):
         handle_event -= inner_box
 
         return BodySpecification.from_event(
-            name, handle_event, connection_specification=connection_specification
+            name=name,
+            event=handle_event,
+            connection_specification=connection_specification,
         )
 
     def default_grasp_candidates(self) -> list[GraspCandidate]:
@@ -203,15 +205,15 @@ class Handle(IsGraspable):
             which way the bar runs.
         """
         if not self.root.has_collision():
-            raise NoGraspGeometry(self)
+            raise NoGraspGeometry(graspable=self)
         mesh = self.root.combined_mesh
         bar_axis = np.argmax(mesh.extents)
         bar_direction = Vector3.from_iterable(np.eye(3)[bar_axis])
         across_bar = np.delete(np.eye(3), bar_axis, axis=0)
         return [
             GraspCandidate(
-                self,
-                Pose(
+                graspable=self,
+                grasp_pose=Pose(
                     position=Point3.from_iterable(mesh.bounds.mean(axis=0)),
                     orientation=RotationMatrix.from_vectors(
                         x=approach, y=bar_direction.cross(approach)
@@ -223,7 +225,7 @@ class Handle(IsGraspable):
         ]
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Dishwasher(HasCaseAsRootBody, HasDoors, HasDrawers):
     """
     A dishwasher is a kitchen appliance used for cleaning dishes, utensils, and
@@ -238,7 +240,7 @@ class Dishwasher(HasCaseAsRootBody, HasDoors, HasDrawers):
         return Vector3.NEGATIVE_X()
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class WashingMachine(HasCaseAsRootBody, HasDoors, HasDrawers):
     """
     A washing machine is a household appliance that washes laundry in a drum.
@@ -251,7 +253,7 @@ class WashingMachine(HasCaseAsRootBody, HasDoors, HasDrawers):
         return Vector3.NEGATIVE_X()
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Aperture(HasRootRegion):
     """
     An opening in a physical entity.
@@ -262,6 +264,7 @@ class Aperture(HasRootRegion):
     @classmethod
     def create_with_new_region_in_world_from_body(
         cls,
+        *,
         name: str,
         world: World,
         body: Body,
@@ -269,16 +272,17 @@ class Aperture(HasRootRegion):
     ) -> Self:
         world.update_forward_kinematics()
         body_scale = (
-            body.collision.as_bounding_box_collection_in_frame(body)
+            body.collision.as_bounding_box_collection_in_frame(reference_frame=body)
             .bounding_box()
             .scale
         )
         return cls.create_with_new_region_in_world(
-            name, world, parent_T_self, scale=body_scale
+            name=name, world=world, world_root_T_self=parent_T_self, scale=body_scale
         )
 
     def _mount_strategy(
         self,
+        *,
         main_has_root_body_annotation: HasRootBody,
         relationship: IsPartWholeRelationship,
     ) -> None:
@@ -290,10 +294,15 @@ class Aperture(HasRootRegion):
         rather than a hole, so the whole keeps its material.
         """
         if relationship.removes_part_geometry_from_whole:
-            self._remove_aperture_geometry_from_parent(main_has_root_body_annotation)
-        super()._mount_strategy(main_has_root_body_annotation, relationship)
+            self._remove_aperture_geometry_from_parent(
+                parent=main_has_root_body_annotation
+            )
+        super()._mount_strategy(
+            main_has_root_body_annotation=main_has_root_body_annotation,
+            relationship=relationship,
+        )
 
-    def _remove_aperture_geometry_from_parent(self, parent: HasRootBody):
+    def _remove_aperture_geometry_from_parent(self, *, parent: HasRootBody):
         """
         Remove the geometry of the aperture from the parent body's collision and visual
         geometry.
@@ -303,14 +312,16 @@ class Aperture(HasRootRegion):
         world = parent._world
         world.update_forward_kinematics()
         hole_event = self.root.area.as_bounding_box_collection_in_frame(
-            parent.root
+            reference_frame=parent.root
         ).event
         wall_event = parent.root.collision.as_bounding_box_collection_in_frame(
-            parent.root
+            reference_frame=parent.root
         ).event
         new_wall_event = wall_event - hole_event
         new_bounding_box_collection = BoundingBoxCollection.from_event(
-            VolumetricBoundingBox, parent.root, new_wall_event
+            box_type=VolumetricBoundingBox,
+            reference_frame=parent.root,
+            event=new_wall_event,
         ).as_shapes()
 
         parent.root.collision = new_bounding_box_collection
@@ -319,6 +330,7 @@ class Aperture(HasRootRegion):
     @classmethod
     def get_default_root_kinematic_structure_entity_specification(
         cls,
+        *,
         name: str | None = None,
         scale: Scale | None = None,
         connection_specification: ConnectionSpecification | None = None,
@@ -336,13 +348,13 @@ class Aperture(HasRootRegion):
         """
         scale = scale or Scale()
         return RegionSpecification.from_event(
-            name,
-            scale.to_simple_event().as_composite_set(),
+            name=name,
+            event=scale.to_simple_event().as_composite_set(),
             connection_specification=connection_specification,
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class EntryWay(Aperture):
     """
     The passage a door covers.
@@ -354,10 +366,10 @@ class EntryWay(Aperture):
     @classmethod
     def get_default_root_kinematic_structure_entity_specification(
         cls,
+        *,
         name: str | None = None,
         scale: Scale | None = None,
         connection_specification: ConnectionSpecification | None = None,
-        *,
         color: Color | None = None,
     ) -> RegionSpecification:
         """
@@ -372,14 +384,14 @@ class EntryWay(Aperture):
         :return: A region specification with the passage geometry.
         """
         return RegionSpecification.box(
-            name,
-            scale or Scale(),
+            name=name,
+            scale=scale or Scale(),
             color=color or Color.from_rgba(red=1.0, green=1.0, blue=1.0, opacity=0.2),
             connection_specification=connection_specification,
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Door(HasHandle, HasMovableJoint):
     """
     A door is a physical entity that has covers an opening, has a movable body and a
@@ -402,14 +414,14 @@ class Door(HasHandle, HasMovableJoint):
         The scale the door's geometry and its entry way are built from when the caller
         supplies none.
         """
-        return Scale(0.03, 1, 2)
+        return Scale(x=0.03, y=1, z=2)
 
     @classmethod
     def get_annotation_specification(
         cls,
+        *,
         name: str,
         root_specification: KinematicStructureEntitySpecification,
-        *,
         parent_connection_specification: ConnectionSpecification | None = None,
         annotation_kwargs: dict | None = None,
         part_specifications: dict | None = None,
@@ -433,14 +445,14 @@ class Door(HasHandle, HasMovableJoint):
         :return: The annotation specification.
         """
         entry_way_specification = EntryWay.get_annotation_specification(
-            f"{name}_entry_way",
-            EntryWay.get_default_root_kinematic_structure_entity_specification(
+            name=f"{name}_entry_way",
+            root_specification=EntryWay.get_default_root_kinematic_structure_entity_specification(
                 scale=root_specification.scale
             ),
         )
         return super().get_annotation_specification(
-            name,
-            root_specification,
+            name=name,
+            root_specification=root_specification,
             parent_connection_specification=parent_connection_specification,
             annotation_kwargs=annotation_kwargs,
             part_specifications={
@@ -452,6 +464,7 @@ class Door(HasHandle, HasMovableJoint):
     @classmethod
     def get_default_root_kinematic_structure_entity_specification(
         cls,
+        *,
         name: str | None = None,
         scale: Scale | None = None,
         connection_specification: ConnectionSpecification | None = None,
@@ -471,13 +484,13 @@ class Door(HasHandle, HasMovableJoint):
         """
         scale = scale or cls.default_scale
         if not (scale.x < scale.y and scale.x < scale.z):
-            raise InvalidPlaneDimensions(scale, clazz=Door)
+            raise InvalidPlaneDimensions(scale=scale, clazz=Door)
         return super().get_default_root_kinematic_structure_entity_specification(
-            name, scale, connection_specification
+            name=name, scale=scale, connection_specification=connection_specification
         )
 
     def calculate_self_T_movable_joint(
-        self, axis: Vector3
+        self, *, axis: Vector3
     ) -> HomogeneousTransformationMatrix:
         """
         Calculate where the door's hinge sits: on the edge opposite its handle.
@@ -487,7 +500,10 @@ class Door(HasHandle, HasMovableJoint):
         :return: The pose of the hinge in the door frame.
         """
         if self.handle is None:
-            raise MissingSemanticAnnotationError(self.__class__, Handle)
+            raise MissingSemanticAnnotationError(
+                semantic_annotation_class=self.__class__,
+                missing_semantic_annotation_class=Handle,
+            )
 
         connection = self.handle.root.parent_connection
         door_P_handle = connection.origin_expression.position
@@ -528,7 +544,7 @@ class Door(HasHandle, HasMovableJoint):
         return door_T_hinge
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class DoubleDoor(SemanticAnnotation):
     """
     A semantic annotation that represents a double door with left and right doors.
@@ -538,7 +554,7 @@ class DoubleDoor(SemanticAnnotation):
     door_1: Door = field(kw_only=True)
 
     def calculate_left_right_door_from_view_point(
-        self, world_T_view_point: HomogeneousTransformationMatrix
+        self, *, world_T_view_point: HomogeneousTransformationMatrix
     ) -> tuple[Door, Door]:
         """
         Calculate which door is the left and which is the right door based on a given
@@ -558,14 +574,14 @@ class DoubleDoor(SemanticAnnotation):
             return self.door_1, self.door_0
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Drawer(Furniture, HasCaseAsRootBody, HasHandle, HasMovableJoint):
     @classproperty
     def _hole_direction_axis(cls) -> Vector3:
         return Vector3.Z()
 
     def calculate_self_T_movable_joint(
-        self, axis: Vector3
+        self, *, axis: Vector3
     ) -> HomogeneousTransformationMatrix:
         """
         A drawer slides, which moves it the same wherever its rails sit, so they sit at
@@ -577,7 +593,7 @@ class Drawer(Furniture, HasCaseAsRootBody, HasHandle, HasMovableJoint):
         return HomogeneousTransformationMatrix()
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Elevator(HasCaseAsRootBody, HasDoors, HasMovableJoint):
     """
     An elevator in the world, consists of three walls a floor, double doors for entering and a prismatic drive that moves
@@ -589,7 +605,7 @@ class Elevator(HasCaseAsRootBody, HasDoors, HasMovableJoint):
         return Vector3.NEGATIVE_X()
 
     def calculate_self_T_movable_joint(
-        self, axis: Vector3
+        self, *, axis: Vector3
     ) -> HomogeneousTransformationMatrix:
         """
         An elevator's drive slides it, which moves it the same wherever the drive sits,
@@ -606,7 +622,7 @@ class Elevator(HasCaseAsRootBody, HasDoors, HasMovableJoint):
         """
         for door in self.doors:
             if door.movable_joint is None:
-                raise MissingMovableJointError(door)
+                raise MissingMovableJointError(semantic_annotation=door)
             door.movable_joint.position = door.movable_joint.dof.limits.upper.position
 
     def close(self):
@@ -615,10 +631,10 @@ class Elevator(HasCaseAsRootBody, HasDoors, HasMovableJoint):
         """
         for door in self.doors:
             if door.movable_joint is None:
-                raise MissingMovableJointError(door)
+                raise MissingMovableJointError(semantic_annotation=door)
             door.movable_joint.position = door.movable_joint.dof.limits.lower.position
 
-    def drive_position_for_floor(self, floor: Level) -> float:
+    def drive_position_for_floor(self, *, floor: Level) -> float:
         """
         The drive position at which the elevator serves the given floor.
 
@@ -630,19 +646,19 @@ class Elevator(HasCaseAsRootBody, HasDoors, HasMovableJoint):
         """
         return float(floor.floor_plane[0].z)
 
-    def drive_to_floor(self, floor: Level):
+    def drive_to_floor(self, *, floor: Level):
         """
         Drives the elevator to the floor given
         """
         if self.movable_joint is None:
-            raise MissingMovableJointError(self)
-        self.movable_joint.position = self.drive_position_for_floor(floor)
+            raise MissingMovableJointError(semantic_annotation=self)
+        self.movable_joint.position = self.drive_position_for_floor(floor=floor)
 
 
 ############################### subclasses to Furniture
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ShelfLayer(HasSupportingSurface):
     """
     A horizontal surface used for storing objects, typically found inside cabinets or on
@@ -652,14 +668,14 @@ class ShelfLayer(HasSupportingSurface):
     _synonyms = {"level", "board"}
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Table(Furniture, HasSupportingSurface):
     """
     A semantic annotation that represents a table.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class CounterTop(Furniture, HasSupportingSurface, HasSink):
     """
     A semantic annotation that represents a counter top.
@@ -668,7 +684,7 @@ class CounterTop(Furniture, HasSupportingSurface, HasSink):
     _synonyms = {"countertop"}
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class KitchenIsland(Furniture, HasRootBody, HasCabinets, HasCounterTop, HasDoors):
     """
     A run of kitchen cabinets standing free of the walls, under one counter top.
@@ -677,18 +693,18 @@ class KitchenIsland(Furniture, HasRootBody, HasCabinets, HasCounterTop, HasDoors
     _synonyms = {"kitchen_island", "island"}
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Cabinet(Furniture, HasCaseAsRootBody, HasDoors, HasDrawers):
     @classproperty
     def _hole_direction_axis(cls) -> Vector3:
         return Vector3.NEGATIVE_X()
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Fridge(Cabinet): ...
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class TumbleDryer(HasCaseAsRootBody, HasDoors, HasDrawers):
     """
     A tumble dryer is a household appliance that dries laundry in a rotating drum.
@@ -701,23 +717,23 @@ class TumbleDryer(HasCaseAsRootBody, HasDoors, HasDrawers):
         return Vector3.NEGATIVE_X()
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Oven(HasRootBody, HasDoors): ...
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Dresser(Cabinet): ...
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Cupboard(Cabinet): ...
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Wardrobe(Cabinet): ...
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Floor(HasSupportingSurface):
     """
     A floor that robots and furniture stand on.
@@ -737,7 +753,9 @@ class Floor(HasSupportingSurface):
         if not isinstance(robot, HasMobileBase):
             raise MissingMobileBaseError(robot_part=robot)
         return self.planar_free_space(
-            max_height=robot.as_bounding_box_collection_in_frame(robot.root)
+            max_height=robot.as_bounding_box_collection_in_frame(
+                reference_frame=robot.root
+            )
             .bounding_box()
             .scale.z,
             bloat_obstacles=robot.mobile_base.base_radius + margin,
@@ -746,6 +764,7 @@ class Floor(HasSupportingSurface):
     @classmethod
     def create_with_new_body_from_polytope_in_world(
         cls,
+        *,
         name: str,
         world: World,
         floor_polytope: list[Point3],
@@ -759,13 +778,16 @@ class Floor(HasSupportingSurface):
         :param floor_polytope: A list of 3D points defining the floor poly
         """
         return cls.get_annotation_specification(
-            name,
-            BodySpecification.from_3d_points(name, floor_polytope),
-        ).spawn(world, parent_T_self=world_root_T_self)
+            name=name,
+            root_specification=BodySpecification.from_3d_points(
+                name=name, points_3d=floor_polytope
+            ),
+        ).spawn(world=world, parent_T_self=world_root_T_self)
 
     @classmethod
     def get_default_root_kinematic_structure_entity_specification(
         cls,
+        *,
         name: str | None = None,
         scale: Scale | None = None,
         connection_specification: ConnectionSpecification | None = None,
@@ -783,13 +805,13 @@ class Floor(HasSupportingSurface):
         """
         scale = scale or Scale()
         return BodySpecification.from_3d_points(
-            name,
-            scale.to_bounding_box().get_points(),
+            name=name,
+            points_3d=scale.to_bounding_box().get_points(),
             connection_specification=connection_specification,
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Room(SemanticAnnotation):
     """
     A closed area with a specific purpose.
@@ -801,23 +823,23 @@ class Room(SemanticAnnotation):
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Kitchen(Room): ...
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Bedroom(Room): ...
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Bathroom(Room): ...
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class LivingRoom(Room): ...
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Level(HasRootRegion):
     """
     A level of a building
@@ -831,10 +853,10 @@ class Level(HasRootRegion):
         :return: The floor plane of the level
         """
         min_point_global = self._world.transform(
-            self.root.area.min_point, self._world.root
+            spatial_object=self.root.area.min_point, target_frame=self._world.root
         )
         max_point_global = self._world.transform(
-            self.root.area.max_point, self._world.root
+            spatial_object=self.root.area.max_point, target_frame=self._world.root
         )
         min_z = min_point_global.z
         return min_point_global, Point3(
@@ -845,19 +867,19 @@ class Level(HasRootRegion):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class GroundFloor(Level): ...
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class FirstFloor(Level): ...
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class SecondFloor(Level): ...
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Wall(HasApertures):
     """
     A wall is a physical entity that separates two spaces and can contain apertures.
@@ -871,7 +893,9 @@ class Wall(HasApertures):
     def doors(self) -> Iterable[Door]:
         return [
             door
-            for door in self._world.get_semantic_annotations_by_type(Door)
+            for door in self._world.get_semantic_annotations_by_type(
+                semantic_annotation_type=Door
+            )
             if door.entry_way
             and InsideOf(
                 body=door.entry_way.root, other=self.root, minimum_containment_ratio=0.1
@@ -879,7 +903,7 @@ class Wall(HasApertures):
         ]
 
     @classmethod
-    def _create_wall_event(cls, scale: Scale) -> SimpleEvent:
+    def _create_wall_event(cls, *, scale: Scale) -> SimpleEvent:
         """
         Return the collision shapes for the wall.
 
@@ -902,6 +926,7 @@ class Wall(HasApertures):
     @classmethod
     def get_default_root_kinematic_structure_entity_specification(
         cls,
+        *,
         name: str | None = None,
         scale: Scale | None = None,
         connection_specification: ConnectionSpecification | None = None,
@@ -919,15 +944,16 @@ class Wall(HasApertures):
         """
         scale = scale or Scale()
         if not (scale.x < scale.y and scale.x < scale.z):
-            raise InvalidPlaneDimensions(scale, clazz=Wall)
+            raise InvalidPlaneDimensions(scale=scale, clazz=Wall)
         return BodySpecification.from_event(
-            name,
-            cls._create_wall_event(scale).as_composite_set(),
+            name=name,
+            event=cls._create_wall_event(scale=scale).as_composite_set(),
             connection_specification=connection_specification,
         )
 
     def bloated_bounding_box_collection(
         self,
+        *,
         origin: HomogeneousTransformationMatrix,
         bloat_amount: float,
         obstacle_height_clearance: float = 0.01,
@@ -943,136 +969,146 @@ class Wall(HasApertures):
         :return: The bloated bounding boxes.
         """
         return BoundingBoxCollection(
-            [
+            shapes=[
                 (
-                    bounding_box.bloat(bloat_amount, 0, obstacle_height_clearance)
+                    bounding_box.bloat(
+                        x_amount=bloat_amount,
+                        y_amount=0,
+                        z_amount=obstacle_height_clearance,
+                    )
                     if bounding_box.width > bounding_box.depth
-                    else bounding_box.bloat(0, bloat_amount, obstacle_height_clearance)
+                    else bounding_box.bloat(
+                        x_amount=0,
+                        y_amount=bloat_amount,
+                        z_amount=obstacle_height_clearance,
+                    )
                 )
-                for bounding_box in self.as_bounding_box_collection_at_origin(origin)
+                for bounding_box in self.as_bounding_box_collection_at_origin(
+                    origin=origin
+                )
             ],
-            origin.reference_frame,
+            reference_frame=origin.reference_frame,
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Container(IsGraspable):
     """
     An object that holds contents and has an opening they go in and out through.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Cookware(IsGraspable):
     """
     An object used to cook with.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Tableware(IsGraspable):
     """
     An object a table is set with for a meal.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Bottle(Container):
     """
     Abstract class for bottles.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Statue(IsGraspable):
     """
     A sculpture small enough to be picked up.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class SoapBottle(Bottle):
     """
     A soap bottle.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class WineBottle(Bottle):
     """
     A wine bottle.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class MustardBottle(Bottle):
     """
     A mustard bottle.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class DrinkingContainer(Container, Tableware): ...
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Cup(HasHandle, HasRim, DrinkingContainer, IsPerceivable):
     """
     A cup.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Mug(HasHandle, HasRim, DrinkingContainer):
     """
     A mug, held by its handle.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class CookingContainer(Container, Cookware): ...
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Lid(Cookware): ...
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Pan(CookingContainer):
     """
     A pan.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PanLid(Lid):
     """
     A pan lid.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Pot(CookingContainer, HasHandles):
     """
     A pot.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PotLid(Lid):
     """
     A pot lid.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Plate(HasSupportingSurface, Tableware):
     """
     A plate.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Rim(HasDrawnGraspsByDefault):
     """
     The upper edge of an open container's wall, which a gripper pinches from above.
@@ -1083,7 +1119,7 @@ class Rim(HasDrawnGraspsByDefault):
         return PinchARim()
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Bowl(HasRim, HasSupportingSurface, Container, Tableware, IsPerceivable):
     """
     A bowl, grasped by pinching the wall of its rim: it offers nothing to grip at its
@@ -1092,21 +1128,21 @@ class Bowl(HasRim, HasSupportingSurface, Container, Tableware, IsPerceivable):
 
 
 # Food Items
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Food(IsGraspable):
     """
     A Group class for Food.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class TunaCan(Food):
     """
     A tuna can.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Bread(Food):
     """
     Bread.
@@ -1121,35 +1157,35 @@ class Bread(Food):
     }
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class CheezeIt(Food, IsPerceivable):
     """
     Some type of cracker.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Pringles(Food):
     """
     Pringles chips.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class GelatinBox(Food):
     """
     Gelatin box.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class TomatoSoup(Food):
     """
     Tomato soup.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Candy(Food, IsPerceivable):
     """
     A candy.
@@ -1158,7 +1194,7 @@ class Candy(Food, IsPerceivable):
     ...
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Noodles(Food, IsPerceivable):
     """
     A container of noodles.
@@ -1167,7 +1203,7 @@ class Noodles(Food, IsPerceivable):
     ...
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Cereal(Food, IsPerceivable):
     """
     A container of cereal.
@@ -1176,14 +1212,14 @@ class Cereal(Food, IsPerceivable):
     ...
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Milk(Food, IsPerceivable):
     """
     A container of milk.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class SaltContainer(Container, IsPerceivable):
     """
     A container of salt.
@@ -1197,7 +1233,7 @@ class UnknownObject(HasRootBody, IsPerceivable):
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Produce(Food):
     """
     In American English, produce generally refers to fresh fruits and vegetables
@@ -1292,28 +1328,28 @@ class Pith(FruitPart):
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Vegetable(Produce):
     """
     Vegetable.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Tomato(Fruit):
     """
     A tomato.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Lettuce(Vegetable):
     """
     Lettuce.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Carrot(Vegetable):
     """
     A carrot.
@@ -1393,28 +1429,28 @@ class Watermelon(Fruit, HasPeel, HasFlesh, HasSeeds):
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Salt(Food):
     """
     A pack or container of salt (e.g., salt shaker or salt can).
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class CoffeeTable(Table):
     """
     A coffee table.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class DiningTable(Table, HasLegs):
     """
     A dining table.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class SideTable(Table):
     """
     A side table.
@@ -1423,35 +1459,35 @@ class SideTable(Table):
     _synonyms = {"bedside"}
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Desk(Table, HasLegs):
     """
     A desk.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Chair(Furniture, HasRootBody):
     """
     Abstract class for chairs.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class OfficeChair(Chair):
     """
     An office chair.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Armchair(Chair):
     """
     An armchair.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class TrashCan(HasCaseAsRootBody, Furniture):
     """
     Abstract class for Trash Can.
@@ -1462,7 +1498,7 @@ class TrashCan(HasCaseAsRootBody, Furniture):
         return Vector3.Z()
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Shelf(Cabinet, HasShelfLayers):
     """
     A shelving unit whose storage surfaces are modelled as explicit shelf layers.
@@ -1472,104 +1508,104 @@ class Shelf(Cabinet, HasShelfLayers):
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Bed(Furniture):
     """
     A bed.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Sofa(Furniture, HasSupportingSurface):
     """
     A sofa.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Sink(HasRootBody):
     """
     A sink.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Kettle(CookingContainer): ...
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Decor(HasRootBody): ...
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class WallDecor(Decor):
     """
     Wall decorations.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Cloth(IsGraspable):
     """
     A piece of fabric, such as a towel or a rag.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Poster(WallDecor):
     """
     A poster.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class WallPanel(HasRootBody):
     """
     A wall panel.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Potato(Vegetable): ...
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class GarbageBin(HasRootBody):
     """
     A garbage bin.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Drone(HasRootBody): ...
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ProcthorBox(HasRootBody): ...
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Houseplant(HasRootBody):
     """
     A houseplant.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class SprayBottle(Bottle):
     """
     A spray bottle.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Vase(Container):
     """
     A vase.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Book(IsGraspable):
     """
     A book.
@@ -1578,18 +1614,18 @@ class Book(IsGraspable):
     book_front: BookFront | None = None
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class BookFront(HasRootBody): ...
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class SaltPepperShaker(SaltContainer):
     """
     A salt and pepper shaker.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Cutlery(HasHandle, Tableware):
     """
     A piece of cutlery, lying flat, grasped from above and across its length.
@@ -1602,17 +1638,17 @@ class Cutlery(HasHandle, Tableware):
             which way the piece lies.
         """
         if not self.root.has_collision():
-            raise NoGraspGeometry(self)
+            raise NoGraspGeometry(graspable=self)
         bounding_box = self.root.collision.as_bounding_box_collection_in_frame(
-            self.root
+            reference_frame=self.root
         ).bounding_box()
         along_x = bounding_box.x_interval.upper - bounding_box.x_interval.lower
         along_y = bounding_box.y_interval.upper - bounding_box.y_interval.lower
         finger_axis = Vector3.NEGATIVE_Y() if along_x >= along_y else Vector3.X()
         return [
             GraspCandidate(
-                self,
-                Pose(
+                graspable=self,
+                grasp_pose=Pose(
                     orientation=RotationMatrix.from_vectors(
                         x=Vector3.NEGATIVE_Z(), y=finger_axis
                     ).quaternion,
@@ -1626,39 +1662,39 @@ class Cutlery(HasHandle, Tableware):
         return GraspAcrossTheLength()
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Fork(Cutlery):
     """
     A fork.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Knife(Cutlery):
     """
     A butter knife.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Spoon(Cutlery, IsPerceivable): ...
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Pencil(IsGraspable):
     """
     A pencil.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Pen(IsGraspable):
     """
     A pen.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ShapeSortingPiece(IsGraspable):
     """
     A loose piece of a shape-sorting toy, which drops through the hole of its
@@ -1682,16 +1718,18 @@ class ShapeSortingPiece(IsGraspable):
             bottom face in.
         """
         if not self.root.has_collision():
-            raise NoGraspGeometry(self)
+            raise NoGraspGeometry(graspable=self)
         bottom_face = (
-            self.root.collision.as_bounding_box_collection_in_frame(self.root)
+            self.root.collision.as_bounding_box_collection_in_frame(
+                reference_frame=self.root
+            )
             .bounding_box()
             .min_z
         )
         return [
             GraspCandidate(
-                self,
-                Pose(
+                graspable=self,
+                grasp_pose=Pose(
                     position=Point3(
                         0.0,
                         0.0,
@@ -1707,21 +1745,21 @@ class ShapeSortingPiece(IsGraspable):
         ]
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Baseball(IsGraspable):
     """
     A baseball.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class BottleCap(HasMovableJoint):
     """
     A cap that closes a bottle, typically mounted on a screw joint.
     """
 
     def calculate_self_T_movable_joint(
-        self, axis: Vector3
+        self, *, axis: Vector3
     ) -> HomogeneousTransformationMatrix:
         """
         A cap screws about its own centre line, so its thread sits at its origin.
@@ -1732,7 +1770,7 @@ class BottleCap(HasMovableJoint):
         return HomogeneousTransformationMatrix()
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Agent(HasRootBody):
     """
     Represents an entity in the world that can act, move, or be controlled.
@@ -1743,7 +1781,7 @@ class Agent(HasRootBody):
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Human(Agent, IsPerceivable):
     """
     Represents a human agent in the environment.
@@ -1756,14 +1794,14 @@ class Human(Agent, IsPerceivable):
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Parcel(IsGraspable):
     """
     A parcel, as handled in a warehouse.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class SemanticEnvironmentAnnotation(HasRootBody):
     """
     Represents a semantic annotation of the environment.
@@ -1828,34 +1866,38 @@ class SemanticEnvironmentAnnotation(HasRootBody):
         )
 
         collections = (
-            entity.collision.as_bounding_box_collection_at_origin(origin)
+            entity.collision.as_bounding_box_collection_at_origin(origin=origin)
             for entity in entities_to_consider
         )
         obstacle_bounding_boxes = BoundingBoxCollection.merge_all(
-            collections, world_root
+            collections=collections, reference_frame=world_root
         )
 
         bloated_obstacles = BoundingBoxCollection(
-            [
+            shapes=[
                 bounding_box.bloat(
-                    bloat_obstacles, bloat_obstacles, obstacle_height_clearance
+                    x_amount=bloat_obstacles,
+                    y_amount=bloat_obstacles,
+                    z_amount=obstacle_height_clearance,
                 )
                 for bounding_box in obstacle_bounding_boxes
             ],
-            world_root,
+            reference_frame=world_root,
         )
 
         if semantic_wall_annotation is not None:
             bloated_obstacles = bloated_obstacles.merge(
-                semantic_wall_annotation.bloated_bounding_box_collection(
-                    origin, bloat_walls, obstacle_height_clearance
+                other=semantic_wall_annotation.bloated_bounding_box_collection(
+                    origin=origin,
+                    bloat_amount=bloat_walls,
+                    obstacle_height_clearance=obstacle_height_clearance,
                 )
             )
 
         return bloated_obstacles
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class RoomWithWallsAndDoors(Room):
     """
     A room with a type description (e.g., Ktichen) and walls and doors.
@@ -1877,7 +1919,7 @@ class RoomWithWallsAndDoors(Room):
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class DoorWithType(Door):
     """
     A Door that has a type description, e.g. "main entrance".
@@ -1886,21 +1928,21 @@ class DoorWithType(Door):
     type_description: str | None = field(kw_only=True, default=None)
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Leg(HasRootBody):
     """
     A leg that supports a piece of furniture.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Cooktop(HasRootBody):
     """
     A cooktop surface for cooking.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Tool(IsGraspable, ABC):
     """
     A tool that is held by a robot's end effector to act on other bodies.
@@ -1912,7 +1954,9 @@ class Tool(IsGraspable, ABC):
             tool's root name.
         """
         root_name = self.root.name
-        return PrefixedName(f"{root_name.name}_end_effector", root_name.prefix)
+        return PrefixedName(
+            name=f"{root_name.name}_end_effector", prefix=root_name.prefix
+        )
 
     def _find_end_effector_body(self) -> Body | None:
         if self.root._world is None:
@@ -1938,7 +1982,7 @@ class Tool(IsGraspable, ABC):
         return end_effector
 
     @abstractmethod
-    def tool_alignment(self, target: Body | Pose) -> list[AlignmentPair]:
+    def tool_alignment(self, *, target: Body | Pose) -> list[AlignmentPair]:
         """
         :param target: The body or pose the tool acts on.
         :return: The normal pairs that must stay aligned while the tool acts on the
@@ -1946,7 +1990,7 @@ class Tool(IsGraspable, ABC):
         """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class ToolWithHandle(Tool, HasHandle, ABC):
     """
     A tool held by its handle, acting through a tip body located ahead of its root.
@@ -1967,9 +2011,9 @@ class ToolWithHandle(Tool, HasHandle, ABC):
         world = self.root._world
         tip_body = Body(name=self._end_effector_name())
         with world.modify_world():
-            world.add_kinematic_structure_entity(tip_body)
+            world.add_kinematic_structure_entity(kinematic_structure_entity=tip_body)
             world.add_connection(
-                FixedConnection(
+                connection=FixedConnection(
                     parent=self.root,
                     child=tip_body,
                     parent_T_connection_expression=HomogeneousTransformationMatrix.from_xyz_rpy(
@@ -1982,13 +2026,13 @@ class ToolWithHandle(Tool, HasHandle, ABC):
             )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Whisk(ToolWithHandle):
     """
     A whisk for mixing the contents of containers.
     """
 
-    def tool_alignment(self, target: Body | Pose) -> list[AlignmentPair]:
+    def tool_alignment(self, *, target: Body | Pose) -> list[AlignmentPair]:
         return [
             AlignmentPair(
                 tip_normal=Vector3(-1, 0, 0, reference_frame=self.root),
@@ -1997,13 +2041,13 @@ class Whisk(ToolWithHandle):
         ]
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class CuttingKnife(ToolWithHandle):
     """
     A knife for cutting food objects.
     """
 
-    def tool_alignment(self, target: Body | Pose) -> list[AlignmentPair]:
+    def tool_alignment(self, *, target: Body | Pose) -> list[AlignmentPair]:
         return [
             AlignmentPair(
                 tip_normal=Vector3(1, 0, 0, reference_frame=self.root),
@@ -2016,13 +2060,13 @@ class CuttingKnife(ToolWithHandle):
         ]
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PouringCup(Tool, Container):
     """
     A cup for pouring liquids into containers.
     """
 
-    def tool_alignment(self, target: Body | Pose) -> list[AlignmentPair]:
+    def tool_alignment(self, *, target: Body | Pose) -> list[AlignmentPair]:
         return [
             AlignmentPair(
                 tip_normal=Vector3(0, 0, 1, reference_frame=self.root),
@@ -2031,7 +2075,7 @@ class PouringCup(Tool, Container):
         ]
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Sponge(Tool):
     """
     A sponge for wiping surfaces.
@@ -2040,7 +2084,7 @@ class Sponge(Tool):
         which is why its alignments use negative Z normals unlike the other tools.
     """
 
-    def tool_alignment(self, target: Body | Pose) -> list[AlignmentPair]:
+    def tool_alignment(self, *, target: Body | Pose) -> list[AlignmentPair]:
         if isinstance(target, Body):
             return [
                 AlignmentPair(
@@ -2051,11 +2095,11 @@ class Sponge(Tool):
         return [
             AlignmentPair(
                 tip_normal=Vector3(0, 0, -1, reference_frame=self.root),
-                reference_normal=self._pose_surface_normal(target),
+                reference_normal=self._pose_surface_normal(pose=target),
             )
         ]
 
-    def _pose_surface_normal(self, pose: Pose) -> Vector3:
+    def _pose_surface_normal(self, *, pose: Pose) -> Vector3:
         """
         :param pose: The pose whose surface normal is computed.
         :return: The pose's local Z axis expressed in the pose's reference frame.
@@ -2070,7 +2114,7 @@ class Sponge(Tool):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Microwave(IsStorageSpace, HasDoors):
     """
     A microwave oven, a kitchen appliance with a door that heats food placed inside it
@@ -2078,21 +2122,21 @@ class Microwave(IsStorageSpace, HasDoors):
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Hood(HasRootBody):
     """
     A range hood mounted above a cooktop that vents cooking fumes.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Toaster(HasRootBody):
     """
     A countertop appliance for toasting slices of bread.
     """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class CoffeeMachine(HasRootBody):
     """
     A countertop appliance that brews coffee.

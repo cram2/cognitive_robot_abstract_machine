@@ -18,7 +18,9 @@ from semantic_digital_twin.specifications.robots import RobotSpecification
 def test_garmi_giskard_weights_the_velocity_of_its_base(init_background_node):
     giskard = GarmiGiskard(
         world_source=WorldSpecification(
-            robots=[RobotSpecification.specify_real_robot(Garmi)]
+            robots=[
+                RobotSpecification.specify_real_robot(semantic_annotation_type=Garmi)
+            ]
         ),
         robot_interface_config=GarmiVelocityInterface(),
         server_config=GiskardServerConfig(),
@@ -27,7 +29,9 @@ def test_garmi_giskard_weights_the_velocity_of_its_base(init_background_node):
 
     giskard.setup()
 
-    [drive] = giskard.executor.context.world.get_connections_by_type(OmniDrive)
+    [drive] = giskard.executor.context.world.get_connections_by_type(
+        connection_type=OmniDrive
+    )
     for degree_of_freedom in drive.active_dofs:
         assert (
             giskard.qp_controller_config.get_degree_of_freedom_weight(

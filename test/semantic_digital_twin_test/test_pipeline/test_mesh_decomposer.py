@@ -27,8 +27,10 @@ def jeroen_cup_world_fixture():
     """
     :return: A world of the jeroen cup whose root is named ``root``.
     """
-    world = STLParser("package://iai_objects/objects/jeroen_cup.stl").create_world()
-    world.root.name = PrefixedName("root")
+    world = STLParser(
+        file_path="package://iai_objects/objects/jeroen_cup.stl"
+    ).create_world()
+    world.root.name = PrefixedName(name="root")
     return world
 
 
@@ -36,8 +38,8 @@ def test_coacd(jeroen_cup_world_fixture):
     [cup] = jeroen_cup_world_fixture.bodies
     old_collision_length = len(cup.collision.shapes)
 
-    pipeline = Pipeline([COACDMeshDecomposer(threshold=0.2)])
-    pipeline.apply(jeroen_cup_world_fixture)
+    pipeline = Pipeline(steps=[COACDMeshDecomposer(threshold=0.2)])
+    pipeline.apply(world=jeroen_cup_world_fixture)
 
     assert len(cup.collision.shapes) > old_collision_length
 
@@ -46,8 +48,8 @@ def test_vhacd(jeroen_cup_world_fixture):
     [cup] = jeroen_cup_world_fixture.bodies
     old_collision_length = len(cup.collision.shapes)
 
-    pipeline = Pipeline([VHACDMeshDecomposer(max_convex_hulls=10)])
-    pipeline.apply(jeroen_cup_world_fixture)
+    pipeline = Pipeline(steps=[VHACDMeshDecomposer(max_convex_hulls=10)])
+    pipeline.apply(world=jeroen_cup_world_fixture)
 
     assert len(cup.collision.shapes) > old_collision_length
 
@@ -56,9 +58,9 @@ def test_box_decomposer(jeroen_cup_world_fixture):
     [cup] = jeroen_cup_world_fixture.bodies
     old_collision_length = len(cup.collision.shapes)
 
-    pipeline = Pipeline([BoxDecomposer()])
+    pipeline = Pipeline(steps=[BoxDecomposer()])
 
-    pipeline.apply(jeroen_cup_world_fixture)
+    pipeline.apply(world=jeroen_cup_world_fixture)
 
     assert len(cup.collision.shapes) > old_collision_length
     assert all([isinstance(shape, Box) for shape in cup.collision.shapes])
@@ -72,7 +74,7 @@ def test_vhacd_decomposes_flat_mesh_into_its_convex_hull(millimetre_wall_strip):
     A mesh in which V-HACD finds no convex parts is decomposed into its convex hull.
     """
     [part] = VHACDMeshDecomposer().apply_to_mesh(
-        Mesh.from_trimesh(mesh=millimetre_wall_strip)
+        mesh=Mesh.from_trimesh(mesh=millimetre_wall_strip)
     )
 
     convex_hull = millimetre_wall_strip.convex_hull
@@ -96,4 +98,4 @@ def test_vhacd_raises_for_mesh_without_convex_parts(vertices: np.ndarray):
     )
 
     with pytest.raises(MeshWithoutConvexPartsError):
-        VHACDMeshDecomposer().apply_to_mesh(mesh)
+        VHACDMeshDecomposer().apply_to_mesh(mesh=mesh)

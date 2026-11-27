@@ -43,8 +43,8 @@ def height_above_base(world: World, link_name: str) -> float:
     """
     return float(
         world.compute_forward_kinematics(
-            world.get_kinematic_structure_entity_by_name("base_footprint"),
-            world.get_kinematic_structure_entity_by_name(link_name),
+            root=world.get_kinematic_structure_entity_by_name(name="base_footprint"),
+            tip=world.get_kinematic_structure_entity_by_name(name=link_name),
         ).to_np()[2, 3]
     )
 
@@ -55,12 +55,14 @@ def height_above_base(world: World, link_name: str) -> float:
 def test_joint_goal_on_a_mimic_joint_moves_the_joint_it_mimics(
     hsr_world_copy: World, default_hsr_pose: dict[str, float]
 ) -> None:
-    JointState.from_str_dict(default_hsr_pose, hsr_world_copy).apply_to(hsr_world_copy)
+    JointState.from_str_dict(mapping=default_hsr_pose, world=hsr_world_copy).apply_to(
+        world=hsr_world_copy
+    )
     torso_lift_joint: ActiveConnection1DOF = hsr_world_copy.get_connection_by_name(
-        HSRBJoint.TORSO_LIFT
+        name=HSRBJoint.TORSO_LIFT
     )
     arm_lift_joint: ActiveConnection1DOF = hsr_world_copy.get_connection_by_name(
-        HSRBJoint.ARM_LIFT
+        name=HSRBJoint.ARM_LIFT
     )
     torso_goal = 0.1
 
@@ -68,8 +70,8 @@ def test_joint_goal_on_a_mimic_joint_moves_the_joint_it_mimics(
         hsr_world_copy,
         JointPositionList(
             goal_state=JointState.from_str_dict(
-                {HSRBJoint.TORSO_LIFT: torso_goal, HSRBJoint.HAND_MOTOR: 1.23},
-                hsr_world_copy,
+                mapping={HSRBJoint.TORSO_LIFT: torso_goal, HSRBJoint.HAND_MOTOR: 1.23},
+                world=hsr_world_copy,
             )
         ),
     )
@@ -80,7 +82,7 @@ def test_joint_goal_on_a_mimic_joint_moves_the_joint_it_mimics(
         decimal=2,
     )
     hand_palm_link = hsr_world_copy.get_kinematic_structure_entity_by_name(
-        "hand_palm_link"
+        name="hand_palm_link"
     )
     hand_T_finger_expected = HomogeneousTransformationMatrix.from_xyz_quaternion(
         pos_x=-0.01675,
@@ -92,8 +94,10 @@ def test_joint_goal_on_a_mimic_joint_moves_the_joint_it_mimics(
     )
     np.testing.assert_almost_equal(
         hsr_world_copy.compute_forward_kinematics(
-            hand_palm_link,
-            hsr_world_copy.get_kinematic_structure_entity_by_name("hand_l_distal_link"),
+            root=hand_palm_link,
+            tip=hsr_world_copy.get_kinematic_structure_entity_by_name(
+                name="hand_l_distal_link"
+            ),
         ).to_np(),
         hand_T_finger_expected.to_np(),
         decimal=2,
@@ -104,10 +108,10 @@ def test_mimic_joint_velocity_limits_are_scaled_by_its_multiplier(
     hsr_world_copy: World,
 ) -> None:
     arm_lift_joint: ActiveConnection1DOF = hsr_world_copy.get_connection_by_name(
-        HSRBJoint.ARM_LIFT
+        name=HSRBJoint.ARM_LIFT
     )
     torso_lift_joint: ActiveConnection1DOF = hsr_world_copy.get_connection_by_name(
-        HSRBJoint.TORSO_LIFT
+        name=HSRBJoint.TORSO_LIFT
     )
 
     assert (
@@ -130,15 +134,17 @@ def test_lifting_the_gripper_lifts_the_torso_along(
     Lifting the HSR's gripper drives the arm lift, and the torso, which mimics it, rises
     by the lift times its multiplier.
     """
-    JointState.from_str_dict(default_hsr_pose, hsr_world_copy).apply_to(hsr_world_copy)
+    JointState.from_str_dict(mapping=default_hsr_pose, world=hsr_world_copy).apply_to(
+        world=hsr_world_copy
+    )
     torso_lift_joint: ActiveConnection1DOF = hsr_world_copy.get_connection_by_name(
-        HSRBJoint.TORSO_LIFT
+        name=HSRBJoint.TORSO_LIFT
     )
     arm_lift_joint: ActiveConnection1DOF = hsr_world_copy.get_connection_by_name(
-        HSRBJoint.ARM_LIFT
+        name=HSRBJoint.ARM_LIFT
     )
     gripper = hsr_world_copy.get_kinematic_structure_entity_by_name(
-        "hand_gripper_tool_frame"
+        name="hand_gripper_tool_frame"
     )
     arm_lift_before = arm_lift_joint.position
     torso_height_before = height_above_base(hsr_world_copy, "torso_lift_link")
@@ -149,7 +155,7 @@ def test_lifting_the_gripper_lifts_the_torso_along(
         CartesianPose(
             kinematic_chain=KinematicChain(
                 root=hsr_world_copy.get_kinematic_structure_entity_by_name(
-                    "base_footprint"
+                    name="base_footprint"
                 ),
                 tip=gripper,
             ),
@@ -174,14 +180,16 @@ def test_lifting_the_head_drives_the_joint_the_torso_mimics(
     Lifting the HSR's head drives the arm lift, which the torso mimics, by the lift
     divided by the multiplier.
     """
-    JointState.from_str_dict(default_hsr_pose, hsr_world_copy).apply_to(hsr_world_copy)
+    JointState.from_str_dict(mapping=default_hsr_pose, world=hsr_world_copy).apply_to(
+        world=hsr_world_copy
+    )
     torso_lift_joint: ActiveConnection1DOF = hsr_world_copy.get_connection_by_name(
-        HSRBJoint.TORSO_LIFT
+        name=HSRBJoint.TORSO_LIFT
     )
     arm_lift_joint: ActiveConnection1DOF = hsr_world_copy.get_connection_by_name(
-        HSRBJoint.ARM_LIFT
+        name=HSRBJoint.ARM_LIFT
     )
-    head = hsr_world_copy.get_kinematic_structure_entity_by_name("head_pan_link")
+    head = hsr_world_copy.get_kinematic_structure_entity_by_name(name="head_pan_link")
     arm_lift_before = arm_lift_joint.position
     head_height_before = height_above_base(hsr_world_copy, "head_pan_link")
     head_lift = 0.15
@@ -191,7 +199,7 @@ def test_lifting_the_head_drives_the_joint_the_torso_mimics(
         CartesianPose(
             kinematic_chain=KinematicChain(
                 root=hsr_world_copy.get_kinematic_structure_entity_by_name(
-                    "base_footprint"
+                    name="base_footprint"
                 ),
                 tip=head,
             ),

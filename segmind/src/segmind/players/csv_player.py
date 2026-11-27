@@ -92,6 +92,6 @@ class CSVEpisodePlayer(FilePlayer):
                 obj_pose.y += self.position_shift.y
                 obj_pose.z += self.position_shift.z
 
-            obj = self.world.get_body_by_name(obj_name)
+            obj = self.world.get_body_by_name(name=obj_name)
             objects_poses[obj] = obj_pose
         return objects_poses

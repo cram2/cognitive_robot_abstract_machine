@@ -38,14 +38,14 @@ def test_nested_block_keeps_degree_of_freedom_of_outer_block(
     world_with_two_bodies: tuple[World, Body, Body],
 ):
     world, parent, child = world_with_two_bodies
-    degree_of_freedom = DegreeOfFreedom(name=PrefixedName("hinge"))
+    degree_of_freedom = DegreeOfFreedom(name=PrefixedName(name="hinge"))
     with world.modify_world():
-        world.add_kinematic_structure_entity(parent)
-        world.add_degree_of_freedom(degree_of_freedom)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=parent)
+        world.add_degree_of_freedom(dof=degree_of_freedom)
         with world.modify_world():
-            world.add_kinematic_structure_entity(child)
+            world.add_kinematic_structure_entity(kinematic_structure_entity=child)
         world.add_connection(
-            ScrewAxisConnection(
+            connection=ScrewAxisConnection(
                 screw_axis=ScrewAxisConnection.create_revolute_screw_axis(
                     axis=Vector3.Z()
                 ),
@@ -114,7 +114,9 @@ def test_updating_connection_origin_moves_child(mini_world: World):
         connection.update_parent_T_connection(parent_T_connection=parent_T_connection)
 
     np.testing.assert_allclose(
-        mini_world.compute_forward_kinematics_np(connection.parent, connection.child),
+        mini_world.compute_forward_kinematics_np(
+            root=connection.parent, tip=connection.child
+        ),
         parent_T_connection.to_np(),
     )
 
@@ -128,7 +130,7 @@ def test_rollback_of_connection_origin_update_restores_it(mini_world: World):
             parent_T_connection=HomogeneousTransformationMatrix.from_xyz_rpy(x=1.0)
         )
 
-    mini_world.rollback_to_version(version)
+    mini_world.rollback_to_version(version=version)
 
     np.testing.assert_allclose(
         connection.parent_T_connection_expression.to_np(), origin_before
@@ -162,7 +164,9 @@ def test_updating_connection_origin_in_another_frame_raises(mini_world: World):
 
 def test_setting_hardware_interface_is_recorded(mini_world: World):
     with mini_world.modify_world():
-        mini_world.set_dofs_has_hardware_interface(mini_world.degrees_of_freedom, True)
+        mini_world.set_dofs_has_hardware_interface(
+            dofs=mini_world.degrees_of_freedom, value=True
+        )
 
     last_block = mini_world.get_world_model_manager().model_modification_blocks[-1]
     assert [type(modification) for modification in last_block] == [

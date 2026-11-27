@@ -107,7 +107,9 @@ class Sage10kAbstractDemoHSRB:
 
     @cached_property
     def robot(self) -> HSRB:
-        return self.world.get_semantic_annotations_by_type(HSRB)[0]
+        return self.world.get_semantic_annotations_by_type(
+            semantic_annotation_type=HSRB
+        )[0]
 
     @property
     def arm(self) -> Arm:
@@ -125,8 +127,10 @@ class Sage10kAbstractDemoHSRB:
         """
         with self.world.modify_world():
             for annotation in semantic_annotations:
-                self.world.remove_kinematic_structure_entity(annotation.root)
-                self.world.remove_semantic_annotation(annotation)
+                self.world.remove_kinematic_structure_entity(
+                    kinematic_structure_entity=annotation.root
+                )
+                self.world.remove_semantic_annotation(semantic_annotation=annotation)
 
     @property
     def robot_starting_pose(self) -> Pose:
@@ -146,7 +150,9 @@ class Sage10kAbstractDemoHSRB:
         """
         return [
             RobotAccess(
-                robot=self.world.get_semantic_annotations_by_type(AbstractRobot)[0]
+                robot=self.world.get_semantic_annotations_by_type(
+                    semantic_annotation_type=AbstractRobot
+                )[0]
             ),
             StatementGrounding(query_backend=ProbabilisticBackend()),
         ]
@@ -220,7 +226,7 @@ class Sage10kGymDemo(Sage10kAbstractDemoHSRB):
         open_door = Sage10kOpenDoor(door=self.main_entrance)
 
         [body] = self.world.get_bodies_by_global_position(
-            self.world_P_object_of_interest, 0.1
+            world_P_body=self.world_P_object_of_interest, maximum_distance=0.1
         )
         object_of_interest = an(
             entity(
@@ -282,7 +288,9 @@ class Sage10kTVStudioDemo(Sage10kAbstractDemoHSRB):
     def book_to_pick(self) -> NaturalLanguageWithTypeDescription:
         @symbolic_function
         def closes_to_border(target) -> float:
-            return self.world.transform(target.global_pose, couch_table.root).y
+            return self.world.transform(
+                spatial_object=target.global_pose, target_frame=couch_table.root
+            ).y
 
         v = variable(
             NaturalLanguageWithTypeDescription,
@@ -358,7 +366,9 @@ class Sage10kCraftsmanLobbyDemo(Sage10kAbstractDemoHSRB):
     def book_to_pick(self) -> NaturalLanguageWithTypeDescription:
         @symbolic_function
         def closes_to_border(target) -> float:
-            return self.world.transform(target.global_pose, couch_table.root).y
+            return self.world.transform(
+                spatial_object=target.global_pose, target_frame=couch_table.root
+            ).y
 
         v = variable(
             NaturalLanguageWithTypeDescription,

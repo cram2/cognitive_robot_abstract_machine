@@ -83,7 +83,7 @@ def test_from_directory_parses_frames_and_poses(tmp_path):
     scene = GraspClutter6DScene.from_directory(scene_id="000001", directory=tmp_path)
 
     assert {f.image_id for f in scene.frames} == {"1", "2"}
-    frame_one = scene.frame("1")
+    frame_one = scene.frame(image_id="1")
     assert len(frame_one.object_poses) == 2
     assert frame_one.object_poses[0].object_id == 1
     # cam_t_m2c is in millimeters; camera_T_object's translation is already in meters.
@@ -92,7 +92,7 @@ def test_from_directory_parses_frames_and_poses(tmp_path):
         [float(translation.x), float(translation.y), float(translation.z)],
         [1.0, 2.0, 3.0],
     )
-    frame_two = scene.frame("2")
+    frame_two = scene.frame(image_id="2")
     assert frame_two.camera.camera_T_world is not None
     world_translation = frame_two.camera.camera_T_world.position
     np.testing.assert_allclose(
@@ -148,7 +148,9 @@ def test_create_world_places_objects_relative_to_camera(tmp_path):
     assert (1.0, 2.0, 3.0) in positions
     assert (-1.0, 0.0, 0.0) in positions
 
-    annotations = world.get_semantic_annotations_by_type(NaturalLanguageDescription)
+    annotations = world.get_semantic_annotations_by_type(
+        semantic_annotation_type=NaturalLanguageDescription
+    )
     assert len(annotations) == 2
     # both instances share an object_id, so they share a description too - unlike their
     # (index-suffixed) body names, which stay distinct.

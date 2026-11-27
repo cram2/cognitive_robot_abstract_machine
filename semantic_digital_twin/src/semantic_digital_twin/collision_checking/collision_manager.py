@@ -34,12 +34,13 @@ from semantic_digital_twin.world_description.world_entity import Body
 from semantic_digital_twin.world_description.world_modification import (
     synchronized_attribute_modification,
 )
+from krrood.patterns.called_positionally import called_positionally
 
 if TYPE_CHECKING:
     from ..world import World
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CollisionConsumer(ABC):
     """
     Interface for classes that want to be notified about changes in the collision matrix
@@ -54,6 +55,7 @@ class CollisionConsumer(ABC):
     Backreference to the collision manager that owns this consumer.
     """
 
+    @called_positionally
     @abstractmethod
     def on_compute_collisions(self, collision_results: CollisionCheckingResult):
         """
@@ -63,7 +65,7 @@ class CollisionConsumer(ABC):
         """
 
     @abstractmethod
-    def on_world_model_update(self, world: World):
+    def on_world_model_update(self, *, world: World):
         """
         Called when the world model changes.
 
@@ -77,7 +79,7 @@ class CollisionConsumer(ABC):
         """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class CollisionManager(ModelChangeCallback):
     """
     This class is intended as the primary interface for collision checking.
@@ -165,30 +167,30 @@ class CollisionManager(ModelChangeCallback):
         if self._world.is_empty():
             return
         for consumer in self.collision_consumers:
-            consumer.on_world_model_update(self._world)
+            consumer.on_world_model_update(world=self._world)
 
     def has_consumers(self) -> bool:
         return len(self.collision_consumers) > 0
 
     @synchronized_attribute_modification
-    def add_default_rule(self, rule: CollisionRule):
+    def add_default_rule(self, *, rule: CollisionRule):
         self.default_rules.append(rule)
 
     @synchronized_attribute_modification
-    def extend_default_rules(self, rules: list[CollisionRule]):
+    def extend_default_rules(self, *, rules: list[CollisionRule]):
         self.default_rules.extend(rules)
 
     @synchronized_attribute_modification
-    def add_ignore_collision_rule(self, rule: AllowCollisionRule):
+    def add_ignore_collision_rule(self, *, rule: AllowCollisionRule):
         self.ignore_collision_rules.append(rule)
 
-    def add_temporary_rule(self, rule: CollisionRule):
+    def add_temporary_rule(self, *, rule: CollisionRule):
         """
         Adds a rule to the temporary collision rules.
         """
         self.temporary_rules.append(rule)
 
-    def extend_temporary_rule(self, rules: list[CollisionRule]):
+    def extend_temporary_rule(self, *, rules: list[CollisionRule]):
         """
         Adds a list rule to the temporary collision rules.
         """
@@ -200,7 +202,7 @@ class CollisionManager(ModelChangeCallback):
         """
         self.temporary_rules.clear()
 
-    def put_temporary_rules_in_force(self, rules: list[CollisionRule]) -> None:
+    def put_temporary_rules_in_force(self, *, rules: list[CollisionRule]) -> None:
         """
         Add `rules` to the temporary rules and update the collision matrix.
 
@@ -209,8 +211,8 @@ class CollisionManager(ModelChangeCallback):
             temporary rules already in force would give another collision matrix.
         """
         if self.temporary_rules and (
-            self._checked_distances([*self.temporary_rules, *rules])
-            != self._checked_distances([*rules, *self.temporary_rules])
+            self._checked_distances(temporary_rules=[*self.temporary_rules, *rules])
+            != self._checked_distances(temporary_rules=[*rules, *self.temporary_rules])
         ):
             raise TemporaryCollisionRulesDependOnOrder(
                 rules_in_force=list(self.temporary_rules), added_rules=rules
@@ -218,7 +220,7 @@ class CollisionManager(ModelChangeCallback):
         self.temporary_rules.extend(rules)
         self.update_collision_matrix()
 
-    def take_temporary_rules_out_of_force(self, rules: list[CollisionRule]) -> None:
+    def take_temporary_rules_out_of_force(self, *, rules: list[CollisionRule]) -> None:
         """
         Remove exactly the rule objects in `rules` from the temporary rules and update
         the collision matrix.
@@ -233,7 +235,7 @@ class CollisionManager(ModelChangeCallback):
         self.update_collision_matrix()
 
     def _checked_distances(
-        self, temporary_rules: list[CollisionRule]
+        self, *, temporary_rules: list[CollisionRule]
     ) -> dict[tuple[Body, Body], float | None]:
         """
         :param temporary_rules: The temporary rules to apply, in this order.
@@ -242,11 +244,13 @@ class CollisionManager(ModelChangeCallback):
         """
         return {
             check.bodies(): check.distance
-            for check in self._collision_matrix_of(temporary_rules).collision_checks
+            for check in self._collision_matrix_of(
+                temporary_rules=temporary_rules
+            ).collision_checks
         }
 
     def _collision_matrix_of(
-        self, temporary_rules: list[CollisionRule]
+        self, *, temporary_rules: list[CollisionRule]
     ) -> CollisionMatrix:
         """
         :param temporary_rules: The temporary rules to apply, in this order.
@@ -259,15 +263,15 @@ class CollisionManager(ModelChangeCallback):
             *temporary_rules,
             *self.ignore_collision_rules,
         ]:
-            rule.update(self._world)
-            rule.apply_to_collision_matrix(collision_matrix)
+            rule.update(world=self._world)
+            rule.apply_to_collision_matrix(collision_matrix=collision_matrix)
         return collision_matrix
 
     @synchronized_attribute_modification
-    def extend_max_avoided_bodies_rules(self, rules: list[MaxAvoidedCollisionsRule]):
+    def extend_max_avoided_bodies_rules(self, *, rules: list[MaxAvoidedCollisionsRule]):
         self.max_avoided_bodies_rules.extend(rules)
 
-    def add_collision_consumer(self, consumer: CollisionConsumer):
+    def add_collision_consumer(self, *, consumer: CollisionConsumer):
         """
         Adds a collision consumer to the list of consumers.
 
@@ -278,15 +282,15 @@ class CollisionManager(ModelChangeCallback):
         """
         self.collision_consumers.append(consumer)
         consumer.collision_manager = self
-        consumer.on_world_model_update(self._world)
+        consumer.on_world_model_update(world=self._world)
 
-    def remove_collision_consumer(self, consumer: CollisionConsumer):
+    def remove_collision_consumer(self, *, consumer: CollisionConsumer):
         """
         Removes a collision consumer from the list of consumers.
         """
         self.collision_consumers.remove(consumer)
 
-    def update_collision_matrix(self, buffer: float = 0.05):
+    def update_collision_matrix(self, *, buffer: float = 0.05):
         """
         Creates a new collision matrix based on the current rules and applies it to the
         collision detector.
@@ -296,14 +300,16 @@ class CollisionManager(ModelChangeCallback):
         :param buffer: A buffer is added to the collision matrix distance thresholds.
             This is useful when you want to react to collisions before they go below the threshold.
         """
-        self.collision_matrix = self._collision_matrix_of(self.temporary_rules)
+        self.collision_matrix = self._collision_matrix_of(
+            temporary_rules=self.temporary_rules
+        )
         for consumer in self.collision_consumers:
             consumer.on_collision_matrix_update()
         if buffer is not None:
-            self.collision_matrix.apply_buffer(buffer)
+            self.collision_matrix.apply_buffer(buffer=buffer)
         clear_memoization_cache(self)
 
-    def set_collision_matrix(self, collision_matrix: CollisionMatrix):
+    def set_collision_matrix(self, *, collision_matrix: CollisionMatrix):
         """
         Sets the collision matrix directly and clears caches.
 
@@ -321,13 +327,13 @@ class CollisionManager(ModelChangeCallback):
         :return: Result of the collision checking.
         """
         collision_results = self.collision_detector.check_collisions(
-            self.collision_matrix
+            collision_matrix=self.collision_matrix
         )
         for consumer in self.collision_consumers:
             consumer.on_compute_collisions(collision_results)
         return collision_results
 
-    def get_max_avoided_bodies(self, body: Body) -> int:
+    def get_max_avoided_bodies(self, *, body: Body) -> int:
         """
         Returns the maximum number of collisions `body` should avoid.
 
@@ -335,13 +341,13 @@ class CollisionManager(ModelChangeCallback):
         :return: Maximum number of collisions that are allowed between two bodies.
         """
         for rule in reversed(self.max_avoided_bodies_rules):
-            max_avoided_bodies = rule.get_max_avoided_collisions(body)
+            max_avoided_bodies = rule.get_max_avoided_collisions(body=body)
             if max_avoided_bodies is not None:
                 return max_avoided_bodies
         raise Exception(f"No rule found for {body}")
 
     @memoize
-    def get_buffer_zone_distance(self, body_a: Body, body_b: Body) -> float:
+    def get_buffer_zone_distance(self, *, body_a: Body, body_b: Body) -> float:
         """
         Returns the buffer-zone distance for the body pair by scanning rules from
         highest to lowest priority.
@@ -349,13 +355,13 @@ class CollisionManager(ModelChangeCallback):
         for rule in reversed(self.rules):
             if not isinstance(rule, AvoidCollisionRule):
                 continue
-            value = rule.buffer_zone_distance_for(body_a, body_b)
+            value = rule.buffer_zone_distance_for(body_a=body_a, body_b=body_b)
             if value is not None:
                 return value
         raise ValueError(f"No buffer-zone rule found for {body_a, body_b}")
 
     @memoize
-    def get_violated_distance(self, body_a: Body, body_b: Body) -> float:
+    def get_violated_distance(self, *, body_a: Body, body_b: Body) -> float:
         """
         Returns the violated distance for the body pair by scanning rules from highest
         to lowest priority.
@@ -363,7 +369,7 @@ class CollisionManager(ModelChangeCallback):
         for rule in reversed(self.rules):
             if not isinstance(rule, AvoidCollisionRule):
                 continue
-            value = rule.violated_distance_for(body_a, body_b)
+            value = rule.violated_distance_for(body_a=body_a, body_b=body_b)
             if value is not None:
                 return value
         raise ValueError(f"No violated-distance rule found for {body_a, body_b}")
@@ -388,7 +394,7 @@ class CollisionManager(ModelChangeCallback):
         }
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         return cls(
             collision_detector=BulletCollisionDetector(),
             default_rules=from_json(data["default_rules"], **kwargs),

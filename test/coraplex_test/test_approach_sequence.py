@@ -43,7 +43,7 @@ class GraspApproachingAction(HasGraspApproach, SequentialAction):
 
 # %% fixtures
 
-BOX_SCALE = Scale(0.1, 0.2, 0.3)
+BOX_SCALE = Scale(x=0.1, y=0.2, z=0.3)
 """
 Extents of the box the approach sequence has to clear.
 """
@@ -57,18 +57,18 @@ def boxed_pr2_world(simple_pr2_context):
     world, robot, extensions = simple_pr2_context
     with world.modify_world():
         box = Body(
-            name=PrefixedName("approach_box"),
-            collision=ShapeCollection([Box(scale=BOX_SCALE)]),
+            name=PrefixedName(name="approach_box"),
+            collision=ShapeCollection(shapes=[Box(scale=BOX_SCALE)]),
         )
         connection = Connection6DoF.create_with_dofs(
             world=world, parent=world.root, child=box
         )
-        world.add_connection(connection)
+        world.add_connection(connection=connection)
         connection.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
             1, 0, 1, reference_frame=world.root
         )
         graspable = Milk(root=box)
-        world.add_semantic_annotation(graspable)
+        world.add_semantic_annotation(semantic_annotation=graspable)
     return world, robot, graspable
 
 
@@ -87,8 +87,8 @@ def grasp_from_above(graspable) -> GraspCandidate:
         closing along the body's x-axis, so its own z-axis lies flat.
     """
     return GraspCandidate(
-        graspable,
-        Pose(
+        graspable=graspable,
+        grasp_pose=Pose(
             position=Vector3(0, 0, BOX_SCALE.z / 2).point3,
             orientation=RotationMatrix.from_vectors(
                 x=Vector3.NEGATIVE_Z(), y=Vector3.X()
@@ -168,10 +168,10 @@ def test_a_body_without_collision_is_approached_from_the_clearance_alone(
     """
     world, _, _ = boxed_pr2_world
     with world.modify_world():
-        body = Body(name=PrefixedName("no_collision_box"))
-        world.add_connection(FixedConnection(parent=world.root, child=body))
+        body = Body(name=PrefixedName(name="no_collision_box"))
+        world.add_connection(connection=FixedConnection(parent=world.root, child=body))
         graspable = Milk(root=body)
-        world.add_semantic_annotation(graspable)
+        world.add_semantic_annotation(semantic_annotation=graspable)
     action = GraspApproachingAction()
 
     assert action._approach_distance(
@@ -189,8 +189,8 @@ def test_a_grasp_outside_the_body_is_approached_from_the_clearance_alone(
     _, _, graspable = boxed_pr2_world
     action = GraspApproachingAction()
     in_front = GraspCandidate(
-        graspable,
-        Pose(
+        graspable=graspable,
+        grasp_pose=Pose(
             position=Vector3(-BOX_SCALE.x, 0, 0).point3,
             reference_frame=graspable.root,
         ),
@@ -211,8 +211,8 @@ def test_a_diagonal_approach_leaves_the_body_through_its_nearest_face(
     _, _, graspable = boxed_pr2_world
     action = GraspApproachingAction()
     diagonal = GraspCandidate(
-        graspable,
-        Pose(
+        graspable=graspable,
+        grasp_pose=Pose(
             orientation=RotationMatrix.from_rpy(yaw=np.pi / 4).quaternion,
             reference_frame=graspable.root,
         ),
@@ -240,7 +240,7 @@ def test_grasp_pose_is_the_middle_of_the_sequence(boxed_pr2_world):
 
     np.testing.assert_allclose(
         poses.grasp.to_np(),
-        end_effector.tool_frame_goal_for_grasp(grasp.grasp_pose).to_np(),
+        end_effector.tool_frame_goal_for_grasp(grasp_pose=grasp.grasp_pose).to_np(),
         atol=1e-9,
     )
 
@@ -266,10 +266,10 @@ def test_retreat_pose_rises_along_the_world_z_axis(boxed_pr2_world, grasp_on):
     )
 
     world_P_grasp = world.transform(
-        grasp.grasp_pose.homogeneous_matrix, world.root
+        spatial_object=grasp.grasp_pose.homogeneous_matrix, target_frame=world.root
     ).to_np()
     world_P_retreat = world.transform(
-        poses.retreat.homogeneous_matrix, world.root
+        spatial_object=poses.retreat.homogeneous_matrix, target_frame=world.root
     ).to_np()
     np.testing.assert_allclose(
         world_P_retreat[:3, 3] - world_P_grasp[:3, 3],
@@ -359,7 +359,9 @@ def test_a_tracy_gripper_approaches_along_the_grasp(tracy_world):
     Tracy's gripper points along its tool frame's z-axis rather than its x-axis, and the
     sequence has to follow it all the same.
     """
-    tracy = tracy_world.get_semantic_annotations_by_type(Tracy)[0]
+    tracy = tracy_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=Tracy
+    )[0]
     _assert_the_gripper_approaches_along_the_grasp(
         tracy_world, tracy.left_arm.end_effector
     )
@@ -385,7 +387,7 @@ def test_a_grasp_is_aimed_at_the_point_the_fingers_meet_at(boxed_pr2_world):
 
     np.testing.assert_allclose(
         poses.grasp.to_np(),
-        end_effector.tool_frame_goal_for_grasp(grasp.grasp_pose).to_np(),
+        end_effector.tool_frame_goal_for_grasp(grasp_pose=grasp.grasp_pose).to_np(),
         atol=1e-9,
     )
 

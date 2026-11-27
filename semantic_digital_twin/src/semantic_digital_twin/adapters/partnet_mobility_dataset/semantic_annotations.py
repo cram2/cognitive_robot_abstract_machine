@@ -5,7 +5,7 @@ from typing_extensions import ClassVar
 from semantic_digital_twin.semantic_annotations.mixins import HasRootBody
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PartNetLabel(HasRootBody):
     """
     Represents a label in the Partnet Mobility dataset semantic annotation hierarchy.

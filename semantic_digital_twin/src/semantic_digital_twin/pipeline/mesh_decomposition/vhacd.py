@@ -35,7 +35,7 @@ class FillMode(StrEnum):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class VHACDMeshDecomposer(MeshDecomposer):
     """
     Decompose meshes using Voxelized Hierarchical Approximate Convex Decomposition.
@@ -112,7 +112,7 @@ class VHACDMeshDecomposer(MeshDecomposer):
     Originally referenced as findBestPlane.
     """
 
-    def apply_to_mesh(self, mesh: Mesh) -> list[Mesh]:
+    def apply_to_mesh(self, *, mesh: Mesh) -> list[Mesh]:
         """
         :meth:`MeshDecomposer.apply_to_mesh`, where a mesh in which V-HACD finds no convex
         parts, such as a flat one without volume, has its convex hull as its only part.
@@ -148,7 +148,7 @@ class VHACDMeshDecomposer(MeshDecomposer):
             for decomposed_part in decomposed
         ]
 
-    def apply_to_mesh_and_save(self, mesh: Mesh, output_path: str) -> str:
-        parts = self.apply_to_mesh(mesh)
+    def apply_to_mesh_and_save(self, *, mesh: Mesh, output_path: str) -> str:
+        parts = self.apply_to_mesh(mesh=mesh)
         trimesh.Scene([p.mesh for p in parts]).export(output_path, file_type="obj")
         return output_path

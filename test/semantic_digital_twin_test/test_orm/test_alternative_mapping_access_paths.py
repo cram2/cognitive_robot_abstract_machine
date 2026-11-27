@@ -139,7 +139,7 @@ def test_a_vector_pair_survives_being_stored(mapping, vector_pair_type):
     world = World()
     with world.modify_world():
         root = Body(name="root")
-        world.add_kinematic_structure_entity(root)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=root)
     vector_pair = vector_pair_type(
         **{
             vector_pair_type._rotational_part_name: Vector3(0.0, 0.4, 0.0),
@@ -158,7 +158,9 @@ def test_a_vector_pair_survives_being_stored(mapping, vector_pair_type):
 def test_world_state_data_and_ids_follow_the_stored_state():
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name="root"))
+        world.add_kinematic_structure_entity(
+            kinematic_structure_entity=Body(name="root")
+        )
     assert world.state.ids == world.state._ids
     assert world.state.data == world.state._data.ravel().tolist()
 
@@ -166,7 +168,9 @@ def test_world_state_data_and_ids_follow_the_stored_state():
 def test_world_modification_history_lists_the_applied_blocks():
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(Body(name="root"))
+        world.add_kinematic_structure_entity(
+            kinematic_structure_entity=Body(name="root")
+        )
     assert world.modification_history is world._model_manager.model_modification_blocks
     assert len(world.modification_history) == 1
 

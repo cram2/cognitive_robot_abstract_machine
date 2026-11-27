@@ -41,7 +41,9 @@ def _left_gripper(world: World) -> HasTwoFingers:
     """
     :return: The end effector of the left arm of the robot in ``world``.
     """
-    return world.get_semantic_annotations_by_type(PR2)[0].left_arm.end_effector
+    return world.get_semantic_annotations_by_type(semantic_annotation_type=PR2)[
+        0
+    ].left_arm.end_effector
 
 
 def _expanded_nodes(goal: MoveFingers, world: World):
@@ -96,7 +98,7 @@ def test_gripper_is_given_the_width_between_its_facing_points(pr2_world_copy) ->
 
 def test_fingers_driven_to_a_joint_state_are_given_that_state(pr2_world_copy) -> None:
     goal_state = _left_gripper(pr2_world_copy).get_joint_state_by_type(
-        GripperState.CLOSE
+        state_type=GripperState.CLOSE
     )
     goal = MoveFingersToJointState(goal_state=goal_state)
 
@@ -271,7 +273,7 @@ def test_fingers_reach_the_commanded_joint_state(pr2_world_state_reset) -> None:
     Ticking the goal drives the fingers to the positions the commanded state holds.
     """
     goal_state = _left_gripper(pr2_world_state_reset).get_joint_state_by_type(
-        GripperState.OPEN
+        state_type=GripperState.OPEN
     )
 
     _run(MoveFingersToJointState(goal_state=goal_state), pr2_world_state_reset)

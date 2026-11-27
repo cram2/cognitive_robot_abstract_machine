@@ -283,7 +283,7 @@ def main_cli(args: list[str] | None = None) -> None:
     rclpy.init(args=args)
     node_registry = ROSNodeRegistry()
     node = Node("robokudo_query_test_client")
-    node_registry.register(node)
+    node_registry.register(node=node)
     action_client = RoboKudoActionClient(
         node=node, preempt_timer=cli_args.preempt_timer
     )
@@ -299,7 +299,7 @@ def main_cli(args: list[str] | None = None) -> None:
         pass
     finally:
         action_client.close()
-        node_registry.clear(node)
+        node_registry.clear(expected_node=node)
         node.destroy_node()
         if rclpy.ok():
             rclpy.shutdown()
@@ -323,7 +323,7 @@ def main(
     rclpy.init(context=ros_context)
     node_registry = ROSNodeRegistry()
     node = Node("robokudo_query_test_client", context=ros_context)
-    node_registry.register(node)
+    node_registry.register(node=node)
     action_client = RoboKudoActionClient(node=node, preempt_timer=None)
     executor = SingleThreadedExecutor(context=ros_context)
     executor.add_node(node)
@@ -354,7 +354,7 @@ def main(
         action_client.close()
         executor.remove_node(node)
         executor.shutdown()
-        node_registry.clear(node)
+        node_registry.clear(expected_node=node)
         node.destroy_node()
         if rclpy.ok(context=ros_context):
             rclpy.shutdown(context=ros_context)

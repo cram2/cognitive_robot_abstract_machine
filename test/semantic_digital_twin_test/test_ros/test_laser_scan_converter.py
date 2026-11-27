@@ -67,14 +67,16 @@ def world_with_laser_body() -> World:
     """
     A world whose root body carries the name the scan messages refer to.
     """
-    return World.create_with_root_body(LASER_FRAME_NAME)
+    return World.create_with_root_body(root_body_name=LASER_FRAME_NAME)
 
 
 # %% message conversion
 
 
 def test_converted_scan_keeps_the_ranges_of_the_message(world_with_laser_body):
-    reading = LaserScanToSemDTConverter.convert(laser_scan(), world_with_laser_body)
+    reading = LaserScanToSemDTConverter.convert(
+        data=laser_scan(), world=world_with_laser_body
+    )
 
     assert reading.ranges.tolist() == RANGES
 
@@ -82,7 +84,9 @@ def test_converted_scan_keeps_the_ranges_of_the_message(world_with_laser_body):
 def test_converted_scan_holds_the_distances_a_reading_is_typed_to_hold(
     world_with_laser_body,
 ):
-    reading = LaserScanToSemDTConverter.convert(laser_scan(), world_with_laser_body)
+    reading = LaserScanToSemDTConverter.convert(
+        data=laser_scan(), world=world_with_laser_body
+    )
 
     assert reading.ranges.dtype == np.float64
 
@@ -90,7 +94,9 @@ def test_converted_scan_holds_the_distances_a_reading_is_typed_to_hold(
 def test_converted_scan_is_expressed_in_the_body_named_by_its_header(
     world_with_laser_body,
 ):
-    reading = LaserScanToSemDTConverter.convert(laser_scan(), world_with_laser_body)
+    reading = LaserScanToSemDTConverter.convert(
+        data=laser_scan(), world=world_with_laser_body
+    )
 
     assert reading.reference_frame is world_with_laser_body.root
 
@@ -100,7 +106,7 @@ def test_converted_scan_carries_the_pattern_the_message_declares(
 ):
     scan = laser_scan()
 
-    reading = LaserScanToSemDTConverter.convert(scan, world_with_laser_body)
+    reading = LaserScanToSemDTConverter.convert(data=scan, world=world_with_laser_body)
 
     assert reading.scan_pattern == ScanPattern(
         minimum_angle=scan.angle_min,
@@ -116,14 +122,17 @@ def test_scan_whose_range_count_disagrees_with_its_angles_is_rejected(
 ):
     with pytest.raises(LaserScanBeamCountMismatch):
         LaserScanToSemDTConverter.convert(
-            laser_scan(ranges=[1.0, 2.0]), world_with_laser_body
+            data=laser_scan(ranges=[1.0, 2.0]), world=world_with_laser_body
         )
 
 
 def test_converter_is_found_by_the_registry(world_with_laser_body):
     scan = laser_scan()
 
-    assert Ros2ToSemDTConverter.get_to_converter(scan) is LaserScanToSemDTConverter
+    assert (
+        Ros2ToSemDTConverter.get_to_converter(input_obj=scan)
+        is LaserScanToSemDTConverter
+    )
 
 
 # %% the lidar a subscribed source feeds
@@ -134,7 +143,7 @@ The topic the subscribed sources below listen on.
 """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class RootMountedLidar(Lidar):
     """
     A lidar mounted on the world's root body, sweeping :data:`DECLARED_PATTERN` until a
@@ -166,9 +175,11 @@ def subscribed_lidar(node, world: World) -> RootMountedLidar:
 def test_a_lidar_switched_onto_its_robot_listens_on_the_given_topic(
     rclpy_node, world_with_laser_body
 ):
-    lidar = RootMountedLidar.with_simulated_source(world_with_laser_body.root)
+    lidar = RootMountedLidar.with_simulated_source(
+        robot_root=world_with_laser_body.root
+    )
 
-    lidar.use_real_source(rclpy_node)
+    lidar.use_real_source(node=rclpy_node)
 
     assert isinstance(lidar.source, SubscribedLidarSource)
     assert lidar.source.topic_name == TOPIC_NAME
@@ -189,9 +200,9 @@ def test_subscribed_source_reports_the_reading_of_its_latest_scan(
 ):
     scan = laser_scan()
     lidar = subscribed_lidar(rclpy_node, world_with_laser_body)
-    lidar.source.buffer_message(scan)
+    lidar.source.buffer_message(message=scan)
 
-    expected = LaserScanToSemDTConverter.convert(scan, world_with_laser_body)
+    expected = LaserScanToSemDTConverter.convert(data=scan, world=world_with_laser_body)
     reading = lidar.get_lidar_reading()
 
     np.testing.assert_array_equal(reading.ranges, expected.ranges)
@@ -203,9 +214,9 @@ def test_a_subscribed_source_reports_a_scan_without_changing_the_lidar(
     rclpy_node, world_with_laser_body
 ):
     lidar = subscribed_lidar(rclpy_node, world_with_laser_body)
-    lidar.source.buffer_message(laser_scan())
+    lidar.source.buffer_message(message=laser_scan())
 
-    lidar.source.get_lidar_reading(lidar)
+    lidar.source.get_lidar_reading(lidar=lidar)
 
     assert lidar.scan_pattern == DECLARED_PATTERN
 

@@ -326,7 +326,7 @@ class RobotDemonstration(ABC):
         :return: A world holding the scene and the robot.
         """
         world = self.build_scene()
-        self.robot_specification().spawn(world)
+        self.robot_specification().spawn(world=world)
         return world
 
     def fetch_real_world(self) -> World:
@@ -345,7 +345,7 @@ class RobotDemonstration(ABC):
         if not self.is_scene_populated(world=world):
             scene = self.build_scene()
             world.merge_world(
-                scene,
+                other=scene,
                 root_connection=FixedConnection(parent=world.root, child=scene.root),
             )
         return world
@@ -387,7 +387,7 @@ class RobotDemonstration(ABC):
             return
         self.simulation = self.build_simulation(world=world)
         self.simulation.start_stepped_simulation()
-        self.simulation.step_simulation(self.settling_duration)
+        self.simulation.step_simulation(duration=self.settling_duration)
 
     def create_executor(self, *, world: World) -> PlanExecutor:
         """

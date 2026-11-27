@@ -32,23 +32,29 @@ def test_tf_publisher(rclpy_node, pr2_world_state_reset):
     )
 
     assert tf_wrapper.wait_for_transform(
-        "odom_combined",
-        "pr2/base_footprint",
+        target_frame="odom_combined",
+        source_frame="pr2/base_footprint",
         timeout=Duration(seconds=1.0),
         time=Time(),
     )
-    transform = tf_wrapper.lookup_transform("odom_combined", "pr2/base_footprint")
+    transform = tf_wrapper.lookup_transform(
+        target_frame="odom_combined", source_frame="pr2/base_footprint"
+    )
     odom_combined = pr2_world_state_reset.get_kinematic_structure_entities_by_name(
-        "odom_combined"
+        name="odom_combined"
     )[0]
     base_footprint = pr2_world_state_reset.get_kinematic_structure_entities_by_name(
-        "base_footprint"
+        name="base_footprint"
     )[0]
-    fk = pr2_world_state_reset.compute_forward_kinematics(odom_combined, base_footprint)
-    transform2 = HomogeneousTransformationMatrixToRos2Converter.convert(fk)
+    fk = pr2_world_state_reset.compute_forward_kinematics(
+        root=odom_combined, tip=base_footprint
+    )
+    transform2 = HomogeneousTransformationMatrixToRos2Converter.convert(data=fk)
     assert transform.transform == transform2.transform
 
-    tf_wrapper.lookup_transform("odom_combined", "pr2/r_gripper_tool_frame")
+    tf_wrapper.lookup_transform(
+        target_frame="odom_combined", source_frame="pr2/r_gripper_tool_frame"
+    )
 
 
 def test_clear(rclpy_node, pr2_world_copy):
@@ -59,8 +65,8 @@ def test_clear(rclpy_node, pr2_world_copy):
     )
 
     assert tf_wrapper.wait_for_transform(
-        "odom_combined",
-        "pr2/base_footprint",
+        target_frame="odom_combined",
+        source_frame="pr2/base_footprint",
         timeout=Duration(seconds=1.0),
         time=Time(),
     )
@@ -75,14 +81,14 @@ def test_clear(rclpy_node, pr2_world_copy):
     )
 
     with pr2_world_copy.modify_world():
-        pr2_world_copy.merge_world(world_copy)
+        pr2_world_copy.merge_world(other=world_copy)
 
     tf_wrapper.tf_buffer.clear()
     pr2_world_copy.notify_state_change()
 
     assert tf_wrapper.wait_for_transform(
-        "odom_combined",
-        "pr2/base_footprint",
+        target_frame="odom_combined",
+        source_frame="pr2/base_footprint",
         timeout=Duration(seconds=1.0),
         time=Time(),
     )
@@ -90,36 +96,44 @@ def test_clear(rclpy_node, pr2_world_copy):
 
 def test_tf_publisher_ignore_robot(rclpy_node, pr2_world_copy):
     with pr2_world_copy.modify_world():
-        box = Body(name=PrefixedName("box"))
+        box = Body(name=PrefixedName(name="box"))
         c = FixedConnection(parent=pr2_world_copy.root, child=box)
-        pr2_world_copy.add_connection(c)
+        pr2_world_copy.add_connection(connection=c)
     tf_wrapper = TFWrapper(node=rclpy_node)
     tf_publisher = TFPublisher.create_with_ignore_robot(
         node=rclpy_node,
-        robot=pr2_world_copy.get_semantic_annotations_by_type(AbstractRobot)[0],
+        robot=pr2_world_copy.get_semantic_annotations_by_type(
+            semantic_annotation_type=AbstractRobot
+        )[0],
     )
 
     assert not tf_wrapper.wait_for_transform(
-        "pr2/base_link",
-        "pr2/base_footprint",
+        target_frame="pr2/base_link",
+        source_frame="pr2/base_footprint",
         timeout=Duration(seconds=1.0),
         time=Time(),
     )
 
     assert tf_wrapper.wait_for_transform(
-        "odom_combined",
-        "box",
+        target_frame="odom_combined",
+        source_frame="box",
         timeout=Duration(seconds=1.0),
         time=Time(),
     )
-    transform = tf_wrapper.lookup_transform("odom_combined", "box")
+    transform = tf_wrapper.lookup_transform(
+        target_frame="odom_combined", source_frame="box"
+    )
 
     odom_combined = pr2_world_copy.get_kinematic_structure_entities_by_name(
-        "odom_combined"
+        name="odom_combined"
     )[0]
-    base_footprint = pr2_world_copy.get_kinematic_structure_entities_by_name("box")[0]
-    fk = pr2_world_copy.compute_forward_kinematics(odom_combined, base_footprint)
-    transform2 = HomogeneousTransformationMatrixToRos2Converter.convert(fk)
+    base_footprint = pr2_world_copy.get_kinematic_structure_entities_by_name(
+        name="box"
+    )[0]
+    fk = pr2_world_copy.compute_forward_kinematics(
+        root=odom_combined, tip=base_footprint
+    )
+    transform2 = HomogeneousTransformationMatrixToRos2Converter.convert(data=fk)
     assert transform.transform == transform2.transform
 
 
@@ -135,18 +149,20 @@ def test_tf_publisher_kitchen(rclpy_node, pr2_apartment_world, ros_publishers):
         VizMarkerPublisher(_world=pr2_apartment_world, node=rclpy_node)
     )
 
-    milk = pr2_apartment_world.get_kinematic_structure_entities_by_name("milk.stl")[0]
+    milk = pr2_apartment_world.get_kinematic_structure_entities_by_name(
+        name="milk.stl"
+    )[0]
 
     assert tf_wrapper.wait_for_transform(
-        "apartment/apartment_root",
-        "pr2/base_footprint",
+        target_frame="apartment/apartment_root",
+        source_frame="pr2/base_footprint",
         timeout=Duration(seconds=1.0),
         time=Time(),
     )
 
     assert tf_wrapper.wait_for_transform(
-        "odom_combined",
-        str(milk.name),
+        target_frame="odom_combined",
+        source_frame=str(milk.name),
         timeout=Duration(seconds=1.0),
         time=Time(),
     )
@@ -156,12 +172,12 @@ def test_tf_publisher_kitchen(rclpy_node, pr2_apartment_world, ros_publishers):
         new_connection = FixedConnection(
             parent=milk.parent_kinematic_structure_entity, child=milk
         )
-        pr2_apartment_world.remove_connection(milk.parent_connection)
-        pr2_apartment_world.add_connection(new_connection)
+        pr2_apartment_world.remove_connection(connection=milk.parent_connection)
+        pr2_apartment_world.add_connection(connection=new_connection)
 
     assert tf_wrapper.wait_for_transform(
-        "odom_combined",
-        str(milk.name),
+        target_frame="odom_combined",
+        source_frame=str(milk.name),
         timeout=Duration(seconds=1.0),
         time=Time(),
     )
@@ -173,26 +189,28 @@ def test_tf_publisher_kitchen(rclpy_node, pr2_apartment_world, ros_publishers):
             parent=milk.parent_kinematic_structure_entity,
             child=milk,
         )
-        pr2_apartment_world.remove_connection(milk.parent_connection)
-        pr2_apartment_world.add_connection(new_connection)
+        pr2_apartment_world.remove_connection(connection=milk.parent_connection)
+        pr2_apartment_world.add_connection(connection=new_connection)
 
     assert tf_wrapper.wait_for_transform(
-        "odom_combined",
-        str(milk.name),
+        target_frame="odom_combined",
+        source_frame=str(milk.name),
         timeout=Duration(seconds=1.0),
         time=Time(),
     )
 
     # delete body
     with pr2_apartment_world.modify_world():
-        pr2_apartment_world.remove_connection(milk.parent_connection)
-        pr2_apartment_world.remove_kinematic_structure_entity(milk)
+        pr2_apartment_world.remove_connection(connection=milk.parent_connection)
+        pr2_apartment_world.remove_kinematic_structure_entity(
+            kinematic_structure_entity=milk
+        )
 
     # make sure wrapper forgets about it too
     tf_wrapper.tf_buffer.clear()
     assert not tf_wrapper.wait_for_transform(
-        "odom_combined",
-        str(milk.name),
+        target_frame="odom_combined",
+        source_frame=str(milk.name),
         timeout=Duration(seconds=1.0),
         time=Time(),
     )
@@ -204,11 +222,11 @@ def test_tf_publisher_kitchen(rclpy_node, pr2_apartment_world, ros_publishers):
             parent=pr2_apartment_world.root,
             child=milk,
         )
-        pr2_apartment_world.add_connection(new_connection)
+        pr2_apartment_world.add_connection(connection=new_connection)
 
     assert tf_wrapper.wait_for_transform(
-        "odom_combined",
-        str(milk.name),
+        target_frame="odom_combined",
+        source_frame=str(milk.name),
         timeout=Duration(seconds=1.0),
         time=Time(),
     )
@@ -222,16 +240,16 @@ def test_tf_publisher_with_Regions(rclpy_node, pr2_world_state_reset):
     )
 
     assert tf_wrapper.wait_for_transform(
-        "odom_combined",
-        "pr2/base_footprint",
+        target_frame="odom_combined",
+        source_frame="pr2/base_footprint",
         timeout=Duration(seconds=1.0),
         time=Time(),
     )
-    region = Region(name=PrefixedName("region"))
+    region = Region(name=PrefixedName(name="region"))
     connection = FixedConnection(parent=pr2_world_state_reset.root, child=region)
     with pr2_world_state_reset.modify_world():
-        pr2_world_state_reset.add_region(region)
-        pr2_world_state_reset.add_connection(connection)
+        pr2_world_state_reset.add_region(region=region)
+        pr2_world_state_reset.add_connection(connection=connection)
 
 
 def test_empty_world(rclpy_node):
@@ -243,8 +261,8 @@ def test_empty_world(rclpy_node):
         _world=world,
     )
     assert not tf_wrapper.wait_for_transform(
-        "muh1",
-        "muh2",
+        target_frame="muh1",
+        source_frame="muh2",
         timeout=Duration(seconds=0.5),
         time=Time(),
     )
@@ -253,21 +271,21 @@ def test_empty_world(rclpy_node):
 def test_static_world(rclpy_node):
     world = World()
     with world.modify_world():
-        body1 = Body(name=PrefixedName("body1"))
-        body2 = Body(name=PrefixedName("body2"))
-        body3 = Body(name=PrefixedName("body3"))
-        body4 = Body(name=PrefixedName("body4"))
-        body5 = Body(name=PrefixedName("body5"))
+        body1 = Body(name=PrefixedName(name="body1"))
+        body2 = Body(name=PrefixedName(name="body2"))
+        body3 = Body(name=PrefixedName(name="body3"))
+        body4 = Body(name=PrefixedName(name="body4"))
+        body5 = Body(name=PrefixedName(name="body5"))
 
         body1_C_body2 = FixedConnection(parent=body1, child=body2)
-        world.add_connection(body1_C_body2)
+        world.add_connection(connection=body1_C_body2)
         body2_C_body3 = FixedConnection(parent=body2, child=body3)
-        world.add_connection(body2_C_body3)
+        world.add_connection(connection=body2_C_body3)
 
         body1_C_body4 = FixedConnection(parent=body1, child=body4)
-        world.add_connection(body1_C_body4)
+        world.add_connection(connection=body1_C_body4)
         body4_C_body5 = FixedConnection(parent=body4, child=body5)
-        world.add_connection(body4_C_body5)
+        world.add_connection(connection=body4_C_body5)
 
     tf_wrapper = TFWrapper(node=rclpy_node)
     tf_publisher = TFPublisher(
@@ -278,32 +296,32 @@ def test_static_world(rclpy_node):
 
     # body1 not ignored -> publish
     assert tf_wrapper.wait_for_transform(
-        str(body1.name),
-        str(body2.name),  # ignored
+        target_frame=str(body1.name),
+        source_frame=str(body2.name),  # ignored
         timeout=Duration(seconds=1.0),
         time=Time(),
     )
 
     # both parent and child are ignored -> no publish
     assert not tf_wrapper.wait_for_transform(
-        str(body2.name),  # ignored
-        str(body3.name),  # ignored
+        target_frame=str(body2.name),  # ignored
+        source_frame=str(body3.name),  # ignored
         timeout=Duration(seconds=1.0),
         time=Time(),
     )
 
     # both parent and child are not ignored -> publish
     assert tf_wrapper.wait_for_transform(
-        str(body1.name),
-        str(body4.name),
+        target_frame=str(body1.name),
+        source_frame=str(body4.name),
         timeout=Duration(seconds=1.0),
         time=Time(),
     )
 
     # body4 not ignored -> publish
     assert tf_wrapper.wait_for_transform(
-        str(body4.name),
-        str(body5.name),  # ignored
+        target_frame=str(body4.name),
+        source_frame=str(body5.name),  # ignored
         timeout=Duration(seconds=1.0),
         time=Time(),
     )
@@ -312,11 +330,11 @@ def test_static_world(rclpy_node):
 def test_static_world2(rclpy_node):
     world = World()
     with world.modify_world():
-        body1 = Body(name=PrefixedName("body1"))
-        body2 = Body(name=PrefixedName("body2"))
+        body1 = Body(name=PrefixedName(name="body1"))
+        body2 = Body(name=PrefixedName(name="body2"))
 
         body1_C_body2 = FixedConnection(parent=body1, child=body2)
-        world.add_connection(body1_C_body2)
+        world.add_connection(connection=body1_C_body2)
 
     tf_wrapper = TFWrapper(node=rclpy_node)
     tf_publisher = TFPublisher(
@@ -327,8 +345,8 @@ def test_static_world2(rclpy_node):
 
     # even though body2 is ignored, there is no other transform for body1, so we need to publish anyway
     assert tf_wrapper.wait_for_transform(
-        str(body1.name),
-        str(body2.name),
+        target_frame=str(body1.name),
+        source_frame=str(body2.name),
         timeout=Duration(seconds=1.0),
         time=Time(),
     )
@@ -398,10 +416,10 @@ def world_with_a_fixed_and_a_moving_body() -> tuple[World, Body, Body]:
     connection with degrees of freedom.
     """
     world, (fixed,) = world_with_bodies("table")
-    moving = Body(name=PrefixedName("cup"))
+    moving = Body(name=PrefixedName(name="cup"))
     with world.modify_world():
         world.add_connection(
-            Connection6DoF.create_with_dofs(
+            connection=Connection6DoF.create_with_dofs(
                 world=world, parent=world.root, child=moving
             )
         )
@@ -430,8 +448,8 @@ def test_a_listener_joining_later_still_receives_the_fixed_transforms(
     tf_wrapper = TFWrapper(node=rclpy_node)
 
     assert tf_wrapper.wait_for_transform(
-        str(world.root.name),
-        str(fixed.name),
+        target_frame=str(world.root.name),
+        source_frame=str(fixed.name),
         timeout=Duration(seconds=1.0),
         time=Time(),
     )
@@ -448,8 +466,8 @@ def test_a_fixed_body_added_later_reaches_a_listener_joining_afterwards(
     tf_wrapper = TFWrapper(node=rclpy_node)
 
     assert tf_wrapper.wait_for_transform(
-        str(world.root.name),
-        str(shelf.name),
+        target_frame=str(world.root.name),
+        source_frame=str(shelf.name),
         timeout=Duration(seconds=1.0),
         time=Time(),
     )
@@ -464,33 +482,33 @@ def world_with_bodies(*names: str) -> tuple[World, list[Body]]:
     Build a world whose root carries one body per given name.
     """
     world = World()
-    root = Body(name=PrefixedName("map"))
-    bodies = [Body(name=PrefixedName(name)) for name in names]
+    root = Body(name=PrefixedName(name="map"))
+    bodies = [Body(name=PrefixedName(name=name)) for name in names]
     with world.modify_world():
-        world.add_body(root)
+        world.add_body(body=root)
         for body in bodies:
-            world.add_connection(FixedConnection(parent=root, child=body))
+            world.add_connection(connection=FixedConnection(parent=root, child=body))
     return world, bodies
 
 
 def attach_body(world: World, name: str) -> Body:
-    body = Body(name=PrefixedName(name))
+    body = Body(name=PrefixedName(name=name))
     with world.modify_world():
-        world.add_connection(FixedConnection(parent=world.root, child=body))
+        world.add_connection(connection=FixedConnection(parent=world.root, child=body))
     return body
 
 
 def test_frame_is_named_after_the_entity():
     world, (milk,) = world_with_bodies("milk")
 
-    assert TfFrameNames().assign(milk) == "milk"
+    assert TfFrameNames().assign(entity=milk) == "milk"
 
 
 def test_a_prefix_is_put_in_front_of_every_frame_name():
     world, (milk,) = world_with_bodies("milk")
     frame_names = TfFrameNames(prefix="copy/")
 
-    assert frame_names.assign(milk) == f"{frame_names.prefix}milk"
+    assert frame_names.assign(entity=milk) == f"{frame_names.prefix}milk"
 
 
 def test_a_prefixed_tree_hangs_under_the_root_of_the_unprefixed_one(rclpy_node):
@@ -505,8 +523,8 @@ def test_a_prefixed_tree_hangs_under_the_root_of_the_unprefixed_one(rclpy_node):
     TFPublisher(node=rclpy_node, _world=world, frame_names=frame_names)
 
     assert tf_wrapper.wait_for_transform(
-        str(world.root.name),
-        frame_names.assign(milk),
+        target_frame=str(world.root.name),
+        source_frame=frame_names.assign(entity=milk),
         timeout=Duration(seconds=1.0),
         time=Time(),
     )
@@ -516,38 +534,41 @@ def test_first_of_two_equally_named_bodies_keeps_the_plain_frame_name():
     world, (first, second) = world_with_bodies("milk", "milk")
     frame_names = TfFrameNames()
 
-    assert frame_names.assign(first) == "milk"
-    assert frame_names.assign(second) == f"milk_{second.id.hex}"
+    assert frame_names.assign(entity=first) == "milk"
+    assert frame_names.assign(entity=second) == f"milk_{second.id.hex}"
 
 
 def test_frame_names_are_reused_on_every_republish():
     world, (first, second) = world_with_bodies("milk", "milk")
     frame_names = TfFrameNames()
-    published = [frame_names.assign(first), frame_names.assign(second)]
+    published = [frame_names.assign(entity=first), frame_names.assign(entity=second)]
 
-    assert [frame_names.assign(first), frame_names.assign(second)] == published
+    assert [
+        frame_names.assign(entity=first),
+        frame_names.assign(entity=second),
+    ] == published
 
 
 def test_a_body_arriving_later_does_not_rename_the_bodies_already_published():
     world, (first,) = world_with_bodies("milk")
     frame_names = TfFrameNames()
-    published = frame_names.assign(first)
+    published = frame_names.assign(entity=first)
 
-    frame_names.assign(attach_body(world, "milk"))
+    frame_names.assign(entity=attach_body(world, "milk"))
 
-    assert frame_names.assign(first) == published
+    assert frame_names.assign(entity=first) == published
 
 
 def test_removing_a_body_leaves_the_frame_name_of_the_other_one_alone():
     world, (first, second) = world_with_bodies("milk", "milk")
     frame_names = TfFrameNames()
-    frame_names.assign(first)
-    published = frame_names.assign(second)
+    frame_names.assign(entity=first)
+    published = frame_names.assign(entity=second)
 
     with world.modify_world():
-        world.remove_kinematic_structure_entity(first)
+        world.remove_kinematic_structure_entity(kinematic_structure_entity=first)
 
-    assert frame_names.assign(second) == published
+    assert frame_names.assign(entity=second) == published
 
 
 def published_child_frames(tf_publisher: TFPublisher) -> set[str]:
@@ -606,7 +627,10 @@ def test_two_equally_named_bodies_reach_the_tree_as_two_frames(rclpy_node):
     TFPublisher(node=rclpy_node, _world=world)
 
     assert tf_wrapper.wait_for_transform(
-        "map", "milk", timeout=Duration(seconds=1.0), time=Time()
+        target_frame="map",
+        source_frame="milk",
+        timeout=Duration(seconds=1.0),
+        time=Time(),
     )
     published_frames = set(tf_wrapper.get_tf_frames())
     told_apart_by_identifier = {
@@ -627,16 +651,18 @@ def test_a_body_named_after_a_path_keeps_its_slashes_in_its_frame(
     """
     world = World()
     with world.modify_world():
-        scene = Body(name=PrefixedName("scene", "clinic"))
-        chair = Body(name=PrefixedName("Meshes/Assets/Chair/Actor_0003", "clinic"))
-        world.add_connection(FixedConnection(parent=scene, child=chair))
+        scene = Body(name=PrefixedName(name="scene", prefix="clinic"))
+        chair = Body(
+            name=PrefixedName(name="Meshes/Assets/Chair/Actor_0003", prefix="clinic")
+        )
+        world.add_connection(connection=FixedConnection(parent=scene, child=chair))
     ros_publishers.adopt(TFPublisher(node=rclpy_node, _world=world))
 
     tf_wrapper = TFWrapper(node=rclpy_node)
 
     assert tf_wrapper.wait_for_transform(
-        "clinic/scene",
-        "clinic/Meshes/Assets/Chair/Actor_0003",
+        target_frame="clinic/scene",
+        source_frame="clinic/Meshes/Assets/Chair/Actor_0003",
         timeout=Duration(seconds=1.0),
         time=Time(),
     )

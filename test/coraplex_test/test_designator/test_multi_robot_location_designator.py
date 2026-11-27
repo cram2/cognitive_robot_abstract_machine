@@ -48,9 +48,11 @@ def setup_multi_robot_simple_apartment(
 
     if request.param == "hsrb":
         hsr_copy = deepcopy(_hsr_world_setup)
-        apartment_copy.merge_world(hsr_copy)
-        view = apartment_copy.get_semantic_annotations_by_type(HSRB)
-        view = view[0] if view else HSRB.from_world(apartment_copy)
+        apartment_copy.merge_world(other=hsr_copy)
+        view = apartment_copy.get_semantic_annotations_by_type(
+            semantic_annotation_type=HSRB
+        )
+        view = view[0] if view else HSRB.from_world(world=apartment_copy)
         view.root.parent_connection.origin = (
             HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
         )
@@ -58,10 +60,12 @@ def setup_multi_robot_simple_apartment(
     elif request.param == "stretch":
         stretch_copy = deepcopy(_stretch_world_setup)
         apartment_copy.merge_world(
-            stretch_copy,
+            other=stretch_copy,
         )
-        view = apartment_copy.get_semantic_annotations_by_type(Stretch)
-        view = view[0] if view else Stretch.from_world(apartment_copy)
+        view = apartment_copy.get_semantic_annotations_by_type(
+            semantic_annotation_type=Stretch
+        )
+        view = view[0] if view else Stretch.from_world(world=apartment_copy)
         view.root.parent_connection.origin = (
             HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
         )
@@ -70,10 +74,12 @@ def setup_multi_robot_simple_apartment(
     elif request.param == "tiago":
         tiago_copy = deepcopy(_tiago_world_setup)
         apartment_copy.merge_world(
-            tiago_copy,
+            other=tiago_copy,
         )
-        view = apartment_copy.get_semantic_annotations_by_type(Tiago)
-        view = view[0] if view else Tiago.from_world(apartment_copy)
+        view = apartment_copy.get_semantic_annotations_by_type(
+            semantic_annotation_type=Tiago
+        )
+        view = view[0] if view else Tiago.from_world(world=apartment_copy)
         view.root.parent_connection.origin = (
             HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
         )
@@ -82,10 +88,12 @@ def setup_multi_robot_simple_apartment(
     elif request.param == "pr2":
         pr2_copy = deepcopy(_pr2_world_setup)
         apartment_copy.merge_world(
-            pr2_copy,
+            other=pr2_copy,
         )
-        view = apartment_copy.get_semantic_annotations_by_type(PR2)
-        view = view[0] if view else PR2.from_world(apartment_copy)
+        view = apartment_copy.get_semantic_annotations_by_type(
+            semantic_annotation_type=PR2
+        )
+        view = view[0] if view else PR2.from_world(world=apartment_copy)
         view.root.parent_connection.origin = (
             HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
         )
@@ -94,9 +102,11 @@ def setup_multi_robot_simple_apartment(
     elif request.param == "garmi":
         garmi_copy = deepcopy(request.getfixturevalue("_garmi_world_setup"))
         apartment_copy.merge_world(
-            garmi_copy,
+            other=garmi_copy,
         )
-        view = apartment_copy.get_semantic_annotations_by_type(Garmi)[0]
+        view = apartment_copy.get_semantic_annotations_by_type(
+            semantic_annotation_type=Garmi
+        )[0]
         view.root.parent_connection.origin = (
             HomogeneousTransformationMatrix.from_xyz_rpy(1.5, 2, 0)
         )
@@ -149,7 +159,7 @@ def test_new_reachability_location_body(
     world.notify_state_change()
 
     arm = right_or_only_arm(robot)
-    milk = world.get_body_by_name("milk.stl")
+    milk = world.get_body_by_name(name="milk.stl")
     location = ReachabilityLocation(
         target_pose=Pose(reference_frame=milk),
         arm=arm,
@@ -176,14 +186,14 @@ def test_visibility_location_pose(multiple_robot_simple_apartment_context):
     world.notify_state_change()
 
     location = VisibilityLocation(
-        target_pose=world.get_body_by_name("milk.stl").global_pose,
+        target_pose=world.get_body_by_name(name="milk.stl").global_pose,
         context=context_of(extensions),
     )
 
     pose = next(iter(location))
 
     assert pose.reference_frame is world.root
-    _assert_faces(pose, world.get_body_by_name("milk.stl"))
+    _assert_faces(pose, world.get_body_by_name(name="milk.stl"))
 
 
 def test_visibility_location_body(multiple_robot_simple_apartment_context):
@@ -199,11 +209,11 @@ def test_visibility_location_body(multiple_robot_simple_apartment_context):
     world.notify_state_change()
 
     location = VisibilityLocation(
-        target_pose=Pose(reference_frame=world.get_body_by_name("milk.stl")),
+        target_pose=Pose(reference_frame=world.get_body_by_name(name="milk.stl")),
         context=context_of(extensions),
     )
 
     pose = next(iter(location))
 
     assert pose.reference_frame is world.root
-    _assert_faces(pose, world.get_body_by_name("milk.stl"))
+    _assert_faces(pose, world.get_body_by_name(name="milk.stl"))

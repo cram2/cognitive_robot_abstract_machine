@@ -245,20 +245,20 @@ def run_pose_goal(
     motion_statechart.add_node(node=EndMotion.when_true(node=goal))
     executor.compile(statechart=motion_statechart)
 
-    root_T_goal = world.compute_forward_kinematics_np(root, tip) @ (
+    root_T_goal = world.compute_forward_kinematics_np(root=root, tip=tip) @ (
         offset.goal_pose(tip=tip).to_np()
     )
     trace = ErrorTrace()
     trace.record(
         time=0.0,
-        root_T_tip=world.compute_forward_kinematics_np(root, tip),
+        root_T_tip=world.compute_forward_kinematics_np(root=root, tip=tip),
         root_T_goal=root_T_goal,
     )
     for _ in range(maximum_cycles):
         executor.tick()
         trace.record(
             time=executor.time,
-            root_T_tip=world.compute_forward_kinematics_np(root, tip),
+            root_T_tip=world.compute_forward_kinematics_np(root=root, tip=tip),
             root_T_goal=root_T_goal,
         )
         if executor.statechart.is_ended():
@@ -366,9 +366,9 @@ def test_pr2_translation_rotation_balance(
     pr2_world_state_reset: World, better_pr2_pose
 ):
     world = pr2_world_state_reset
-    JointState.from_str_dict(better_pr2_pose, world=world).apply_to(world)
-    root = world.get_kinematic_structure_entity_by_name("base_footprint")
-    tip = world.get_kinematic_structure_entity_by_name("r_gripper_tool_frame")
+    JointState.from_str_dict(mapping=better_pr2_pose, world=world).apply_to(world=world)
+    root = world.get_kinematic_structure_entity_by_name(name="base_footprint")
+    tip = world.get_kinematic_structure_entity_by_name(name="r_gripper_tool_frame")
 
     runs = run_every_pose_offset(world, root, tip)
 
@@ -383,8 +383,8 @@ def test_tracy_translation_rotation_balance(
     Tracy's right arm, starting elbow-up, reaches every offset pose goal.
     """
     world = tracy_world_copy
-    JointState.from_str_dict(tracy_arm_pose, world=world).apply_to(world)
-    tip = world.get_kinematic_structure_entity_by_name("r_gripper_tool_frame")
+    JointState.from_str_dict(mapping=tracy_arm_pose, world=world).apply_to(world=world)
+    tip = world.get_kinematic_structure_entity_by_name(name="r_gripper_tool_frame")
 
     runs = run_every_pose_offset(world, world.root, tip)
 

@@ -9,7 +9,7 @@ from semantic_digital_twin.adapters.ros.node_registry import ROSNodeRegistry
 from semantic_digital_twin.exceptions import ROSNodeNotRegisteredError
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LifecycleOwnedNode:
     """
     Records whether something outside its lifecycle owner tries to destroy it.
@@ -62,7 +62,7 @@ def test_get_without_registration_raises_specific_error(
 def test_registered_node_is_returned(registry: ROSNodeRegistry) -> None:
     node = LifecycleOwnedNode()
 
-    registry.register(node)
+    registry.register(node=node)
 
     assert registry.get() is node
 
@@ -70,9 +70,9 @@ def test_registered_node_is_returned(registry: ROSNodeRegistry) -> None:
 def test_register_replaces_the_previous_node(registry: ROSNodeRegistry) -> None:
     previous_node = LifecycleOwnedNode()
     current_node = LifecycleOwnedNode()
-    registry.register(previous_node)
+    registry.register(node=previous_node)
 
-    registry.register(current_node)
+    registry.register(node=current_node)
 
     assert registry.get() is current_node
 
@@ -83,7 +83,7 @@ def test_register_replaces_the_previous_node(registry: ROSNodeRegistry) -> None:
 def test_clear_without_expected_node_removes_registration(
     registry: ROSNodeRegistry,
 ) -> None:
-    registry.register(LifecycleOwnedNode())
+    registry.register(node=LifecycleOwnedNode())
 
     registry.clear()
 
@@ -92,9 +92,9 @@ def test_clear_without_expected_node_removes_registration(
 
 def test_clear_matching_node_removes_registration(registry: ROSNodeRegistry) -> None:
     node = LifecycleOwnedNode()
-    registry.register(node)
+    registry.register(node=node)
 
-    registry.clear(node)
+    registry.clear(expected_node=node)
 
     assert not registry.has_node()
 
@@ -102,18 +102,18 @@ def test_clear_matching_node_removes_registration(registry: ROSNodeRegistry) -> 
 def test_clear_previous_node_preserves_replacement(registry: ROSNodeRegistry) -> None:
     previous_node = LifecycleOwnedNode()
     current_node = LifecycleOwnedNode()
-    registry.register(previous_node)
-    registry.register(current_node)
+    registry.register(node=previous_node)
+    registry.register(node=current_node)
 
-    registry.clear(previous_node)
+    registry.clear(expected_node=previous_node)
 
     assert registry.get() is current_node
 
 
 def test_clear_does_not_destroy_node(registry: ROSNodeRegistry) -> None:
     node = LifecycleOwnedNode()
-    registry.register(node)
+    registry.register(node=node)
 
-    registry.clear(node)
+    registry.clear(expected_node=node)
 
     assert node.destruction_count == 0

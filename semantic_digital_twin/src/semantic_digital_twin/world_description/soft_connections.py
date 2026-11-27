@@ -18,7 +18,7 @@ from krrood_spatial_math.spatial_types import HomogeneousTransformationMatrix
 from semantic_digital_twin.world import World
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class PiecewiseConstantCurvatureConnection(Connection):
     """
     A continuum connection based on the Piecewise Constant Curvature (PCC) model.
@@ -49,7 +49,7 @@ class PiecewiseConstantCurvatureConnection(Connection):
         return result
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         tracker = WorldEntityWithIDKwargsTracker.from_kwargs(from_json_kwargs=kwargs)
         return cls(
             name=from_json(data["name"]),
@@ -120,8 +120,8 @@ class PiecewiseConstantCurvatureConnection(Connection):
         super().add_to_world(world=world)
 
         # Access DOFs through the world using the stored UUIDs
-        kappa_dof = world.get_degree_of_freedom_by_id(self.kappa_dof_id)
-        phi_dof = world.get_degree_of_freedom_by_id(self.phi_dof_id)
+        kappa_dof = world.get_degree_of_freedom_by_id(id=self.kappa_dof_id)
+        phi_dof = world.get_degree_of_freedom_by_id(id=self.phi_dof_id)
 
         kappa = kappa_dof.variables.position
         phi = phi_dof.variables.position
@@ -171,12 +171,12 @@ class PiecewiseConstantCurvatureConnection(Connection):
         Returns the list of degrees of freedom controlling this PCC segment.
         """
         return [
-            self._world.get_degree_of_freedom_by_id(self.kappa_dof_id),
-            self._world.get_degree_of_freedom_by_id(self.phi_dof_id),
+            self._world.get_degree_of_freedom_by_id(id=self.kappa_dof_id),
+            self._world.get_degree_of_freedom_by_id(id=self.phi_dof_id),
         ]
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class CosseratRodConnection(Connection):
     """
     A connection implementing Cosserat Rod Theory.
@@ -221,7 +221,7 @@ class CosseratRodConnection(Connection):
         return result
 
     @classmethod
-    def _from_json(cls, data: dict[str, Any], **kwargs) -> Self:
+    def _from_json(cls, *, data: dict[str, Any], **kwargs) -> Self:
         tracker = WorldEntityWithIDKwargsTracker.from_kwargs(from_json_kwargs=kwargs)
         return cls(
             name=from_json(data["name"]),
@@ -304,10 +304,10 @@ class CosseratRodConnection(Connection):
         """
         super().add_to_world(world=world)
 
-        bending_x_dof = world.get_degree_of_freedom_by_id(self.bending_x_dof_id)
-        bending_y_dof = world.get_degree_of_freedom_by_id(self.bending_y_dof_id)
-        torsion_dof = world.get_degree_of_freedom_by_id(self.torsion_dof_id)
-        extension_dof = world.get_degree_of_freedom_by_id(self.extension_dof_id)
+        bending_x_dof = world.get_degree_of_freedom_by_id(id=self.bending_x_dof_id)
+        bending_y_dof = world.get_degree_of_freedom_by_id(id=self.bending_y_dof_id)
+        torsion_dof = world.get_degree_of_freedom_by_id(id=self.torsion_dof_id)
+        extension_dof = world.get_degree_of_freedom_by_id(id=self.extension_dof_id)
 
         bending_x = bending_x_dof.variables.position
         bending_y = bending_y_dof.variables.position
@@ -366,8 +366,8 @@ class CosseratRodConnection(Connection):
         Returns the list of degrees of freedom controlling this rod segment.
         """
         return [
-            self._world.get_degree_of_freedom_by_id(self.bending_x_dof_id),
-            self._world.get_degree_of_freedom_by_id(self.bending_y_dof_id),
-            self._world.get_degree_of_freedom_by_id(self.torsion_dof_id),
-            self._world.get_degree_of_freedom_by_id(self.extension_dof_id),
+            self._world.get_degree_of_freedom_by_id(id=self.bending_x_dof_id),
+            self._world.get_degree_of_freedom_by_id(id=self.bending_y_dof_id),
+            self._world.get_degree_of_freedom_by_id(id=self.torsion_dof_id),
+            self._world.get_degree_of_freedom_by_id(id=self.extension_dof_id),
         ]

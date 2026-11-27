@@ -63,23 +63,23 @@ Your goal:
 world = World.create_with_root_body()
 with world.modify_world():
     drawer = Drawer.create_with_new_body_in_world(
-        name="drawer", scale=Scale(0.2, 0.4, 0.2), world=world
+        name="drawer", scale=Scale(x=0.2, y=0.4, z=0.2), world=world
     )
     handle = Handle.create_with_new_body_in_world(
         name="drawer_handle",
         world=world,
         world_root_T_self=HomogeneousTransformationMatrix.from_xyz_rpy(x=-0.1),
-        scale=Scale(0.05, 0.02, 0.1),
+        scale=Scale(x=0.05, y=0.02, z=0.1),
     )
     drawer.add(part=handle)
 ```
 
 ```{code-cell} ipython3
 :tags: [verify-solution, remove-input]
-if drawer not in world.semantic_annotations: raise ExerciseVerificationFailed("The drawer should be registered in the world.")
-if handle not in world.semantic_annotations: raise ExerciseVerificationFailed("The handle should be registered in the world.")
-if drawer.handle is not handle: raise ExerciseVerificationFailed("The handle should be mounted on the drawer.")
-if not len(drawer.root.collision.shapes) > 0: raise ExerciseVerificationFailed("The factory should have generated geometry for the drawer.")
+if drawer not in world.semantic_annotations: raise ExerciseVerificationFailed(requirement="The drawer should be registered in the world.")
+if handle not in world.semantic_annotations: raise ExerciseVerificationFailed(requirement="The handle should be registered in the world.")
+if drawer.handle is not handle: raise ExerciseVerificationFailed(requirement="The handle should be mounted on the drawer.")
+if not len(drawer.root.collision.shapes) > 0: raise ExerciseVerificationFailed(requirement="The factory should have generated geometry for the drawer.")
 ```
 
 ## 2. Extract the geometry as a specification
@@ -98,13 +98,13 @@ Your goal:
 
 ```{code-cell} ipython3
 :tags: [example-solution]
-specification = Drawer.get_default_root_kinematic_structure_entity_specification(scale=Scale(0.2, 0.4, 0.2))
-free_standing = specification.to_domain_object("free_drawer_body")
+specification = Drawer.get_default_root_kinematic_structure_entity_specification(scale=Scale(x=0.2, y=0.4, z=0.2))
+free_standing = specification.to_domain_object(name="free_drawer_body")
 ```
 
 ```{code-cell} ipython3
 :tags: [verify-solution, remove-input]
 # The specification measures the same extents as the drawer the factory spawned.
-if not np.allclose(specification.scale.to_np(), drawer.scale.to_np(), atol=1e-6): raise ExerciseVerificationFailed("The generated body should have the scale requested by the specification.")
-if free_standing in world.bodies: raise ExerciseVerificationFailed("to_domain_object must not add the body to any world.")
+if not np.allclose(specification.scale.to_np(), drawer.scale.to_np(), atol=1e-6): raise ExerciseVerificationFailed(requirement="The generated body should have the scale requested by the specification.")
+if free_standing in world.bodies: raise ExerciseVerificationFailed(requirement="to_domain_object must not add the body to any world.")
 ```

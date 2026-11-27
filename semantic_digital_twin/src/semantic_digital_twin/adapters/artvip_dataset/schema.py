@@ -28,7 +28,7 @@ class ArtVipCategory(StrEnum):
     LAB_ITEMS = "lab_items"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ArtVipObject:
     """
     An ArtVIP object parsed into a :class:`~semantic_digital_twin.world.World` by

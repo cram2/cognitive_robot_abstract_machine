@@ -98,12 +98,12 @@ BOWL_RIM_DEPTH = 0.02
 How far below the top of the synthetic bowl's wall its rim reaches.
 """
 
-BOX_SCALE = Scale(0.1, 0.2, 0.3)
+BOX_SCALE = Scale(x=0.1, y=0.2, z=0.3)
 """
 Extents of the box body used by the default grasp pose tests.
 """
 
-PIECE_SCALE = Scale(0.03, 0.04, 0.03)
+PIECE_SCALE = Scale(x=0.03, y=0.04, z=0.03)
 """
 Extents of the shape-sorting piece, a rectangular prism.
 """
@@ -137,14 +137,14 @@ def bowl(tmp_path) -> Bowl:
     mesh.export(mesh_path)
     shape = Mesh(origin=HomogeneousTransformationMatrix(), filename=str(mesh_path))
     body = Body(
-        name=PrefixedName("bowl", prefix="grasp_candidates"),
-        collision=ShapeCollection([shape]),
+        name=PrefixedName(name="bowl", prefix="grasp_candidates"),
+        collision=ShapeCollection(shapes=[shape]),
     )
     annotation = Bowl(root=body)
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(body)
-        world.add_semantic_annotation(annotation)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=body)
+        world.add_semantic_annotation(semantic_annotation=annotation)
     PartSplitter(
         part_type=Rim,
         finder=LocatedFacesFinder(face_centers=rim.triangles_center[rim_faces]),
@@ -158,16 +158,16 @@ def milk() -> Milk:
     A box-shaped body, which the default implementation grasps at its origin.
     """
     body = Body(
-        name=PrefixedName("milk", prefix="grasp_candidates"),
+        name=PrefixedName(name="milk", prefix="grasp_candidates"),
         collision=ShapeCollection(
-            [Box(origin=HomogeneousTransformationMatrix(), scale=BOX_SCALE)]
+            shapes=[Box(origin=HomogeneousTransformationMatrix(), scale=BOX_SCALE)]
         ),
     )
     annotation = Milk(root=body)
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(body)
-        world.add_semantic_annotation(annotation)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=body)
+        world.add_semantic_annotation(semantic_annotation=annotation)
     return annotation
 
 
@@ -226,7 +226,7 @@ def test_default_grasp_candidates_approach_along_evenly_spaced_yaws(milk):
 # %% changing how an annotation is grasped
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class FixedlyGraspedHandle(Handle):
     """
     A handle that offers one grasp at its origin, whatever its shape.
@@ -249,7 +249,7 @@ def test_an_annotation_can_offer_its_grasps_its_own_way():
     np.testing.assert_allclose(grasps[0].grasp_pose.to_np(), np.eye(4), atol=1e-9)
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class MilkGraspedLow(Milk):
     """
     A carton that may be grasped only at its lower half.
@@ -263,7 +263,7 @@ class MilkGraspedLow(Milk):
 def test_an_annotation_can_state_where_it_may_be_grasped(milk):
     carton = MilkGraspedLow(root=milk.root)
     with milk._world.modify_world():
-        milk._world.add_semantic_annotation(carton)
+        milk._world.add_semantic_annotation(semantic_annotation=carton)
 
     grasps = carton.drawn_grasp_candidates()
 
@@ -272,7 +272,7 @@ def test_an_annotation_can_state_where_it_may_be_grasped(milk):
         assert grasp.grasp_pose.to_np()[2, 3] < 0.0
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class MilkDrawnUniformly(HasDrawnGraspsByDefault, Milk):
     """
     A carton that offers grasps drawn uniformly from its statement while no model is
@@ -283,7 +283,7 @@ class MilkDrawnUniformly(HasDrawnGraspsByDefault, Milk):
 def test_an_annotation_can_offer_other_grasps_while_no_model_is_given(milk):
     carton = MilkDrawnUniformly(root=milk.root)
     with milk._world.modify_world():
-        milk._world.add_semantic_annotation(carton)
+        milk._world.add_semantic_annotation(semantic_annotation=carton)
     half_extents = BOX_SCALE.to_np()[:3] / 2
 
     grasps = carton.grasp_candidates()
@@ -315,7 +315,7 @@ def test_bowl_grasps_sit_in_the_middle_of_the_rims_height(bowl):
 
 
 def test_bowl_grasps_approach_from_above(bowl):
-    allowed = allowed_intervals(bowl.rim.grasp_strategy.statement(bowl.rim))
+    allowed = allowed_intervals(bowl.rim.grasp_strategy.statement(graspable=bowl.rim))
     for grasp in bowl.grasp_candidates():
         approach = axes_of(grasp.grasp_pose)[:, 0]
         assert -approach[2] >= np.cos(allowed["pitch"].simple_sets[-1].upper)
@@ -326,7 +326,7 @@ def test_bowl_grasp_fingers_close_across_the_rim_wall(bowl):
     The finger axis must be close to radial, so the fingers straddle the wall rather
     than pinching along it.
     """
-    allowed = allowed_intervals(bowl.rim.grasp_strategy.statement(bowl.rim))
+    allowed = allowed_intervals(bowl.rim.grasp_strategy.statement(graspable=bowl.rim))
     for grasp in bowl.grasp_candidates():
         position = grasp.grasp_pose.to_np()[:3, 3]
         radial = position / np.linalg.norm(position[:2])
@@ -341,7 +341,7 @@ def test_bowl_grasps_close_on_the_middle_of_the_wall(bowl):
     """
     A bowl's rim is pinched in the middle half of its wall.
     """
-    allowed = allowed_intervals(bowl.rim.grasp_strategy.statement(bowl.rim))
+    allowed = allowed_intervals(bowl.rim.grasp_strategy.statement(graspable=bowl.rim))
     wall_thickness = BOWL_OUTER_RADIUS - BOWL_INNER_RADIUS
 
     assert PinchARim().depth_unit(
@@ -360,7 +360,7 @@ def test_a_wall_is_pinched_as_deep_as_asked(bowl):
     A wall is pinched within the fraction of its thickness the strategy was given.
     """
     strategy = PinchARim(depth=Bounds(lower=0.1, upper=0.9))
-    allowed = allowed_intervals(strategy.statement(bowl.rim))
+    allowed = allowed_intervals(strategy.statement(graspable=bowl.rim))
     wall_thickness = strategy.depth_unit(
         graspable=bowl.rim, surface=bowl.rim.grasp_surface()
     )
@@ -375,7 +375,9 @@ def test_a_wall_is_pinched_as_deep_as_asked(bowl):
 
 def test_a_wall_is_pinched_as_tilted_and_turned_as_asked(bowl):
     pitch, roll = Bounds(lower=0.0, upper=0.3), Bounds(lower=-0.2, upper=0.2)
-    allowed = allowed_intervals(PinchARim(pitch=pitch, roll=roll).statement(bowl.rim))
+    allowed = allowed_intervals(
+        PinchARim(pitch=pitch, roll=roll).statement(graspable=bowl.rim)
+    )
 
     assert allowed["pitch"].simple_sets[-1].upper == pytest.approx(pitch.upper)
     assert allowed["roll"].simple_sets[0].lower == pytest.approx(roll.lower)
@@ -384,7 +386,7 @@ def test_a_wall_is_pinched_as_tilted_and_turned_as_asked(bowl):
 
 def test_a_rim_is_pinched_between_the_heights_asked(bowl):
     height = Bounds(lower=0.1, upper=0.9)
-    allowed = allowed_intervals(PinchARim(height=height).statement(bowl.rim))
+    allowed = allowed_intervals(PinchARim(height=height).statement(graspable=bowl.rim))
 
     assert allowed["height"].simple_sets[0].lower == pytest.approx(height.lower)
     assert allowed["height"].simple_sets[-1].upper == pytest.approx(height.upper)
@@ -397,7 +399,7 @@ def test_a_container_without_a_rim_is_pinched_as_far_into_its_rim_depth_as_asked
     rim_depth, rim_fraction = 0.02, Bounds(lower=0.1, upper=0.9)
     allowed = allowed_intervals(
         PinchTheTopOfAWall(rim_depth=rim_depth, rim_fraction=rim_fraction).statement(
-            bowl
+            graspable=bowl
         )
     )
     lowest, highest = bowl.grasp_surface().bounds
@@ -423,16 +425,21 @@ def _spoon_lying_along(length_axis: int) -> Spoon:
     extents = [0.02, 0.02, 0.01]
     extents[length_axis] = 0.15
     body = Body(
-        name=PrefixedName(f"spoon_along_{length_axis}", prefix="grasp_candidates"),
+        name=PrefixedName(name=f"spoon_along_{length_axis}", prefix="grasp_candidates"),
         collision=ShapeCollection(
-            [Box(origin=HomogeneousTransformationMatrix(), scale=Scale(*extents))]
+            shapes=[
+                Box(
+                    origin=HomogeneousTransformationMatrix(),
+                    scale=Scale(x=extents[0], y=extents[1], z=extents[2]),
+                )
+            ]
         ),
     )
     annotation = Spoon(root=body)
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(body)
-        world.add_semantic_annotation(annotation)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=body)
+        world.add_semantic_annotation(semantic_annotation=annotation)
     return annotation
 
 
@@ -480,7 +487,7 @@ def test_drawn_cutlery_grasps_come_from_above_across_its_length(length_axis):
 def test_cutlery_is_grasped_along_its_length_as_far_as_asked():
     spoon = _spoon_lying_along(0)
     strategy = GraspAcrossTheLength(position=Bounds(lower=0.3, upper=0.7))
-    allowed = allowed_intervals(strategy.statement(spoon))
+    allowed = allowed_intervals(strategy.statement(graspable=spoon))
 
     assert allowed["position"].simple_sets[0].lower == pytest.approx(
         strategy.position.lower
@@ -493,12 +500,12 @@ def test_cutlery_is_grasped_along_its_length_as_far_as_asked():
 
 
 def test_cutlery_without_a_shape_offers_no_grasp():
-    body = Body(name=PrefixedName("shapeless_spoon", prefix="grasp_candidates"))
+    body = Body(name=PrefixedName(name="shapeless_spoon", prefix="grasp_candidates"))
     spoon = Spoon(root=body)
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(body)
-        world.add_semantic_annotation(spoon)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=body)
+        world.add_semantic_annotation(semantic_annotation=spoon)
 
     with pytest.raises(NoGraspGeometry):
         spoon.grasp_candidates()
@@ -520,11 +527,11 @@ def _mug(with_handle: bool, handle_type: type = Handle) -> Mug:
     handle_shape = trimesh.creation.box(extents=[0.03, 0.01, BOWL_HEIGHT / 2])
     handle_shape.apply_translation([BOWL_OUTER_RADIUS + 0.015, 0.0, 0.0])
     body = Body(
-        name=PrefixedName(f"mug_{with_handle}", prefix="grasp_candidates"),
+        name=PrefixedName(name=f"mug_{with_handle}", prefix="grasp_candidates"),
         inertial=Inertial(),
     )
     body.collision = ShapeCollection(
-        [
+        shapes=[
             Mesh.from_trimesh(
                 mesh=trimesh.util.concatenate([body_shape, handle_shape]),
                 origin=HomogeneousTransformationMatrix(reference_frame=body),
@@ -535,8 +542,8 @@ def _mug(with_handle: bool, handle_type: type = Handle) -> Mug:
     mug = Mug(root=body)
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(body)
-        world.add_semantic_annotation(mug)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=body)
+        world.add_semantic_annotation(semantic_annotation=mug)
     if with_handle:
         PartSplitter(
             part_type=handle_type,
@@ -578,7 +585,7 @@ def test_a_handle_is_grasped_along_its_bar_and_around_it_as_far_as_asked():
     strategy = GraspABar(
         position=Bounds(lower=0.3, upper=0.7), angle=Bounds(lower=0.5, upper=1.5)
     )
-    allowed = allowed_intervals(strategy.statement(handle))
+    allowed = allowed_intervals(strategy.statement(graspable=handle))
 
     assert allowed["position"].simple_sets[0].lower == pytest.approx(
         strategy.position.lower
@@ -630,14 +637,14 @@ def _shape_sorting_piece(collision: ShapeCollection) -> ShapeSortingPiece:
     :return: A shape-sorting piece standing alone in a world of its own.
     """
     body = Body(
-        name=PrefixedName("shape_sorting_piece", prefix="grasp_candidates"),
+        name=PrefixedName(name="shape_sorting_piece", prefix="grasp_candidates"),
         collision=collision,
     )
     annotation = ShapeSortingPiece(root=body, grasp_height=PIECE_GRASP_HEIGHT)
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(body)
-        world.add_semantic_annotation(annotation)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=body)
+        world.add_semantic_annotation(semantic_annotation=annotation)
     return annotation
 
 
@@ -649,7 +656,7 @@ def shape_sorting_piece() -> ShapeSortingPiece:
     """
     return _shape_sorting_piece(
         ShapeCollection(
-            [Box(origin=HomogeneousTransformationMatrix(), scale=PIECE_SCALE)]
+            shapes=[Box(origin=HomogeneousTransformationMatrix(), scale=PIECE_SCALE)]
         )
     )
 
@@ -699,7 +706,9 @@ def test_a_shape_sorting_piece_reaches_another_world_with_its_grasp_height(
     with other_world.modify_world():
         sent.apply(world=other_world)
 
-    [arrived] = other_world.get_semantic_annotations_by_type(ShapeSortingPiece)
+    [arrived] = other_world.get_semantic_annotations_by_type(
+        semantic_annotation_type=ShapeSortingPiece
+    )
     assert arrived.grasp_height == shape_sorting_piece.grasp_height
 
 
@@ -722,12 +731,12 @@ def _handle_with_bar_along(
     extents = [0.03, 0.03, 0.02]
     extents[bar_axis] = 0.2
     body = Body(
-        name=PrefixedName(f"handle_along_{bar_axis}", prefix="grasp_candidates"),
+        name=PrefixedName(name=f"handle_along_{bar_axis}", prefix="grasp_candidates"),
         collision=ShapeCollection(
-            [
+            shapes=[
                 Box(
                     origin=HomogeneousTransformationMatrix.from_xyz_rpy(*bar_center),
-                    scale=Scale(*extents),
+                    scale=Scale(x=extents[0], y=extents[1], z=extents[2]),
                 )
             ]
         ),
@@ -735,8 +744,8 @@ def _handle_with_bar_along(
     annotation = Handle(root=body)
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(body)
-        world.add_semantic_annotation(annotation)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=body)
+        world.add_semantic_annotation(semantic_annotation=annotation)
     return annotation
 
 
@@ -784,10 +793,10 @@ def test_a_kitchen_handle_can_be_approached_into_the_furniture(kitchen_world) ->
     y-axis, so one grasp has to approach along their negative x-axis and close along
     their z-axis.
     """
-    body = kitchen_world.get_body_by_name("sink_area_left_middle_drawer_handle")
+    body = kitchen_world.get_body_by_name(name="sink_area_left_middle_drawer_handle")
     handle = Handle(root=body)
     with kitchen_world.modify_world():
-        kitchen_world.add_semantic_annotation(handle)
+        kitchen_world.add_semantic_annotation(semantic_annotation=handle)
 
     assert any(
         np.allclose(axes_of(grasp.grasp_pose)[:, 0], [-1, 0, 0], atol=1e-9)
@@ -797,12 +806,12 @@ def test_a_kitchen_handle_can_be_approached_into_the_furniture(kitchen_world) ->
 
 
 def test_a_handle_without_a_shape_offers_no_grasp() -> None:
-    body = Body(name=PrefixedName("shapeless_handle", prefix="grasp_candidates"))
+    body = Body(name=PrefixedName(name="shapeless_handle", prefix="grasp_candidates"))
     handle = Handle(root=body)
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(body)
-        world.add_semantic_annotation(handle)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=body)
+        world.add_semantic_annotation(semantic_annotation=handle)
 
     with pytest.raises(NoGraspGeometry):
         handle.grasp_candidates()
@@ -897,7 +906,7 @@ def test_the_grasp_axis_of_a_bar_runs_through_its_centre_along_its_length(bar_ax
     )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HandleWithDiagonalBar(Handle):
     """
     A handle that states its grasp axis instead of leaving it to its bounding box.
@@ -918,7 +927,7 @@ def test_an_axial_grasp_follows_the_axis_its_object_states():
     handle = _handle_with_bar_along(0)
     diagonal = HandleWithDiagonalBar(root=handle.root)
     with handle._world.modify_world():
-        handle._world.add_semantic_annotation(diagonal)
+        handle._world.add_semantic_annotation(semantic_annotation=diagonal)
     axis = diagonal.grasp_axis()
     start, end = axis.start.to_np()[:3], axis.end.to_np()[:3]
     axis_direction = axis.direction.to_np()[:3]
@@ -954,7 +963,7 @@ def test_a_grasp_in_a_foreign_frame_is_refused(milk, bowl):
     clear the wrong geometry. Nothing downstream can tell, so it is refused here.
     """
     with pytest.raises(ReferenceFrameMismatchError):
-        GraspCandidate(milk, Pose(reference_frame=bowl.root))
+        GraspCandidate(graspable=milk, grasp_pose=Pose(reference_frame=bowl.root))
 
 
 def test_a_grasp_without_a_frame_is_refused(milk):
@@ -962,7 +971,7 @@ def test_a_grasp_without_a_frame_is_refused(milk):
     A frameless pose names no body at all, so it cannot be a grasp on one.
     """
     with pytest.raises(MissingReferenceFrameError):
-        GraspCandidate(milk, Pose())
+        GraspCandidate(graspable=milk, grasp_pose=Pose())
 
 
 def test_a_grasp_from_the_body_origin_takes_the_object_at_its_own_origin(milk):
@@ -978,19 +987,19 @@ def test_a_grasp_from_the_body_origin_takes_the_object_at_its_own_origin(milk):
 
 def test_a_grasp_in_the_world_frame_follows_where_the_object_stands():
     world = World()
-    world_root = Body(name=PrefixedName("map", prefix="grasp_candidates"))
-    body = Body(name=PrefixedName("milk", prefix="grasp_candidates"))
+    world_root = Body(name=PrefixedName(name="map", prefix="grasp_candidates"))
+    body = Body(name=PrefixedName(name="milk", prefix="grasp_candidates"))
     milk = Milk(root=body)
     world_T_milk = HomogeneousTransformationMatrix.from_xyz_rpy(1.0, 2.0, 0.5, yaw=0.3)
     with world.modify_world():
         world.add_connection(
-            FixedConnection(
+            connection=FixedConnection(
                 parent=world_root,
                 child=body,
                 parent_T_connection_expression=world_T_milk,
             )
         )
-        world.add_semantic_annotation(milk)
+        world.add_semantic_annotation(semantic_annotation=milk)
     grasp = milk.grasp_candidates()[1]
 
     world_T_grasp = grasp.world_T_grasp
@@ -1054,8 +1063,8 @@ def test_the_width_is_the_objects_extent_along_the_closing_axis(milk):
     exactly that extent.
     """
     grasp = GraspCandidate(
-        milk,
-        Pose(
+        graspable=milk,
+        grasp_pose=Pose(
             orientation=RotationMatrix.from_vectors(
                 x=Vector3.NEGATIVE_Z(), y=Vector3.Y()
             ).quaternion,
@@ -1073,8 +1082,8 @@ def test_turning_the_grasp_changes_the_width_it_meets(milk):
     """
     along_y, along_x = (
         GraspCandidate(
-            milk,
-            Pose(
+            graspable=milk,
+            grasp_pose=Pose(
                 orientation=RotationMatrix.from_vectors(
                     x=Vector3.NEGATIVE_Z(), y=closing_axis
                 ).quaternion,
@@ -1094,8 +1103,8 @@ def test_a_diagonal_grasp_meets_the_box_across_its_shadow(milk):
     axis, since that is the widest the fingers can run into.
     """
     diagonal = GraspCandidate(
-        milk,
-        Pose(
+        graspable=milk,
+        grasp_pose=Pose(
             orientation=RotationMatrix.from_vectors(
                 x=Vector3.NEGATIVE_Z(),
                 y=Vector3(x=1 / np.sqrt(2), y=1 / np.sqrt(2), z=0),
@@ -1112,12 +1121,12 @@ def test_an_object_without_collision_has_no_width_to_measure():
     """
     An object without collision geometry has no width along the closing axis to measure.
     """
-    body = Body(name=PrefixedName("shapeless", prefix="grasp_candidates"))
+    body = Body(name=PrefixedName(name="shapeless", prefix="grasp_candidates"))
     annotation = Milk(root=body)
     world = World()
     with world.modify_world():
-        world.add_kinematic_structure_entity(body)
-        world.add_semantic_annotation(annotation)
+        world.add_kinematic_structure_entity(kinematic_structure_entity=body)
+        world.add_semantic_annotation(semantic_annotation=annotation)
 
     with pytest.raises(ObjectHasNoWidthWithoutCollision):
         GraspCandidate.from_body_origin(graspable=annotation).width_along_closing_axis

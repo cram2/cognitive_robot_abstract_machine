@@ -368,8 +368,8 @@ class TestStorage:
             camera_frame=camera_frame,
             world_T_camera=HomogeneousTransformationMatrix(),
         )
-        camera_body = sem_world.get_body_by_name(camera_frame)
-        world_body = sem_world.get_body_by_name(world_frame)
+        camera_body = sem_world.get_body_by_name(name=camera_frame)
+        world_body = sem_world.get_body_by_name(name=world_frame)
         camera_model = create_camera_model()
         camera = Camera(
             name=PrefixedName(name=camera_frame),
@@ -377,7 +377,7 @@ class TestStorage:
             camera_model=camera_model,
         )
         with sem_world.modify_world():
-            sem_world.add_semantic_annotation(camera)
+            sem_world.add_semantic_annotation(semantic_annotation=camera)
 
         transform = HomogeneousTransformationMatrix.from_xyz_quaternion(
             pos_x=0.1,

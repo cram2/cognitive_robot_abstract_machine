@@ -16,7 +16,7 @@ from semantic_digital_twin.world_description.mesh_file_storage import (
 from .dataset import export_mesh_and_print_session_root
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DeclaredProcessLiveness(ProcessLiveness):
     """
     Reports exactly the processes it was told are running, so a test can describe the

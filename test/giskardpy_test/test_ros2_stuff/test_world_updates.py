@@ -407,7 +407,7 @@ class ControlLoopFixture:
         return [
             connection
             for connection in self.controlled_world.get_connections_by_type(
-                ScrewAxisConnection
+                connection_type=ScrewAxisConnection
             )
             if connection.behaves_like_a_prismatic_connection
         ][0]
@@ -433,12 +433,12 @@ def add_moving_connection(world: World) -> None:
     velocity limits to decide whether the world has settled.
     """
     with world.modify_world():
-        parent_body = Body(name=PrefixedName("parent"))
-        child_body = Body(name=PrefixedName("child"))
-        world.add_body(parent_body)
-        world.add_body(child_body)
+        parent_body = Body(name=PrefixedName(name="parent"))
+        child_body = Body(name=PrefixedName(name="child"))
+        world.add_body(body=parent_body)
+        world.add_body(body=child_body)
         world.add_connection(
-            ScrewAxisConnection.create_with_dofs(
+            connection=ScrewAxisConnection.create_with_dofs(
                 screw_axis=ScrewAxisConnection.create_prismatic_screw_axis(
                     axis=Vector3.X()
                 ),
@@ -538,7 +538,7 @@ class TestRealWorldUpdatesDuringAMotion:
         remote_connection = [
             connection
             for connection in control_loop.remote_world.get_connections_by_type(
-                ScrewAxisConnection
+                connection_type=ScrewAxisConnection
             )
             if connection.behaves_like_a_prismatic_connection
         ][0]
@@ -571,10 +571,12 @@ class TestRealWorldUpdatesDuringAMotion:
         statechart and the quadratic program were compiled against the old structure.
         """
         with control_loop.remote_world.modify_world():
-            late_body = Body(name=PrefixedName("late_body"))
-            control_loop.remote_world.add_body(late_body)
+            late_body = Body(name=PrefixedName(name="late_body"))
+            control_loop.remote_world.add_body(body=late_body)
             control_loop.remote_world.add_connection(
-                FixedConnection(parent=control_loop.remote_world.root, child=late_body)
+                connection=FixedConnection(
+                    parent=control_loop.remote_world.root, child=late_body
+                )
             )
         assert control_loop.wait_until_buffered(count=1)
         entities_before = len(
@@ -676,9 +678,11 @@ class TestModelChangesOfTheMotionItself:
         local_control_loop.command_publishers.append(publisher)
         world = local_control_loop.world
         with world.modify_world():
-            carried_body = Body(name=PrefixedName("carried_body"))
-            world.add_body(carried_body)
-            world.add_connection(FixedConnection(parent=world.root, child=carried_body))
+            carried_body = Body(name=PrefixedName(name="carried_body"))
+            world.add_body(body=carried_body)
+            world.add_connection(
+                connection=FixedConnection(parent=world.root, child=carried_body)
+            )
 
         local_control_loop.run_cycle()
 

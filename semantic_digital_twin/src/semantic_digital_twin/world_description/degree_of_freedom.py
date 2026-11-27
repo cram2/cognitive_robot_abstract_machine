@@ -36,7 +36,7 @@ class DegreeOfFreedomVariableJSONKey(StrEnum):
     """
 
 
-@dataclass(eq=False, init=False)
+@dataclass(eq=False, init=False, kw_only=True)
 class DegreeOfFreedomVariable(sm.FloatVariable):
     """
     A variable standing for one derivative of a degree of freedom.
@@ -77,7 +77,7 @@ class DegreeOfFreedomVariable(sm.FloatVariable):
         return dof.variables[cls.derivative]
 
 
-@dataclass(eq=False, init=False)
+@dataclass(eq=False, init=False, kw_only=True)
 class PositionVariable(DegreeOfFreedomVariable):
     """
     Describes the position of a degree of freedom.
@@ -86,7 +86,7 @@ class PositionVariable(DegreeOfFreedomVariable):
     derivative = Derivatives.position
 
 
-@dataclass(eq=False, init=False)
+@dataclass(eq=False, init=False, kw_only=True)
 class VelocityVariable(DegreeOfFreedomVariable):
     """
     Describes the velocity of a degree of freedom.
@@ -95,7 +95,7 @@ class VelocityVariable(DegreeOfFreedomVariable):
     derivative = Derivatives.velocity
 
 
-@dataclass(eq=False, init=False)
+@dataclass(eq=False, init=False, kw_only=True)
 class AccelerationVariable(DegreeOfFreedomVariable):
     """
     Describes the acceleration of a degree of freedom.
@@ -104,7 +104,7 @@ class AccelerationVariable(DegreeOfFreedomVariable):
     derivative = Derivatives.acceleration
 
 
-@dataclass(eq=False, init=False)
+@dataclass(eq=False, init=False, kw_only=True)
 class JerkVariable(DegreeOfFreedomVariable):
     """
     Describes the jerk of a degree of freedom.
@@ -133,7 +133,7 @@ class PositionLimitSide(IntEnum):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DegreeOfFreedomLimits(Generic[T]):
     """
     A class representing the limits of a degree of freedom.
@@ -156,6 +156,7 @@ class DegreeOfFreedomLimits(Generic[T]):
     @classmethod
     def from_position_range_and_speed(
         cls,
+        *,
         lower_position: T | None = None,
         upper_position: T | None = None,
         maximum_speed: T | None = None,
@@ -209,7 +210,7 @@ class DegreeOfFreedomLimits(Generic[T]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
     """
     A class representing a degree of freedom in a world model with associated
@@ -253,7 +254,7 @@ class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
         lower = self.limits.lower.position
         upper = self.limits.upper.position
         if lower is not None and upper is not None and lower > upper:
-            raise InvalidConnectionLimits(self.name, self.limits)
+            raise InvalidConnectionLimits(name=self.name, limits=self.limits)
 
     def create_variables(self):
         """
@@ -262,16 +263,16 @@ class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
         """
         assert self._world is not None
         self.variables.position = PositionVariable(
-            name=str(PrefixedName("position", prefix=str(self.name))), dof=self
+            name=str(PrefixedName(name="position", prefix=str(self.name))), dof=self
         )
         self.variables.velocity = VelocityVariable(
-            name=str(PrefixedName("velocity", prefix=str(self.name))), dof=self
+            name=str(PrefixedName(name="velocity", prefix=str(self.name))), dof=self
         )
         self.variables.acceleration = AccelerationVariable(
-            name=str(PrefixedName("acceleration", prefix=str(self.name))), dof=self
+            name=str(PrefixedName(name="acceleration", prefix=str(self.name))), dof=self
         )
         self.variables.jerk = JerkVariable(
-            name=str(PrefixedName("jerk", prefix=str(self.name))), dof=self
+            name=str(PrefixedName(name="jerk", prefix=str(self.name))), dof=self
         )
 
     def has_position_limits(self) -> bool:
@@ -298,6 +299,7 @@ class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
 
     def _overwrite_dof_limits(
         self,
+        *,
         new_lower_limits: DerivativeMap[float],
         new_upper_limits: DerivativeMap[float],
     ):
@@ -316,8 +318,10 @@ class DegreeOfFreedom(WorldEntityWithID, SubclassJSONSerializer):
             derivative.
         """
         if not isinstance(self.variables.position, sm.FloatVariable):
-            raise MimicDofLimitOverwriteError(self.name)
-        for derivative in Derivatives.range(Derivatives.position, Derivatives.jerk):
+            raise MimicDofLimitOverwriteError(dof_name=self.name)
+        for derivative in Derivatives.range(
+            start=Derivatives.position, stop=Derivatives.jerk
+        ):
             if new_lower_limits[derivative] is not None:
                 if self.limits.lower[derivative] is None:
                     self.limits.lower[derivative] = new_lower_limits[derivative]

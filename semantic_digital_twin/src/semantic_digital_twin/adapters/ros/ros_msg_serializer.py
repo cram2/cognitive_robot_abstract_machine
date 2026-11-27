@@ -30,7 +30,7 @@ from semantic_digital_twin.adapters.ros.utils import is_ros2_message_class
 # %% ROS 2 message serializer
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Ros2MessageJSONSerializer(ExternalClassJSONSerializer[None]):
     """
     Json serializer for ROS2 messages.
@@ -82,7 +82,7 @@ class Ros2MessageJSONSerializer(ExternalClassJSONSerializer[None]):
 # %% QoS profile serializer
 
 
-@dataclass
+@dataclass(kw_only=True)
 class QoSProfileJSONSerializer(ExternalClassJSONSerializer[QoSProfile]):
     """
     A serializer class for converting a QoSProfile instance to and from JSON format.
@@ -122,7 +122,7 @@ class QoSProfileJSONSerializer(ExternalClassJSONSerializer[QoSProfile]):
 # %% Duration serializer
 
 
-@dataclass
+@dataclass(kw_only=True)
 class DurationJSONSerializer(ExternalClassJSONSerializer[Duration]):
     """
     Serializer for converting Duration objects to and from JSON format.

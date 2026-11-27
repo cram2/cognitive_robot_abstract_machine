@@ -136,7 +136,7 @@ def camel_case_split(word: str) -> list[str]:
     return result
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MockedNodeClass(MockedClass):
     """
     Mocked class for Node in rclpy
@@ -145,7 +145,7 @@ class MockedNodeClass(MockedClass):
     ...
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MockedNodeModule(MockedModule):
     """
     Mocked module for rclpy.node.
@@ -157,7 +157,7 @@ class MockedNodeModule(MockedModule):
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class MockedRCLPY(MockedModule):
     """
     Mocked module for rclpy.

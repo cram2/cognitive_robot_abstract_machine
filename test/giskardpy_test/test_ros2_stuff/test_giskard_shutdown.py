@@ -38,7 +38,9 @@ class InterruptedWhileIdleInterface(StandAloneRobotInterfaceConfig):
     """
 
     def connect(self) -> None:
-        self.motion_server.inputs.add_input(InterruptingInput(world=self.world))
+        self.motion_server.inputs.add_input(
+            synchronizer=InterruptingInput(world=self.world)
+        )
 
 
 @dataclass(kw_only=True)
@@ -53,7 +55,7 @@ class WorldWithMinimalRobot(WorldSource):
     """
 
     def create_world(self) -> World:
-        MinimalRobot.from_world(self.world)
+        MinimalRobot.from_world(world=self.world)
         return self.world
 
 

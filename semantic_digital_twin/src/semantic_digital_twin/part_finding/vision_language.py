@@ -35,7 +35,7 @@ from semantic_digital_twin.spatial_computations.mesh_rendering import (
 # %% finding the part in each view
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PartBoxPrompt:
     """
     The question a vision-language model is asked about each view of a whole.
@@ -51,7 +51,7 @@ class PartBoxPrompt:
     and the whole.
     """
 
-    def question(self, part_name: str, whole_name: str) -> str:
+    def question(self, *, part_name: str, whole_name: str) -> str:
         """
         :param part_name: What the part is called, such as ``"handle"``.
         :param whole_name: What the whole is called, such as ``"mug"``.
@@ -82,7 +82,7 @@ class PartBoxDetector(VisionModel):
 
     @abstractmethod
     def detect(
-        self, views: RenderedViews, part_name: str, whole_name: str
+        self, *, views: RenderedViews, part_name: str, whole_name: str
     ) -> list[NDArray[np.float64]]:
         """
         :param views: The views of the whole.
@@ -103,7 +103,7 @@ class BoxSegmenter(VisionModel):
 
     @abstractmethod
     def segment(
-        self, views: RenderedViews, boxes: list[NDArray[np.float64]]
+        self, *, views: RenderedViews, boxes: list[NDArray[np.float64]]
     ) -> NDArray[np.bool_]:
         """
         :param views: The views of the whole.
@@ -113,7 +113,7 @@ class BoxSegmenter(VisionModel):
         """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class KnownPartBoxDetector(PartBoxDetector):
     """
     Boxes the faces it is told belong to each part, wherever a view shows them: a stand-
@@ -126,14 +126,15 @@ class KnownPartBoxDetector(PartBoxDetector):
     """
 
     def detect(
-        self, views: RenderedViews, part_name: str, whole_name: str
+        self, *, views: RenderedViews, part_name: str, whole_name: str
     ) -> list[NDArray[np.float64]]:
         return [
             np.array(
                 [
                     box
                     for faces in self.part_faces.get(part_name, [])
-                    if (box := self._box_around(view_faces, faces)) is not None
+                    if (box := self._box_around(view_faces=view_faces, faces=faces))
+                    is not None
                 ],
                 dtype=np.float64,
             ).reshape(-1, 4)
@@ -142,7 +143,7 @@ class KnownPartBoxDetector(PartBoxDetector):
 
     @staticmethod
     def _box_around(
-        view_faces: NDArray[np.int64], faces: NDArray[np.int64]
+        *, view_faces: NDArray[np.int64], faces: NDArray[np.int64]
     ) -> list[int] | None:
         """
         :param view_faces: For each pixel of a view, the face it shows.
@@ -155,7 +156,7 @@ class KnownPartBoxDetector(PartBoxDetector):
         return [columns.min(), rows.min(), columns.max() + 1, rows.max() + 1]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class FilledBoxSegmenter(BoxSegmenter):
     """
     Masks all of the whole inside each box: a stand-in for a model wherever the boxes
@@ -163,7 +164,7 @@ class FilledBoxSegmenter(BoxSegmenter):
     """
 
     def segment(
-        self, views: RenderedViews, boxes: list[NDArray[np.float64]]
+        self, *, views: RenderedViews, boxes: list[NDArray[np.float64]]
     ) -> NDArray[np.bool_]:
         masks = np.zeros(views.faces.shape, dtype=bool)
         for mask, view_boxes in zip(masks, boxes):
@@ -175,7 +176,7 @@ class FilledBoxSegmenter(BoxSegmenter):
 # %% voting on the faces
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ViewVote:
     """
     Decides which faces of a mesh belong to a part from the masks of the part in views
@@ -195,7 +196,7 @@ class ViewVote:
     """
 
     def belongs_to_part_mask(
-        self, mesh: trimesh.Trimesh, views: RenderedViews, masks: NDArray[np.bool_]
+        self, *, mesh: trimesh.Trimesh, views: RenderedViews, masks: NDArray[np.bool_]
     ) -> NDArray[np.bool_]:
         """
         :param mesh: The mesh the views show.
@@ -223,6 +224,7 @@ class ViewVote:
 
     def confidence(
         self,
+        *,
         belongs_to_part_mask: NDArray[np.bool_],
         views: RenderedViews,
         masks: NDArray[np.bool_],
@@ -250,7 +252,7 @@ class ViewVote:
 # %% the locator
 
 
-@dataclass
+@dataclass(kw_only=True)
 class VisionLanguagePartLocator(PartLocator):
     """
     Locates parts by rendering the mesh, finding each part in the views with a detector
@@ -281,25 +283,33 @@ class VisionLanguagePartLocator(PartLocator):
     Decides from the masks which faces belong to a part.
     """
 
-    def locate(self, query: PartQuery) -> list[LocatedPart]:
+    def locate(self, *, query: PartQuery) -> list[LocatedPart]:
         mesh = query.mesh
-        views = self.cameras.render(mesh)
+        views = self.cameras.render(mesh=mesh)
         located = []
         for relationship in query.relationships:
             boxes = self.detector.detect(
-                views, relationship.part_name, query.whole_name
+                views=views,
+                part_name=relationship.part_name,
+                whole_name=query.whole_name,
             )
-            masks = self.segmenter.segment(views, boxes)
-            belongs_to_part_mask = self.vote.belongs_to_part_mask(mesh, views, masks)
+            masks = self.segmenter.segment(views=views, boxes=boxes)
+            belongs_to_part_mask = self.vote.belongs_to_part_mask(
+                mesh=mesh, views=views, masks=masks
+            )
             if not belongs_to_part_mask.any():
                 continue
             pieces = [
                 LocatedPart(
                     relationship_name=relationship.name,
                     faces=np.flatnonzero(piece),
-                    confidence=self.vote.confidence(piece, views, masks),
+                    confidence=self.vote.confidence(
+                        belongs_to_part_mask=piece, views=views, masks=masks
+                    ),
                 )
-                for piece in self._connected_pieces(mesh, belongs_to_part_mask)
+                for piece in self._connected_pieces(
+                    mesh=mesh, belongs_to_part_mask=belongs_to_part_mask
+                )
             ]
             if not relationship.holds_many:
                 pieces = [
@@ -317,7 +327,7 @@ class VisionLanguagePartLocator(PartLocator):
 
     @staticmethod
     def _connected_pieces(
-        mesh: trimesh.Trimesh, belongs_to_part_mask: NDArray[np.bool_]
+        *, mesh: trimesh.Trimesh, belongs_to_part_mask: NDArray[np.bool_]
     ) -> list[NDArray[np.bool_]]:
         """
         :param mesh: A mesh.

@@ -27,17 +27,17 @@ def test_camera_optical_forward_follows_head_forward(
     Optical forward points along the head's positive X axis.
     """
 
-    def find_head(root: KinematicStructureEntity, body_name: str) -> Body:
+    def find_head(*, branch_root: KinematicStructureEntity, name: str) -> Body:
         """
         Return the mounting body requested by the camera.
         """
-        assert root is table_world.root
-        assert body_name is TiagoMujocoBody.HEAD
+        assert branch_root is table_world.root
+        assert name is TiagoMujocoBody.HEAD
         return table_world.root
 
     monkeypatch.setattr(table_world, "get_body_in_branch_by_name", find_head)
     camera = TiagoMujocoCamera.setup_default_configuration_in_world_below_robot_root(
-        table_world.root
+        robot_root=table_world.root
     )
 
     assert isinstance(camera, RobotCamera)

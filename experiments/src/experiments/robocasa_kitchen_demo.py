@@ -253,7 +253,7 @@ def _counter_top_surface(world: World, counter: CounterTop) -> CounterSurface:
     surface_boxes = [
         box
         for box in counter.as_bounding_box_collection_in_frame(
-            world.root
+            reference_frame=world.root
         ).bounding_boxes
         if box.max_z < 2.0
     ]
@@ -290,7 +290,7 @@ def _largest_counter_top(world: World) -> CounterTop:
         :return: The counter's footprint area.
         """
         bounding_box = counter.as_bounding_box_collection_in_frame(
-            world.root
+            reference_frame=world.root
         ).bounding_box()
         return bounding_box.width * bounding_box.depth
 
@@ -325,11 +325,15 @@ def _spawn_robot_and_prepare_pick_up(
     """
     surface = _counter_top_surface(world, _largest_counter_top(world))
 
-    apple_world = RoboCasaDatasetLoader().load_object(RoboCasaObjectCategory.APPLE)
+    apple_world = RoboCasaDatasetLoader().load_object(
+        category=RoboCasaObjectCategory.APPLE
+    )
     apple_body = apple_world.bodies_with_collision[0]
     apple_name = apple_body.name
     apple_half_height = (
-        apple_body.collision.as_bounding_box_collection_in_frame(apple_world.root)
+        apple_body.collision.as_bounding_box_collection_in_frame(
+            reference_frame=apple_world.root
+        )
         .bounding_box()
         .height
         / 2
@@ -342,19 +346,19 @@ def _spawn_robot_and_prepare_pick_up(
     robot_yaw = -math.pi / 2
 
     pr2_world = URDFParser.from_file(
-        "package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
+        file_path="package://iai_pr2_description/robots/pr2_with_ft2_cableguide.xacro"
     ).create_world()
     with world.modify_world():
         drive = OmniDrive.create_with_dofs(
             parent=world.root, child=pr2_world.root, world=world
         )
-        world.merge_world(pr2_world, drive)
+        world.merge_world(other=pr2_world, root_connection=drive)
         drive.origin = HomogeneousTransformationMatrix.from_xyz_rpy(
             place_x, robot_y, 0.0, 0.0, 0.0, robot_yaw
         )
         world.merge_world_at_pose(
-            apple_world,
-            HomogeneousTransformationMatrix.from_xyz_quaternion(
+            other=apple_world,
+            pose=HomogeneousTransformationMatrix.from_xyz_quaternion(
                 place_x,
                 apple_y,
                 apple_z,
@@ -362,12 +366,16 @@ def _spawn_robot_and_prepare_pick_up(
             ),
         )
     with world.modify_world():
-        world.add_semantic_annotation(Apple(root=world.get_body_by_name(apple_name)))
+        world.add_semantic_annotation(
+            semantic_annotation=Apple(root=world.get_body_by_name(name=apple_name))
+        )
 
-    pr2 = PR2.from_world(world)
+    pr2 = PR2.from_world(world=world)
 
-    apple = world.get_body_by_name(apple_name)
-    apple_annotation = world.get_semantic_annotations_by_type(Apple)[0]
+    apple = world.get_body_by_name(name=apple_name)
+    apple_annotation = world.get_semantic_annotations_by_type(
+        semantic_annotation_type=Apple
+    )[0]
     plan = Sequence(
         nodes=[
             ParkArmsAction(arms=pr2.all_arms),
@@ -380,9 +388,9 @@ def _spawn_robot_and_prepare_pick_up(
     )
 
     def perform() -> None:
-        height_before = world.compute_forward_kinematics(world.root, apple).to_np()[
-            2, 3
-        ]
+        height_before = world.compute_forward_kinematics(
+            root=world.root, tip=apple
+        ).to_np()[2, 3]
         logger.info("Spawned PR2; parking arms, raising torso, picking up an apple ...")
         try:
             executor = KinematicallySimulatedPlanExecutor(
@@ -397,7 +405,9 @@ def _spawn_robot_and_prepare_pick_up(
         except PlanFailure as failure:
             logger.warning("Robot could not complete the pick-up: %s", failure)
             return
-        height_after = world.compute_forward_kinematics(world.root, apple).to_np()[2, 3]
+        height_after = world.compute_forward_kinematics(
+            root=world.root, tip=apple
+        ).to_np()[2, 3]
         lift = float(height_after - height_before)
         outcome = "PICKED UP" if lift > 0.01 else "not lifted"
         logger.info("Apple lifted by %.3f m -> %s", lift, outcome)

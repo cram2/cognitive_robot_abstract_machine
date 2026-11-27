@@ -33,13 +33,13 @@ logging.getLogger("physics_simulators").setLevel(logging.WARNING)
 
 world = load_kitchen(layout=LayoutType.LAYOUT001, style=StyleType.STYLE001)
 _spawn_robot_and_prepare_pick_up(world=world)
-(robot,) = world.get_semantic_annotations_by_type(PR2)
+(robot,) = world.get_semantic_annotations_by_type(semantic_annotation_type=PR2)
 arm = robot.right_arm
 
 # %% cell physics
 simulation = MujocoSim(world=world, headless=True)
 simulation.start_stepped_simulation()
-simulation.step_simulation(timedelta(seconds=1))
+simulation.step_simulation(duration=timedelta(seconds=1))
 
 
 def run(*actions: StatechartNode) -> PlanOutcome:

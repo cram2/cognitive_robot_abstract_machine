@@ -131,7 +131,7 @@ class TracyJoint(JointName):
     RIGHT_GRIPPER_RIGHT_KNUCKLE = "right_robotiq_85_right_knuckle_joint"
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class TracyLeftGripperLeftFinger(Finger):
     @classproperty
     def topic_name(cls) -> str:
@@ -148,19 +148,19 @@ class TracyLeftGripperLeftFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "left_robotiq_85_left_knuckle_link"
+                branch_root=robot_root, name="left_robotiq_85_left_knuckle_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "left_robotiq_85_left_finger_tip_link"
+                branch_root=robot_root, name="left_robotiq_85_left_finger_tip_link"
             ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class TracyLeftGripperRightFinger(Finger):
     @classproperty
     def topic_name(cls) -> str:
@@ -177,19 +177,19 @@ class TracyLeftGripperRightFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "left_robotiq_85_right_knuckle_link"
+                branch_root=robot_root, name="left_robotiq_85_right_knuckle_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "left_robotiq_85_right_finger_tip_link"
+                branch_root=robot_root, name="left_robotiq_85_right_finger_tip_link"
             ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class TracyRightGripperLeftFinger(Finger):
     @classproperty
     def topic_name(cls) -> str:
@@ -206,19 +206,19 @@ class TracyRightGripperLeftFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "right_robotiq_85_left_knuckle_link"
+                branch_root=robot_root, name="right_robotiq_85_left_knuckle_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "right_robotiq_85_left_finger_tip_link"
+                branch_root=robot_root, name="right_robotiq_85_left_finger_tip_link"
             ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class TracyRightGripperRightFinger(Finger):
     @classproperty
     def topic_name(cls) -> str:
@@ -235,19 +235,19 @@ class TracyRightGripperRightFinger(Finger):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "right_robotiq_85_right_knuckle_link"
+                branch_root=robot_root, name="right_robotiq_85_right_knuckle_link"
             ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "right_robotiq_85_right_finger_tip_link"
+                branch_root=robot_root, name="right_robotiq_85_right_finger_tip_link"
             ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class TracyLeftGripper(
     Robotiq85Gripper[TracyLeftGripperLeftFinger, TracyLeftGripperRightFinger],
     HasParallelGripperCommandServer,
@@ -265,18 +265,22 @@ class TracyLeftGripper(
 
     def setup_joint_states(self) -> list[JointState]:
         left_gripper_joints = [
-            self._world.get_connection_by_name(TracyJoint.LEFT_GRIPPER_LEFT_KNUCKLE),
-            self._world.get_connection_by_name(TracyJoint.LEFT_GRIPPER_RIGHT_KNUCKLE),
+            self._world.get_connection_by_name(
+                name=TracyJoint.LEFT_GRIPPER_LEFT_KNUCKLE
+            ),
+            self._world.get_connection_by_name(
+                name=TracyJoint.LEFT_GRIPPER_RIGHT_KNUCKLE
+            ),
         ]
 
         gripper_open = JointState.from_mapping(
-            name=PrefixedName("left_gripper_open", prefix=self.name.name),
+            name=PrefixedName(name="left_gripper_open", prefix=self.name.name),
             mapping=dict(zip(left_gripper_joints, [0.0, 0.0])),
             state_type=GripperState.OPEN,
         )
 
         gripper_close = JointState.from_mapping(
-            name=PrefixedName("left_gripper_close", prefix=self.name.name),
+            name=PrefixedName(name="left_gripper_close", prefix=self.name.name),
             mapping=dict(
                 zip(
                     left_gripper_joints,
@@ -300,19 +304,19 @@ class TracyLeftGripper(
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "left_robotiq_85_base_link"
+                branch_root=robot_root, name="left_robotiq_85_base_link"
             ),
             tool_frame=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "l_gripper_tool_frame"
+                branch_root=robot_root, name="l_gripper_tool_frame"
             ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class TracyRightGripper(
     Robotiq85Gripper[TracyRightGripperLeftFinger, TracyRightGripperRightFinger],
     HasParallelGripperCommandServer,
@@ -330,18 +334,22 @@ class TracyRightGripper(
 
     def setup_joint_states(self) -> list[JointState]:
         right_gripper_joints = [
-            self._world.get_connection_by_name(TracyJoint.RIGHT_GRIPPER_LEFT_KNUCKLE),
-            self._world.get_connection_by_name(TracyJoint.RIGHT_GRIPPER_RIGHT_KNUCKLE),
+            self._world.get_connection_by_name(
+                name=TracyJoint.RIGHT_GRIPPER_LEFT_KNUCKLE
+            ),
+            self._world.get_connection_by_name(
+                name=TracyJoint.RIGHT_GRIPPER_RIGHT_KNUCKLE
+            ),
         ]
 
         gripper_open = JointState.from_mapping(
-            name=PrefixedName("right_gripper_open", prefix=self.name.name),
+            name=PrefixedName(name="right_gripper_open", prefix=self.name.name),
             mapping=dict(zip(right_gripper_joints, [0.0, 0.0])),
             state_type=GripperState.OPEN,
         )
 
         gripper_close = JointState.from_mapping(
-            name=PrefixedName("right_gripper_close", prefix=self.name.name),
+            name=PrefixedName(name="right_gripper_close", prefix=self.name.name),
             mapping=dict(zip(right_gripper_joints, [0.8, -0.8])),
             state_type=GripperState.CLOSE,
         )
@@ -358,19 +366,19 @@ class TracyRightGripper(
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "right_robotiq_85_base_link"
+                branch_root=robot_root, name="right_robotiq_85_base_link"
             ),
             tool_frame=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "r_gripper_tool_frame"
+                branch_root=robot_root, name="r_gripper_tool_frame"
             ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class TracyLeftArm(UR10eArm[TracyLeftGripper]):
     @classproperty
     def topic_name(cls) -> str:
@@ -385,7 +393,7 @@ class TracyLeftArm(UR10eArm[TracyLeftGripper]):
     def setup_joint_states(self) -> list[JointState]:
         connections = self.active_connections
         arm_park = JointState.from_mapping(
-            name=PrefixedName("left_arm_park", prefix=self.name.name),
+            name=PrefixedName(name="left_arm_park", prefix=self.name.name),
             mapping=dict(zip(connections, [2.62, -1.035, 1.13, -0.966, -0.88, 2.07])),
             state_type=StaticJointState.PARK,
         )
@@ -393,17 +401,19 @@ class TracyLeftArm(UR10eArm[TracyLeftGripper]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "table"),
+            root=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="table"
+            ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "left_wrist_3_link"
+                branch_root=robot_root, name="left_wrist_3_link"
             ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class TracyRightArm(UR10eArm[TracyRightGripper]):
     @classproperty
     def topic_name(cls) -> str:
@@ -418,7 +428,7 @@ class TracyRightArm(UR10eArm[TracyRightGripper]):
     def setup_joint_states(self) -> list[JointState]:
         connections = self.active_connections
         arm_park = JointState.from_mapping(
-            name=PrefixedName("right_arm_park", prefix=self.name.name),
+            name=PrefixedName(name="right_arm_park", prefix=self.name.name),
             mapping=dict(zip(connections, [3.72, -2.07, -1.17, 4.0, 0.82, 0.75])),
             state_type=StaticJointState.PARK,
         )
@@ -426,17 +436,19 @@ class TracyRightArm(UR10eArm[TracyRightGripper]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
-            root=robot_root._world.get_body_in_branch_by_name(robot_root, "table"),
+            root=robot_root._world.get_body_in_branch_by_name(
+                branch_root=robot_root, name="table"
+            ),
             tip=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "right_wrist_3_link"
+                branch_root=robot_root, name="right_wrist_3_link"
             ),
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class TracyCamera(RobotCamera[FieldOfViewCameraModel]):
     """
     Tracy's fixed camera rooted at its calibrated camera link.
@@ -450,11 +462,11 @@ class TracyCamera(RobotCamera[FieldOfViewCameraModel]):
 
     @classmethod
     def setup_default_configuration_in_world_below_robot_root(
-        cls, robot_root: KinematicStructureEntity
+        cls, *, robot_root: KinematicStructureEntity
     ) -> Self:
         return cls(
             root=robot_root._world.get_body_in_branch_by_name(
-                robot_root, "camera_link"
+                branch_root=robot_root, name="camera_link"
             ),
             camera_model=FieldOfViewCameraModel(
                 angular_extent=FieldOfView(horizontal_angle=1.047, vertical_angle=0.785)
@@ -465,7 +477,7 @@ class TracyCamera(RobotCamera[FieldOfViewCameraModel]):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class TracyTable(MountingTable):
     """
     The table Tracy's arms are bolted onto.
@@ -480,7 +492,7 @@ class TracyTable(MountingTable):
             self.root.collision, key=lambda shape: shape.scale.x * shape.scale.y
         )
         root_transform_table = self._world.compute_forward_kinematics_np(
-            self._world.root, self.root
+            root=self._world.root, tip=self.root
         )
         return float(
             root_transform_table[2, 3]
@@ -489,7 +501,7 @@ class TracyTable(MountingTable):
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class Tracy(
     AbstractRobot,
     HasLeftRightArm[TracyLeftArm, TracyRightArm],
@@ -518,11 +530,13 @@ class Tracy(
             "tracy.srdf",
         )
         self._world.collision_manager.add_ignore_collision_rule(
-            SelfCollisionMatrixRule.from_collision_srdf(srdf_path, self._world)
+            rule=SelfCollisionMatrixRule.from_collision_srdf(
+                file_path=srdf_path, world=self._world
+            )
         )
 
         self._world.collision_manager.extend_default_rules(
-            [
+            rules=[
                 AvoidExternalCollisions(
                     buffer_zone_distance=0.05, violated_distance=0.0, robot=self
                 ),
@@ -558,7 +572,7 @@ class Tracy(
         )
         arm_scale = min(1.0, 0.2 / fastest_arm_velocity)
         self.tighten_dof_velocity_limits_of_1dof_connections(
-            {
+            new_limits={
                 connection: connection.raw_dof.limits.upper.velocity
                 * (arm_scale if connection in arm_connections else 1.0)
                 for connection in self._one_dof_connections

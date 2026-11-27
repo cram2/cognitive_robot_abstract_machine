@@ -23,9 +23,9 @@ def visual_world_bounds(world: World, body_name: str) -> np.ndarray:
     """
     Return a body's visual mesh bounds in the world root frame.
     """
-    body = world.get_body_by_name(body_name)
+    body = world.get_body_by_name(name=body_name)
     mesh = body.visual.combined_mesh.copy()
-    mesh.apply_transform(world.compute_forward_kinematics_np(world.root, body))
+    mesh.apply_transform(world.compute_forward_kinematics_np(root=world.root, tip=body))
     return mesh.bounds
 
 
@@ -50,7 +50,7 @@ def test_module_1_front_piece_is_59_5_centimeters_wide(body_name: str) -> None:
     Each Module 1 front piece should be narrower than the cabinet carcass.
     """
     world = KitchenEnvironment().create_world()
-    body = world.get_body_by_name(body_name)
+    body = world.get_body_by_name(name=body_name)
 
     assert np.isclose(body.visual.combined_mesh.extents[1], 0.595)
 
@@ -112,12 +112,14 @@ def test_the_sideboard_is_a_kitchen_island_built_from_its_corpus_under_its_workt
     worktop is the island's counter top, as in the other modelled kitchens.
     """
     world = KitchenEnvironment().create_world()
-    [island] = world.get_semantic_annotations_by_type(KitchenIsland)
+    [island] = world.get_semantic_annotations_by_type(
+        semantic_annotation_type=KitchenIsland
+    )
 
     assert island.cabinets == [
-        world.get_semantic_annotation_by_name("sideboard_cabinet")
+        world.get_semantic_annotation_by_name(name="sideboard_cabinet")
     ]
-    assert island.counter_top is world.get_semantic_annotation_by_name("sideboard")
+    assert island.counter_top is world.get_semantic_annotation_by_name(name="sideboard")
     assert isinstance(island.counter_top, CounterTop)
 
 
@@ -126,8 +128,8 @@ def test_the_island_worktop_still_carries_its_cooktop() -> None:
     Naming the worktop a counter top must not lose what stands on it.
     """
     world = KitchenEnvironment().create_world()
-    worktop = world.get_semantic_annotation_by_name("sideboard")
+    worktop = world.get_semantic_annotation_by_name(name="sideboard")
 
-    assert worktop.get_objects_of_type(Cooktop) == [
-        world.get_semantic_annotation_by_name("sideboard_cooktop")
+    assert worktop.get_objects_of_type(object_type=Cooktop) == [
+        world.get_semantic_annotation_by_name(name="sideboard_cooktop")
     ]

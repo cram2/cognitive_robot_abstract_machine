@@ -28,7 +28,7 @@ from semantic_digital_twin.world_description.world_entity import (
 )
 
 
-@dataclass
+@dataclass(kw_only=True)
 class CollisionCheckingResult:
     """
     Result of a collision checking operation.
@@ -48,7 +48,7 @@ class CollisionCheckingResult:
         return len(self.contacts) > 0
 
 
-@dataclass
+@dataclass(kw_only=True)
 class ClosestPoints:
     """
     Encapsulates the closest points data between two bodies returned by the collision
@@ -115,7 +115,7 @@ class ClosestPoints:
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class CollisionDetectorModelUpdater(ModelChangeCallback):
     """
     Updates and compiles the collision detector's collision forward kinematics
@@ -154,7 +154,9 @@ class CollisionDetectorModelUpdater(ModelChangeCallback):
                     collision_fks.append(HomogeneousTransformationMatrix())
                 continue
             collision_fks.append(
-                self._world.compose_forward_kinematics_expression(world_root, body)
+                self._world.compose_forward_kinematics_expression(
+                    root=world_root, tip=body
+                )
             )
         collision_fks = Matrix.vstack(list_of_matrices=collision_fks)
 
@@ -172,7 +174,7 @@ class CollisionDetectorModelUpdater(ModelChangeCallback):
         return self.compiled_collision_fks.evaluate()
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class CollisionDetectorStateUpdater(StateChangeCallback):
     """
     Updates the collision detector's collision FK cache when the world state changes.
@@ -194,7 +196,7 @@ class CollisionDetectorStateUpdater(StateChangeCallback):
         self.collision_detector.sync_world_state()
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class CollisionDetector(WorldEntityWithClassBasedID, abc.ABC):
     """
     Abstract class for collision detectors.
@@ -216,7 +218,7 @@ class CollisionDetector(WorldEntityWithClassBasedID, abc.ABC):
     def get_all_collision_fks(self) -> np.ndarray:
         return self.world_model_updater.compiled_collision_fks._out
 
-    def get_collision_fk(self, body_id: UUID):
+    def get_collision_fk(self, *, body_id: UUID):
         pass
 
     @abc.abstractmethod
@@ -233,7 +235,7 @@ class CollisionDetector(WorldEntityWithClassBasedID, abc.ABC):
 
     @abc.abstractmethod
     def check_collisions(
-        self, collision_matrix: CollisionMatrix
+        self, *, collision_matrix: CollisionMatrix
     ) -> CollisionCheckingResult:
         """
         Computes the collisions for all checks in the collision matrix.
@@ -244,7 +246,7 @@ class CollisionDetector(WorldEntityWithClassBasedID, abc.ABC):
         """
 
     def check_collision_between_bodies(
-        self, body_a: Body, body_b: Body, distance: float = 0.0
+        self, *, body_a: Body, body_b: Body, distance: float = 0.0
     ) -> ClosestPoints | None:
         """
         Checks for collisions between two bodies.
@@ -256,8 +258,12 @@ class CollisionDetector(WorldEntityWithClassBasedID, abc.ABC):
             None.
         """
         collision = self.check_collisions(
-            CollisionMatrix(
-                {CollisionCheck.create_and_validate(body_a, body_b, distance)}
+            collision_matrix=CollisionMatrix(
+                collision_checks={
+                    CollisionCheck.create_and_validate(
+                        body_a=body_a, body_b=body_b, distance=distance
+                    )
+                }
             )
         )
         return collision.contacts[0] if collision.any() else None

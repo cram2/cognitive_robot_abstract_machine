@@ -42,7 +42,7 @@ def test_load_kitchen(robocasa_loader):
 
 def test_load_kitchen_appliance(robocasa_loader):
     world = robocasa_loader.load_kitchen_appliance(
-        RoboCasaKitchenApplianceCategory.CABINET
+        category=RoboCasaKitchenApplianceCategory.CABINET
     )
     assert len(world.bodies) > 0
     assert len(world.semantic_annotations) >= 1
@@ -53,7 +53,7 @@ def test_load_kitchen_appliance_attaches_matching_annotation(robocasa_loader):
     The loaded appliance is annotated with the semantic type of the requested category.
     """
     world = robocasa_loader.load_kitchen_appliance(
-        RoboCasaKitchenApplianceCategory.DISHWASHER
+        category=RoboCasaKitchenApplianceCategory.DISHWASHER
     )
     assert any(
         isinstance(annotation, Dishwasher) for annotation in world.semantic_annotations
@@ -61,7 +61,7 @@ def test_load_kitchen_appliance_attaches_matching_annotation(robocasa_loader):
 
 
 def test_load_object(robocasa_loader):
-    world = robocasa_loader.load_object(RoboCasaObjectCategory.APPLE)
+    world = robocasa_loader.load_object(category=RoboCasaObjectCategory.APPLE)
     assert len(world.bodies) > 0
     annotations = world.semantic_annotations
     assert len(annotations) == 1
@@ -72,7 +72,7 @@ def test_load_object_from_group_without_objaverse_assets(robocasa_loader):
     """
     A category with no objaverse assets still loads from another self-contained group.
     """
-    world = robocasa_loader.load_object(RoboCasaObjectCategory.POT)
+    world = robocasa_loader.load_object(category=RoboCasaObjectCategory.POT)
     assert len(world.bodies) > 0
 
 
@@ -84,7 +84,7 @@ def test_load_task_binds_instruction_and_world(robocasa_loader):
     from robocasa.models.scenes.scene_registry import LayoutType, StyleType
 
     task = robocasa_loader.load_task(
-        "TurnOnMicrowave",
+        task_name="TurnOnMicrowave",
         layout_id=LayoutType.LAYOUT001,
         style_id=StyleType.STYLE001,
     )
@@ -100,7 +100,7 @@ def test_load_task_omits_robot(robocasa_loader):
     from robocasa.models.scenes.scene_registry import LayoutType, StyleType
 
     task = robocasa_loader.load_task(
-        "TurnOnMicrowave",
+        task_name="TurnOnMicrowave",
         layout_id=LayoutType.LAYOUT001,
         style_id=StyleType.STYLE001,
     )
@@ -117,7 +117,7 @@ def test_load_task_manipulated_objects_are_in_world(robocasa_loader):
     from robocasa.models.scenes.scene_registry import LayoutType, StyleType
 
     task = robocasa_loader.load_task(
-        "TurnOnMicrowave",
+        task_name="TurnOnMicrowave",
         layout_id=LayoutType.LAYOUT001,
         style_id=StyleType.STYLE001,
     )
@@ -134,7 +134,7 @@ def test_load_task_unknown_name_raises(robocasa_loader):
 
     with pytest.raises(RoboCasaTaskNotFoundError):
         robocasa_loader.load_task(
-            "ThisTaskDoesNotExist",
+            task_name="ThisTaskDoesNotExist",
             layout_id=LayoutType.LAYOUT001,
             style_id=StyleType.STYLE001,
         )

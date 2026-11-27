@@ -85,7 +85,7 @@ TGenericLidar = TypeVar("TGenericLidar")
 TGenericInputSource = TypeVar("TGenericInputSource", bound=InputSource)
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class RobotPartMixin(ABC):
     """
     Base mixin class for robot parts.
@@ -104,7 +104,7 @@ class RobotPartMixin(ABC):
         """
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasFingers(
     Generic[TGenericThumb, Unpack[TGenericFingers]],
     SubClassSafeGeneric,
@@ -149,7 +149,7 @@ class HasFingers(
 # %% the fingertips a gripper closes with
 
 
-@dataclass
+@dataclass(kw_only=True)
 class Fingertips:
     """
     The pair of fingertips a two-finger gripper closes an object between.
@@ -201,7 +201,7 @@ class Fingertips:
         :meth:`~semantic_digital_twin.world.World.reset_state_context` to read it for a
         state the gripper is not standing in.
         """
-        thumb, finger = (self._bounding_box(tip).center for tip in self.both)
+        thumb, finger = (self._bounding_box(tip=tip).center for tip in self.both)
         return thumb.midpoint(finger)
 
     # %% how wide they stand
@@ -229,7 +229,9 @@ class Fingertips:
         :attr:`tool_frame`.
         """
         thumb, finger = (
-            self._closing_axis_coordinate(self._bounding_box(tip).center)
+            self._closing_axis_coordinate(
+                tool_P_point=self._bounding_box(tip=tip).center
+            )
             for tip in self.both
         )
         if thumb < finger:
@@ -242,7 +244,9 @@ class Fingertips:
         The point of the thumb's tip that reaches furthest towards the finger's along
         :attr:`closing_axis`, in the thumb tip's own frame.
         """
-        return self._facing_point(self.thumb, -self.tool_V_finger_to_thumb)
+        return self._facing_point(
+            tip=self.thumb, tool_V_towards_other_tip=-self.tool_V_finger_to_thumb
+        )
 
     @property
     def finger_P_facing_point(self) -> Point3:
@@ -250,7 +254,9 @@ class Fingertips:
         The point of the finger's tip that reaches furthest towards the thumb's along
         :attr:`closing_axis`, in the finger tip's own frame.
         """
-        return self._facing_point(self.finger, self.tool_V_finger_to_thumb)
+        return self._facing_point(
+            tip=self.finger, tool_V_towards_other_tip=self.tool_V_finger_to_thumb
+        )
 
     # %% reading the geometry
 
@@ -261,7 +267,7 @@ class Fingertips:
         """
         return self.thumb._world
 
-    def _facing_point(self, tip: Body, tool_V_towards_other_tip: Vector3) -> Point3:
+    def _facing_point(self, *, tip: Body, tool_V_towards_other_tip: Vector3) -> Point3:
         """
         :param tip: One of the two tips.
         :param tool_V_towards_other_tip: The direction towards the other tip, in
@@ -269,8 +275,12 @@ class Fingertips:
         :return: The corner of the tip's collision bounding box, taken in the tip's own
             frame, that reaches furthest in that direction, in the tip's own frame.
         """
-        box = tip.collision.as_bounding_box_collection_in_frame(tip).bounding_box()
-        tool_T_tip = self._world.compute_forward_kinematics(self.tool_frame, tip)
+        box = tip.collision.as_bounding_box_collection_in_frame(
+            reference_frame=tip
+        ).bounding_box()
+        tool_T_tip = self._world.compute_forward_kinematics(
+            root=self.tool_frame, tip=tip
+        )
         corners = (
             Point3(*corner, reference_frame=tip)
             for corner in product(
@@ -284,16 +294,16 @@ class Fingertips:
             ),
         )
 
-    def _bounding_box(self, tip: Body) -> BoundingBox:
+    def _bounding_box(self, *, tip: Body) -> BoundingBox:
         """
         :param tip: One of the two tips.
         :return: Its collision bounding box, in :attr:`tool_frame`.
         """
         return tip.collision.as_bounding_box_collection_in_frame(
-            self.tool_frame
+            reference_frame=self.tool_frame
         ).bounding_box()
 
-    def _closing_axis_coordinate(self, tool_P_point: Point3) -> float:
+    def _closing_axis_coordinate(self, *, tool_P_point: Point3) -> float:
         """
         :param tool_P_point: A point in :attr:`tool_frame`.
         :return: Where it lies along :attr:`closing_axis`.
@@ -301,7 +311,7 @@ class Fingertips:
         return float(tool_P_point.vector3.dot(self.closing_axis))
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasTwoFingers(
     Generic[TGenericLeftFinger, TGenericRightFinger],
     HasFingers[TGenericLeftFinger, TGenericRightFinger],
@@ -382,14 +392,16 @@ class HasTwoFingers(
         fingertips = self.fingertips
         with self._world.reset_state_context():
             open_P_grasp, closed_P_grasp = (
-                self._meeting_point_in_state(fingertips, state_type)
+                self._meeting_point_in_state(
+                    fingertips=fingertips, state_type=state_type
+                )
                 for state_type in (GripperState.OPEN, GripperState.CLOSE)
             )
         travelled = closed_P_grasp - open_P_grasp
         return float(travelled.dot(self.approach_axis))
 
     def _meeting_point_in_state(
-        self, fingertips: Fingertips, state_type: JointStateType
+        self, *, fingertips: Fingertips, state_type: JointStateType
     ) -> Point3:
         """
         :param fingertips: The tips to read.
@@ -399,7 +411,7 @@ class HasTwoFingers(
         ..warning:: This leaves the gripper standing in that state. Call it inside a
             :meth:`~semantic_digital_twin.world.World.reset_state_context`.
         """
-        self.get_joint_state_by_type(state_type).apply_to(self._world)
+        self.get_joint_state_by_type(state_type=state_type).apply_to(world=self._world)
         return fingertips.tool_P_grasp
 
     @cached_property
@@ -418,7 +430,9 @@ class HasTwoFingers(
         :attr:`Fingertips.tool_P_grasp` for fingers that only slide.
         """
         with self._world.reset_state_context():
-            return self._meeting_point_in_state(self.fingertips, GripperState.CLOSE)
+            return self._meeting_point_in_state(
+                fingertips=self.fingertips, state_type=GripperState.CLOSE
+            )
 
     @cached_property
     def separation_when_open(self) -> float:
@@ -428,17 +442,19 @@ class HasTwoFingers(
 
         A constant of the gripper's description, read once and kept.
         """
-        return self.separation_in(GripperState.OPEN)
+        return self.separation_in(state_type=GripperState.OPEN)
 
-    def separation_in(self, state_type: JointStateType) -> float:
+    def separation_in(self, *, state_type: JointStateType) -> float:
         """
         :param state_type: The state to stand the gripper in.
         :return: How far apart the fingertips' facing surfaces stand with the gripper in
             the joint state of that type, see :meth:`separation_at`.
         """
-        return self.separation_at(self.get_joint_state_by_type(state_type))
+        return self.separation_at(
+            joint_state=self.get_joint_state_by_type(state_type=state_type)
+        )
 
-    def separation_at(self, joint_state: JointState) -> float:
+    def separation_at(self, *, joint_state: JointState) -> float:
         """
         :param joint_state: The joint state to stand the gripper in.
         :return: How far apart the fingertips' facing surfaces stand with the gripper in
@@ -446,7 +462,7 @@ class HasTwoFingers(
             stands as it did afterwards.
         """
         with self._world.reset_state_context():
-            joint_state.apply_to(self._world)
+            joint_state.apply_to(world=self._world)
             return self.fingertips.separation
 
     @property
@@ -463,7 +479,7 @@ class HasTwoFingers(
 
     # %% reaching and reading back a grasp
 
-    def tool_frame_goal_for_grasp(self, grasp_pose: Pose) -> Pose:
+    def tool_frame_goal_for_grasp(self, *, grasp_pose: Pose) -> Pose:
         """
         Express a grasp frame as the goal that puts :attr:`tool_P_grasp_when_closed` on
         it.
@@ -471,7 +487,9 @@ class HasTwoFingers(
         :param grasp_pose: The grasp frame to meet.
         :return: The pose the tool frame has to reach, in ``grasp_pose``'s frame.
         """
-        return self.tool_frame_goal_for_point(self.tool_P_grasp_when_closed, grasp_pose)
+        return self.tool_frame_goal_for_point(
+            tool_P_point=self.tool_P_grasp_when_closed, grasp_pose=grasp_pose
+        )
 
     @property
     def held_body_T_grasp(self) -> Pose:
@@ -481,10 +499,10 @@ class HasTwoFingers(
 
         :return: The grasp frame, in the held body's frame.
         """
-        return self.held_body_T_grasp_at(self.tool_P_grasp_when_closed)
+        return self.held_body_T_grasp_at(tool_P_point=self.tool_P_grasp_when_closed)
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasSensors(
     Generic[Unpack[TGenericSensors]], SubClassSafeGeneric, RobotPartMixin, ABC
 ):
@@ -506,7 +524,7 @@ class HasSensors(
         super().validate()
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasEndEffector(
     Generic[TGenericEndEffector], SubClassSafeGeneric, RobotPartMixin, ABC
 ):
@@ -529,7 +547,7 @@ class HasEndEffector(
         super().validate()
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasArms(Generic[Unpack[TGenericArms]], SubClassSafeGeneric, RobotPartMixin, ABC):
     """
     Mixin class for robots or robot parts that have arms as their direct children.
@@ -553,7 +571,7 @@ class HasArms(Generic[Unpack[TGenericArms]], SubClassSafeGeneric, RobotPartMixin
         super().validate()
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasOneArm(HasArms[TGenericArm], RobotPartMixin, ABC):
     """
     Mixin class for robots or robot parts that have exactly one arm.
@@ -578,7 +596,7 @@ class HasOneArm(HasArms[TGenericArm], RobotPartMixin, ABC):
         return arm
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasLeftRightArm(
     HasArms[TGenericLeftArm, TGenericRightArm],
     SubClassSafeGeneric,
@@ -614,16 +632,16 @@ class HasLeftRightArm(
     def left_arm(self) -> TGenericLeftArm:
         from semantic_digital_twin.reasoning.predicates import LeftOf
 
-        return self._assign_left_right_arms(LeftOf)
+        return self._assign_left_right_arms(relation=LeftOf)
 
     @cached_property
     def right_arm(self) -> TGenericRightArm:
         from semantic_digital_twin.reasoning.predicates import RightOf
 
-        return self._assign_left_right_arms(RightOf)
+        return self._assign_left_right_arms(relation=RightOf)
 
     def _assign_left_right_arms(
-        self, relation: type[LeftOf | RightOf]
+        self, *, relation: type[LeftOf | RightOf]
     ) -> TGenericLeftArm | TGenericRightArm:
         """
         Assigns the left and right arms based on their position relative to the robot's
@@ -653,7 +671,7 @@ class HasLeftRightArm(
         )
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasMobileBase(
     Generic[TGenericMobileBase], SubClassSafeGeneric, RobotPartMixin, ABC
 ):
@@ -675,7 +693,7 @@ class HasMobileBase(
         super().validate()
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasMountingTable(
     Generic[TGenericMountingTable], SubClassSafeGeneric, RobotPartMixin, ABC
 ):
@@ -692,7 +710,7 @@ class HasMountingTable(
         assert self.table is not None, "Expected table, got None"
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasTorso(Generic[TGenericTorso], SubClassSafeGeneric, RobotPartMixin, ABC):
     """
     Mixin class for robots or robot parts that have a torso as their direct child.
@@ -712,7 +730,7 @@ class HasTorso(Generic[TGenericTorso], SubClassSafeGeneric, RobotPartMixin, ABC)
         super().validate()
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasNeck(Generic[TGenericNeck], SubClassSafeGeneric, RobotPartMixin, ABC):
     """
     Mixin class for robots or robot parts that have a neck as their direct child.
@@ -732,7 +750,7 @@ class HasNeck(Generic[TGenericNeck], SubClassSafeGeneric, RobotPartMixin, ABC):
         super().validate()
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasLidar(Generic[TGenericLidar], SubClassSafeGeneric, RobotPartMixin, ABC):
     """
     Mixin class for robots or robot parts that have a lidar as their direct child.
@@ -761,7 +779,7 @@ class HasLidar(Generic[TGenericLidar], SubClassSafeGeneric, RobotPartMixin, ABC)
 # %% where a part is read from
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, kw_only=True)
 class HasInputSource(
     Generic[TGenericInputSource], SubClassSafeGeneric, RobotPartMixin, ABC
 ):
@@ -821,7 +839,7 @@ class HasInputSource(
         """
 
     @abstractmethod
-    def real_source(self, node: Node) -> TGenericInputSource:
+    def real_source(self, *, node: Node) -> TGenericInputSource:
         """
         :param node: The ros node the messages are received on.
         :return: The source reading this part from the robot itself, on the topic this
@@ -832,9 +850,9 @@ class HasInputSource(
         """
         Read this part from the world it stands in.
         """
-        self.use_source(self.simulated_source())
+        self.use_source(source=self.simulated_source())
 
-    def use_real_source(self, node: Node) -> None:
+    def use_real_source(self, *, node: Node) -> None:
         """
         Read this part from the robot itself, on the topic it declares.
 
@@ -843,9 +861,9 @@ class HasInputSource(
         """
         if self.topic_name is None:
             raise UndeclaredTopicError(robot_part=self)
-        self.use_source(self.real_source(node))
+        self.use_source(source=self.real_source(node=node))
 
-    def use_source(self, source: TGenericInputSource) -> None:
+    def use_source(self, *, source: TGenericInputSource) -> None:
         """
         Read this part from the given source from now on, releasing the one it was read
         from before.

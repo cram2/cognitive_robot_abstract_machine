@@ -28,7 +28,7 @@ except ImportError:
 SAPIEN_ACCESS_TOKEN_ENVIRONMENT_VARIABLE_NAME = "SAPIEN_ACCESS_TOKEN"
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PartNetMobilityDatasetLoader:
     """
     Loader for articulated assets from the PartNet-Mobility dataset (https://sapien.ucsd.edu/browse).
@@ -67,7 +67,7 @@ class PartNetMobilityDatasetLoader:
     The default velocity value to use for limit tags in the URDF files.
     """
 
-    def load(self, model_id: int = 179) -> World:
+    def load(self, *, model_id: int = 179) -> World:
         """
         Load a world given the model id.
 
@@ -90,10 +90,10 @@ class PartNetMobilityDatasetLoader:
                 base_directory=self.directory / str(model_id)
             ),
         ).create_world()
-        self._apply_semantics_to_world(world, model_id)
+        self._apply_semantics_to_world(world=world, model_id=model_id)
         return world
 
-    def _apply_semantics_to_world(self, world: World, model_id: int):
+    def _apply_semantics_to_world(self, *, world: World, model_id: int):
         """
         Apply the semantics of a model to the world by creating semantic annotations.
 
@@ -112,16 +112,16 @@ class PartNetMobilityDatasetLoader:
             link_labels[link_name] = label
 
         for link_name, label in link_labels.items():
-            body = world.get_body_by_name(link_name)
+            body = world.get_body_by_name(name=link_name)
             [part_net_semantic_annotations_class] = [
                 cls for cls in recursive_subclasses(PartNetLabel) if label in cls.labels
             ]
             semantic_annotation = part_net_semantic_annotations_class(root=body)
 
             with world.modify_world():
-                world.add_semantic_annotation(semantic_annotation)
+                world.add_semantic_annotation(semantic_annotation=semantic_annotation)
 
-    def _add_missing_information_to_limit_tags(self, file_path: str):
+    def _add_missing_information_to_limit_tags(self, *, file_path: str):
         """
         Add the missing information to all limit tags in a URDF file.
 
@@ -153,7 +153,7 @@ class PartNetMobilityDatasetLoader:
 
             for line in lines:
                 _, _, label = line.strip().split(" ")
-                labels[self.class_name_from_label(label)].add(label)
+                labels[self.class_name_from_label(label=label)].add(label)
 
         # generate class descriptions
         class_descriptions = [
@@ -188,7 +188,7 @@ class PartNetMobilityDatasetLoader:
         subprocess.run(command, capture_output=True, text=True, check=True)
 
     @classmethod
-    def class_name_from_label(cls, label: str) -> str:
+    def class_name_from_label(cls, *, label: str) -> str:
         # remove _body
         label = label.replace("_body", "")
 
@@ -204,7 +204,7 @@ class PartNetMobilityDatasetLoader:
         return [int(directory.name) for directory in self.directory.glob("*")]
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PartNetLabelClassDescription:
     """
     Class description for a PartNet label.

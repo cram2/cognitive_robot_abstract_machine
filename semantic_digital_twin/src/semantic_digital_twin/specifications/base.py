@@ -24,7 +24,7 @@ TWorldEntity = TypeVar("TWorldEntity", bound=WorldEntity)
 # %% specification base classes
 
 
-@dataclass
+@dataclass(kw_only=True)
 class NamedSpecification(ABC):
     """
     Base for every specification: it carries a name and normalizes it.
@@ -41,7 +41,7 @@ class NamedSpecification(ABC):
     ``None`` defers naming to materialization.
     """
 
-    def _resolved_name(self, name: str | None = None) -> PrefixedName | None:
+    def _resolved_name(self, *, name: str | None = None) -> PrefixedName | None:
         """
         Normalize the spawn-time name override, or the spec's own name, into a
         :class:`PrefixedName`.
@@ -59,7 +59,7 @@ class NamedSpecification(ABC):
         return PrefixedName(name=used_name)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class SpawnSpecification(NamedSpecification, Generic[TWorldEntity], ABC):
     """
     Specification for a world entity that materializes itself together with the
@@ -71,6 +71,7 @@ class SpawnSpecification(NamedSpecification, Generic[TWorldEntity], ABC):
     @abstractmethod
     def spawn(
         self,
+        *,
         world: World,
         name: str | None = None,
         parent: KinematicStructureEntity | None = None,

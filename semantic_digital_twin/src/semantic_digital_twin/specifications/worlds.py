@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 # %% world specifications
 
 
-@dataclass
+@dataclass(kw_only=True)
 class WorldSpecification(WorldSource):
     """
     World-independent description of a world: an environment, the robots in it, and
@@ -49,8 +49,8 @@ class WorldSpecification(WorldSource):
     @classmethod
     def from_urdf(
         cls,
-        file_path: str,
         *,
+        file_path: str,
         prefix: str | None = None,
         path_resolver: PathResolver | None = None,
         robots: list[RobotSpecification] | None = None,
@@ -68,7 +68,7 @@ class WorldSpecification(WorldSource):
         :return: The created specification.
         """
         world_source = URDFParser.from_file(
-            file_path, prefix=prefix, path_resolver=path_resolver
+            file_path=file_path, prefix=prefix, path_resolver=path_resolver
         )
         return cls(
             world_source=world_source,
@@ -79,8 +79,8 @@ class WorldSpecification(WorldSource):
     @classmethod
     def from_mjcf(
         cls,
-        file_path: str,
         *,
+        file_path: str,
         prefix: str | None = None,
         mimic_joints: dict[str, str] | None = None,
         use_visual_as_collision_backup: bool = False,
@@ -118,8 +118,8 @@ class WorldSpecification(WorldSource):
     @classmethod
     def from_gazebo(
         cls,
-        file_path: str,
         *,
+        file_path: str,
         prefix: str | None = None,
         path_resolver: PathResolver | None = None,
         robots: list[RobotSpecification] | None = None,
@@ -141,7 +141,7 @@ class WorldSpecification(WorldSource):
         from semantic_digital_twin.adapters.gazebo import GazeboParser
 
         world_source = GazeboParser.from_file(
-            file_path, prefix=prefix, path_resolver=path_resolver
+            file_path=file_path, prefix=prefix, path_resolver=path_resolver
         )
         return cls(
             world_source=world_source,
@@ -163,9 +163,9 @@ class WorldSpecification(WorldSource):
         else:
             world = World.create_with_root_body()
         for robot_specification in self.robots:
-            robot_specification.spawn(world)
+            robot_specification.spawn(world=world)
 
         for object_specification in self.objects:
-            object_specification.spawn(world)
+            object_specification.spawn(world=world)
 
         return world

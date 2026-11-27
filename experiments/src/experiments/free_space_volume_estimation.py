@@ -97,16 +97,18 @@ class ObstacleContainmentChecker:
             watertight; defaults to a VHACD decomposer tuned for speed.
         """
         world_bounding_box = shape.local_frame_bounding_box.transform_to_origin(
-            HomogeneousTransformationMatrix(reference_frame=target_frame)
+            reference_T_new_origin=HomogeneousTransformationMatrix(
+                reference_frame=target_frame
+            )
         )
-        world_mesh = shape.mesh_in_frame(target_frame)
+        world_mesh = shape.mesh_in_frame(target_frame=target_frame)
         if world_mesh.is_watertight:
             return cls([world_mesh], world_bounding_box)
 
         decomposer = mesh_decomposer or _default_mesh_decomposer()
         world_meshes = [
-            piece.mesh_in_frame(target_frame)
-            for piece in decomposer.apply_to_shape(shape)
+            piece.mesh_in_frame(target_frame=target_frame)
+            for piece in decomposer.apply_to_shape(shape=shape)
         ]
         return cls(world_meshes, world_bounding_box)
 

@@ -41,10 +41,10 @@ We build a 3-section uniform robot using the symbolic factory.
 from semantic_digital_twin.adapters.ros.visualization.viz_marker import VizMarkerPublisher
 
 world_pcc = World()
-sections = [SoftTrunkSection(0.3, 0.02, 10)] * 3
+sections = [SoftTrunkSection(length=0.3, radius=0.02, resolution=10)] * 3
 
 # Build the robot in the world
-trunk_pcc = SoftTrunk.build_piecewise_constant_curvature(world_pcc, sections)
+trunk_pcc = SoftTrunk.build_piecewise_constant_curvature(world=world_pcc, sections=sections)
 
 # Set up visualizer with automatic TF publishing
 viz_pcc = VizMarkerPublisher(_world=world_pcc, node=background_node.get_node())
@@ -107,7 +107,7 @@ world_cosserat = World()
 sections = [SoftTrunkSection(length=0.3, radius=0.02, resolution=10)] * 3
 
 # Build the robot
-trunk_cos = SoftTrunk.build_cosserat(world_cosserat, sections)
+trunk_cos = SoftTrunk.build_cosserat(world=world_cosserat, sections=sections)
 
 # Set up visualizer
 viz_cos = VizMarkerPublisher(_world=world_cosserat, node=background_node.get_node())

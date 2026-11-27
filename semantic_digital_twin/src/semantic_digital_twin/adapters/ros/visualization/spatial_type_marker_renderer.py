@@ -98,7 +98,7 @@ class SpatialTypeMarkerRenderer(Generic[SpatialTypeInput], SubClassSafeGeneric, 
         return cls.get_generic_type_parameters()[0]
 
     @classmethod
-    def can_render(cls, spatial_type: SpatialType) -> bool:
+    def can_render(cls, *, spatial_type: SpatialType) -> bool:
         """
         Whether this renderer can render the given spatial type.
 
@@ -117,7 +117,7 @@ class SpatialTypeMarkerRenderer(Generic[SpatialTypeInput], SubClassSafeGeneric, 
         :return: The renderer responsible for rendering the spatial type.
         """
         for subclass in recursive_subclasses(cls):
-            if subclass.can_render(spatial_type):
+            if subclass.can_render(spatial_type=spatial_type):
                 return subclass
         raise CannotRenderSpatialTypeError(spatial_type_type=type(spatial_type))
 
@@ -162,7 +162,9 @@ class SpatialTypeMarkerRenderer(Generic[SpatialTypeInput], SubClassSafeGeneric, 
         raise NotImplementedError
 
     @staticmethod
-    def _reference_frame_name(spatial_type: SpatialType, root_frame_name: str) -> str:
+    def _reference_frame_name(
+        *, spatial_type: SpatialType, root_frame_name: str
+    ) -> str:
         """
         The name of the spatial type's reference frame, falling back to the root frame.
 
@@ -193,7 +195,7 @@ class SpatialTypeMarkerRenderer(Generic[SpatialTypeInput], SubClassSafeGeneric, 
         marker.id = request.marker_id_offset + marker_id
         marker.header = Header(frame_id=frame_id)
         marker.frame_locked = True
-        marker.color = ColorToRos2Converter.convert(request.color)
+        marker.color = ColorToRos2Converter.convert(data=request.color)
         marker.lifetime = Duration(sec=round(request.lifetime_seconds))
         return marker
 
@@ -232,7 +234,9 @@ class Point3MarkerRenderer(SpatialTypeMarkerRenderer[Point3]):
     def create_markers(
         cls, *, request: SpatialTypeVisualization, root_frame_name: str
     ) -> list[Marker]:
-        frame_id = cls._reference_frame_name(request.spatial_type, root_frame_name)
+        frame_id = cls._reference_frame_name(
+            spatial_type=request.spatial_type, root_frame_name=root_frame_name
+        )
         marker = cls._base_marker(request=request, marker_id=0, frame_id=frame_id)
         marker.type = Marker.SPHERE
         marker.pose.orientation.w = 1.0
@@ -273,7 +277,9 @@ class Vector3MarkerRenderer(SpatialTypeMarkerRenderer[Vector3]):
         if vector.visualisation_frame is not None:
             frame_id = str(vector.visualisation_frame.name)
         else:
-            frame_id = cls._reference_frame_name(vector, root_frame_name)
+            frame_id = cls._reference_frame_name(
+                spatial_type=vector, root_frame_name=root_frame_name
+            )
         marker = cls._base_marker(request=request, marker_id=0, frame_id=frame_id)
         marker.type = Marker.ARROW
         marker.points = [RosPoint(), RosPoint()]
@@ -316,7 +322,7 @@ class PoseLikeMarkerRenderer(SpatialTypeMarkerRenderer[Pose]):
         )
 
     @classmethod
-    def can_render(cls, spatial_type: SpatialType) -> bool:
+    def can_render(cls, *, spatial_type: SpatialType) -> bool:
         return isinstance(spatial_type, cls.renderable_types)
 
     @classmethod
@@ -341,7 +347,9 @@ class PoseLikeMarkerRenderer(SpatialTypeMarkerRenderer[Pose]):
     def create_markers(
         cls, *, request: SpatialTypeVisualization, root_frame_name: str
     ) -> list[Marker]:
-        frame_id = cls._reference_frame_name(request.spatial_type, root_frame_name)
+        frame_id = cls._reference_frame_name(
+            spatial_type=request.spatial_type, root_frame_name=root_frame_name
+        )
         markers = [
             cls._axis_marker(request=request, axis_index=axis_index, frame_id=frame_id)
             for axis_index in range(3)

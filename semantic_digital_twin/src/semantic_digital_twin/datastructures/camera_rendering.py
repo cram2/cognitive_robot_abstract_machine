@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 
 
 # %% Body color assignments
-@dataclass
+@dataclass(kw_only=True)
 class BodyColorAssignment:
     """
     Associate a geometry color with the visible bodies sharing it.
@@ -47,14 +47,14 @@ class BodyColorAssignment:
 
 
 # %% Color rendering conventions
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class ColorRenderingMode(ABC):
     """
     Produce aligned BGR images and visible bodies grouped by color.
     """
 
     @abstractmethod
-    def validate_camera_model(self, camera_model: PinholeCameraModel) -> None:
+    def validate_camera_model(self, *, camera_model: PinholeCameraModel) -> None:
         """
         Reject projection models that this color renderer cannot represent.
 
@@ -66,6 +66,7 @@ class ColorRenderingMode(ABC):
     @abstractmethod
     def render(
         self,
+        *,
         segmentation: npt.NDArray[np.int32],
         camera_model: PinholeCameraModel,
         scene: trimesh.Scene,
@@ -83,17 +84,18 @@ class ColorRenderingMode(ABC):
         ...
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class BodyColorRenderingMode(ColorRenderingMode):
     """
     Color each visible body uniformly with its first collision geometry color.
     """
 
-    def validate_camera_model(self, camera_model: PinholeCameraModel) -> None:
+    def validate_camera_model(self, *, camera_model: PinholeCameraModel) -> None:
         pass
 
     def render(
         self,
+        *,
         segmentation: npt.NDArray[np.int32],
         camera_model: PinholeCameraModel,
         scene: trimesh.Scene,
@@ -103,7 +105,7 @@ class BodyColorRenderingMode(ColorRenderingMode):
         body_colors: dict[Color, BodyColorAssignment] = {}
         for body_index in np.unique(segmentation[segmentation >= 0]):
             body = world.kinematic_structure[int(body_index)]
-            body_rgb = self.get_body_color(body)
+            body_rgb = self.get_body_color(body=body)
             color_rgb[segmentation == body_index] = body_rgb
             color = body.collision[0].color
             body_colors.setdefault(
@@ -115,7 +117,7 @@ class BodyColorRenderingMode(ColorRenderingMode):
         )
 
     @staticmethod
-    def get_body_color(body: Body) -> npt.NDArray[np.uint8]:
+    def get_body_color(*, body: Body) -> npt.NDArray[np.uint8]:
         """
         Return the first collision geometry's unsigned-byte RGB color.
 
@@ -129,13 +131,13 @@ class BodyColorRenderingMode(ColorRenderingMode):
         ).astype(np.uint8)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class TexturedColorRenderingMode(ColorRenderingMode):
     """
     Render surface textures and materials with a centered, equal-focal-length camera.
     """
 
-    def validate_camera_model(self, camera_model: PinholeCameraModel) -> None:
+    def validate_camera_model(self, *, camera_model: PinholeCameraModel) -> None:
         resolution = camera_model.resolution
         if not (
             math.isclose(float(camera_model.principal_point.x), resolution.width / 2)
@@ -150,6 +152,7 @@ class TexturedColorRenderingMode(ColorRenderingMode):
 
     def render(
         self,
+        *,
         segmentation: npt.NDArray[np.int32],
         camera_model: PinholeCameraModel,
         scene: trimesh.Scene,
@@ -167,7 +170,7 @@ class TexturedColorRenderingMode(ColorRenderingMode):
 
 
 # %% Depth conventions
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class DepthMode(ABC):
     """
     Compute one meter depth per surface hit, using negative values for invalid depths.
@@ -176,6 +179,7 @@ class DepthMode(ABC):
     @abstractmethod
     def hit_depth(
         self,
+        *,
         hit_points: npt.NDArray[np.float64],
         ray_origins: npt.NDArray[np.float64],
         ray_directions: npt.NDArray[np.float64],
@@ -193,7 +197,7 @@ class DepthMode(ABC):
         ...
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class OpticalAxisDepthMode(DepthMode):
     """
     Measure depth along the rendering camera's negative z axis.
@@ -201,6 +205,7 @@ class OpticalAxisDepthMode(DepthMode):
 
     def hit_depth(
         self,
+        *,
         hit_points: npt.NDArray[np.float64],
         ray_origins: npt.NDArray[np.float64],
         ray_directions: npt.NDArray[np.float64],
@@ -215,7 +220,7 @@ class OpticalAxisDepthMode(DepthMode):
         return np.where(depths > 0.0, depths, -1.0)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class RayDistanceDepthMode(DepthMode):
     """
     Measure depth from each ray origin along its viewing direction.
@@ -223,6 +228,7 @@ class RayDistanceDepthMode(DepthMode):
 
     def hit_depth(
         self,
+        *,
         hit_points: npt.NDArray[np.float64],
         ray_origins: npt.NDArray[np.float64],
         ray_directions: npt.NDArray[np.float64],
@@ -232,7 +238,7 @@ class RayDistanceDepthMode(DepthMode):
 
 
 # %% Aligned depth and segmentation
-@dataclass
+@dataclass(kw_only=True)
 class SegmentationDepthFrame:
     """
     Segmentation and meter depths produced by one camera intersection query.
@@ -249,7 +255,7 @@ class SegmentationDepthFrame:
 
 
 # %% Aligned RGB-D products
-@dataclass
+@dataclass(kw_only=True)
 class RenderedRGBDFrame:
     """
     Contain aligned width-first images with their origin at the top-left pixel.
@@ -282,7 +288,7 @@ class RenderedRGBDFrame:
 
 
 # %% Camera rays
-@dataclass
+@dataclass(kw_only=True)
 class CameraRays:
     """
     World-space viewing rays and the image pixels they represent.
@@ -302,7 +308,7 @@ class CameraRays:
     """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class RayIntersections:
     """
     Surface intersections and their source rays and world bodies.
@@ -323,7 +329,7 @@ class RayIntersections:
 
 
 # %% Color image products
-@dataclass
+@dataclass(kw_only=True)
 class RenderedColorFrame:
     """
     BGR image values and the associated bodies grouped by color.

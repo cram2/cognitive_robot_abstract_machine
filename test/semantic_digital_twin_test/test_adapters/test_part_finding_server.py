@@ -41,7 +41,11 @@ def mug_query() -> PartQuery:
     cup = trimesh.creation.annulus(r_min=0.035, r_max=0.04, height=0.1)
     handle = trimesh.creation.box(extents=[0.02, 0.01, 0.06])
     handle.apply_translation([0.07, 0.0, 0.0])
-    return PartQuery.from_mesh(trimesh.util.concatenate([cup, handle]), Mug, ["handle"])
+    return PartQuery.from_mesh(
+        mesh=trimesh.util.concatenate([cup, handle]),
+        whole_type=Mug,
+        relationship_names=["handle"],
+    )
 
 
 @pytest.fixture
@@ -66,8 +70,8 @@ def server(mug_query, tmp_path):
 
 
 def test_a_remote_query_is_answered_like_a_local_one(server, mug_query):
-    [remote] = RemotePartLocator(base_url=server.url).locate(mug_query)
-    [local] = server.locator.locate(mug_query)
+    [remote] = RemotePartLocator(base_url=server.url).locate(query=mug_query)
+    [local] = server.locator.locate(query=mug_query)
 
     assert remote.relationship_name == local.relationship_name
     assert np.array_equal(remote.faces, local.faces)
@@ -77,8 +81,8 @@ def test_a_remote_query_is_answered_like_a_local_one(server, mug_query):
 def test_a_repeated_query_is_answered_from_the_cache(server, mug_query):
     client = RemotePartLocator(base_url=server.url)
 
-    first = client.answer(mug_query)
-    second = client.answer(mug_query)
+    first = client.answer(query=mug_query)
+    second = client.answer(query=mug_query)
 
     assert not first.from_cache
     assert second.from_cache
@@ -95,7 +99,7 @@ def test_a_query_the_locator_fails_on_is_no_longer_waiting(
     monkeypatch.setattr(server.locator, "locate", fail)
 
     with pytest.raises(RuntimeError):
-        server.answer(mug_query)
+        server.answer(query=mug_query)
 
     assert server.status().waiting_queries == 0
 
@@ -104,7 +108,7 @@ def test_a_shape_with_too_many_faces_is_refused(server, mug_query):
     server.maximum_faces = len(mug_query.faces) - 1
 
     with pytest.raises(PartFindingServerError) as raised:
-        RemotePartLocator(base_url=server.url).locate(mug_query)
+        RemotePartLocator(base_url=server.url).locate(query=mug_query)
 
     assert raised.value.status_code == HTTPStatus.REQUEST_ENTITY_TOO_LARGE
 
@@ -115,7 +119,7 @@ def test_a_query_for_a_relationship_the_annotation_does_not_have_is_refused(
     mug_query.relationship_names = ["spout"]
 
     with pytest.raises(PartFindingServerError) as raised:
-        RemotePartLocator(base_url=server.url).locate(mug_query)
+        RemotePartLocator(base_url=server.url).locate(query=mug_query)
 
     assert raised.value.status_code == HTTPStatus.BAD_REQUEST
 

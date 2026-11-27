@@ -28,7 +28,7 @@ from semantic_digital_twin.semantic_annotations.part_whole.relationship import (
 # %% the question and its answer
 
 
-@dataclass
+@dataclass(kw_only=True)
 class PartQuery:
     """
     The question which faces of a mesh belong to the parts an annotation's part-whole
@@ -59,6 +59,7 @@ class PartQuery:
     @classmethod
     def from_mesh(
         cls,
+        *,
         mesh: trimesh.Trimesh,
         whole_type: type[HasParts],
         relationship_names: list[str],
@@ -101,7 +102,7 @@ class PartQuery:
         return camel_case_to_words(self.whole_type.__name__)
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LocatedPart:
     """
     A part found in the mesh of a :class:`PartQuery`.
@@ -129,7 +130,7 @@ class PartLocator(ABC):
     """
 
     @abstractmethod
-    def locate(self, query: PartQuery) -> list[LocatedPart]:
+    def locate(self, *, query: PartQuery) -> list[LocatedPart]:
         """
         :param query: The mesh and the parts wanted.
         :return: The parts found: for a relationship that holds a single part at most
@@ -138,7 +139,7 @@ class PartLocator(ABC):
         """
 
 
-@dataclass
+@dataclass(kw_only=True)
 class KnownPartLocator(PartLocator):
     """
     Answers every query with the same parts: a stand-in for a real locator wherever the
@@ -155,7 +156,7 @@ class KnownPartLocator(PartLocator):
     The queries asked so far, oldest first.
     """
 
-    def locate(self, query: PartQuery) -> list[LocatedPart]:
+    def locate(self, *, query: PartQuery) -> list[LocatedPart]:
         self.queries.append(query)
         return list(self.parts)
 
@@ -163,7 +164,7 @@ class KnownPartLocator(PartLocator):
 # %% splitting a located part off
 
 
-@dataclass
+@dataclass(kw_only=True)
 class LocatedFacesFinder(PartFinder):
     """
     Finds a part whose faces were located in a mesh before, either in that mesh or in
@@ -181,6 +182,8 @@ class LocatedFacesFinder(PartFinder):
     the part's faces, in meters.
     """
 
-    def split(self, mesh: trimesh.Trimesh) -> MeshSplit | None:
+    def split(self, *, mesh: trimesh.Trimesh) -> MeshSplit | None:
         distances, _ = cKDTree(self.face_centers).query(mesh.triangles_center)
-        return MeshSplit.from_mesh(mesh, distances <= self.tolerance)
+        return MeshSplit.from_mesh(
+            mesh=mesh, belongs_to_part_mask=distances <= self.tolerance
+        )
