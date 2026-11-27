@@ -12,6 +12,7 @@ from krrood.development_tools.agents.prose_length import (
 from .dataset_files import ProseSnippet
 from .dataset_lines import (
     CommentBlocksLine,
+    DoctestExamplesLine,
     ModuleLine,
     OverlongAttributeDocstringLine,
     ProseLineCount,
@@ -45,6 +46,25 @@ def test_field_lists_and_literal_blocks_are_not_prose() -> None:
     ).blocks
 
     assert block.prose_lines == ProseLineCount.FIELDS_AND_LITERAL_BLOCKS
+
+
+def test_doctest_examples_are_not_prose() -> None:
+    """
+    A doctest example, from its first prompt to the next blank line, does not count
+    towards the limit.
+    """
+    within_limit, _ = sorted(
+        SourceProse(source=ProseSnippet.DOCTEST_EXAMPLES.read_text()).docstrings(),
+        key=lambda block: block.first_line,
+    )
+
+    assert within_limit.prose_lines == ProseLineCount.DOCTEST_EXAMPLES
+
+
+def test_prose_around_a_doctest_example_over_its_limit_is_reported() -> None:
+    assert overlong_first_lines(ProseSnippet.DOCTEST_EXAMPLES) == [
+        DoctestExamplesLine.OVER_LIMIT_DOCSTRING
+    ]
 
 
 def test_an_attribute_docstring_is_measured() -> None:

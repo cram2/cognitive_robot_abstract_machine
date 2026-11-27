@@ -48,6 +48,11 @@ class ProsePattern(StrEnum):
     list.
     """
 
+    DOCTEST_PROMPT = r">>>(\s|$)"
+    """
+    The prompt that starts a doctest example, which runs to the next blank line.
+    """
+
     SECTION_HEADER = r"# %%"
     """
     The start of a section header comment, which is a label, not prose.
@@ -89,7 +94,8 @@ class ProseBlock:
     prose_lines: int
     """
     How many of its lines are prose: for a docstring, the non-blank lines before its
-    field list that are not indented below its own margin, such as a literal block.
+    field list that are neither indented below its own margin, such as a literal block,
+    nor part of a doctest example.
     """
 
 
@@ -150,10 +156,14 @@ class SourceProse:
         :return: It, measured as a docstring.
         """
         prose_lines = 0
+        in_doctest_example = False
         for line in inspect.cleandoc(statement.value.value).splitlines():
             if ProsePattern.FIELD_LIST_ITEM.starts(line=line):
                 break
-            if line.strip() and not line[0].isspace():
+            in_doctest_example = bool(line.strip()) and (
+                in_doctest_example or ProsePattern.DOCTEST_PROMPT.starts(line=line)
+            )
+            if line.strip() and not line[0].isspace() and not in_doctest_example:
                 prose_lines += 1
         return ProseBlock(
             kind=ProseKind.DOCSTRING,

@@ -127,6 +127,17 @@ class OverlongAttributeDocstringLine(IntEnum):
     """
 
 
+class DoctestExamplesLine(IntEnum):
+    """
+    Lines of :attr:`~test.krrood_test.test_development_tools.dataset_files.ProseSnippet.DOCTEST_EXAMPLES`.
+    """
+
+    OVER_LIMIT_DOCSTRING = 23
+    """
+    The first line of the docstring holding five prose lines around a doctest example.
+    """
+
+
 class CommentBlocksLine(IntEnum):
     """
     Lines of :attr:`~test.krrood_test.test_development_tools.dataset_files.ProseSnippet.COMMENT_BLOCKS`.
@@ -191,6 +202,11 @@ class ProseLineCount(IntEnum):
     FIELDS_AND_LITERAL_BLOCKS = 2
     """
     The docstring of :attr:`~test.krrood_test.test_development_tools.dataset_files.ProseSnippet.FIELDS_AND_LITERAL_BLOCKS`.
+    """
+
+    DOCTEST_EXAMPLES = 1
+    """
+    The first docstring of :attr:`~test.krrood_test.test_development_tools.dataset_files.ProseSnippet.DOCTEST_EXAMPLES`.
     """
 
     OVERLONG_MODULE_DOCSTRING = 5
