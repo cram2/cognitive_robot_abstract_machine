@@ -12,7 +12,9 @@ from typing_extensions import TYPE_CHECKING
 from probabilistic_model.exceptions import ProbabilisticModelException
 
 if TYPE_CHECKING:
-    from probabilistic_model.learning.structure.region_graph.region_graph import Region
+    from probabilistic_model.learning.structure.region_graph.region_graph import (
+        VariableRegion,
+    )
 
 # %% exceptions
 
@@ -23,7 +25,7 @@ class MultipleRootsError(ProbabilisticModelException, ValueError):
     Exception raised when a region graph has more than one node without parents.
     """
 
-    roots: list[Region]
+    roots: list[VariableRegion]
     """
     The nodes without parents.
     """

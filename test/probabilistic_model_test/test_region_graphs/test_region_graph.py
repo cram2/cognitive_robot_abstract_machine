@@ -26,7 +26,7 @@ from probabilistic_model.learning.structure.region_graph.exceptions import (
 )
 from probabilistic_model.learning.structure.region_graph.region_graph import (
     Partition,
-    Region,
+    VariableRegion,
     RegionGraph,
 )
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.sum_layer import (
@@ -124,7 +124,7 @@ def test_a_region_graph_with_two_roots_raises():
     variables = continuous_variables(2)
     region_graph = RegionGraph(variables=variables)
     for variable in variables:
-        region_graph.add_node(Region(variables=SortedSet([variable])))
+        region_graph.add_node(VariableRegion(variables=SortedSet([variable])))
     with pytest.raises(MultipleRootsError):
         region_graph.root
 
