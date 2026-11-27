@@ -137,7 +137,7 @@ class ClusterPosePCAAnnotator(BaseAnnotator):
             pose_annotation.rotation = list(
                 get_quaternion_from_rotation_matrix(new_rotation)
             )
-            pose_annotation.source = type(self).__name__
+            pose_annotation.source = self.get_class_name()
             object_hypothesis.annotations.append(pose_annotation)
 
             cluster_obb = cluster_cloud.get_oriented_bounding_box()

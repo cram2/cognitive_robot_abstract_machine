@@ -160,7 +160,7 @@ class ClusterPositionAnnotator(BaseAnnotator):
         :return: Position annotation with centroid as translation
         """
         position = annotation.PositionAnnotation()
-        position.source = type(self).__name__
+        position.source = self.get_class_name()
         position.translation = centroid
         return position
 

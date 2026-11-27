@@ -306,7 +306,7 @@ class ShapeEstimatorAnnotator(ThreadedAnnotator):
         )
 
         shape_annotation = best_fit_adapter.to_annotation(fit_result=best_fit)
-        shape_annotation.source = self.name
+        shape_annotation.source = self.get_class_name()
         shape_annotation.inliers = inlier_indices_in_original_object_cloud
         visual_geometries = self._create_visualization_geometries(
             object_hypothesis=object_hypothesis,

@@ -49,7 +49,7 @@ class ChannelMeanClassificationAnnotator(ZeroShotClassificationAnnotator):
         mean_color = image.reshape(-1, 3).mean(axis=0) / 255.0
         classifications = [
             Classification(
-                source=self.name,
+                source=self.get_class_name(),
                 classname=word,
                 confidence=float(mean_color @ (rgb(COLOR_BY_WORD[word]) / 255.0)),
             )

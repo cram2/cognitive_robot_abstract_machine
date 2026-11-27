@@ -401,7 +401,7 @@ class PointCloudClusterExtractor(ThreadedAnnotator):
 
             # Add each cluster to CAS
             object_hypothesis = ObjectHypothesis()
-            object_hypothesis.source = self.name
+            object_hypothesis.source = self.get_class_name()
             object_hypothesis.points = cluster_cloud
             object_hypothesis.point_indices = [cluster_indices_in_outlier_cloud]
 
@@ -589,7 +589,7 @@ class NaivePointCloudClusterExtractor(ThreadedAnnotator):
 
             # Add each cluster to CAS
             object_hypothesis = ObjectHypothesis()
-            object_hypothesis.source = self.name
+            object_hypothesis.source = self.get_class_name()
             object_hypothesis.points = cluster_cloud
             object_hypothesis.point_indices = [cluster_indices]
 

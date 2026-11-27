@@ -367,7 +367,7 @@ class YoloAnnotator(ThreadedAnnotator):
                 detections.append(
                     YoloDetection(
                         classification=Classification(
-                            source=self.name,
+                            source=self.get_class_name(),
                             classname=self._classname(class_id=int(class_id)),
                             confidence=float(confidence),
                             class_id=int(class_id),
@@ -475,7 +475,7 @@ class YoloAnnotator(ThreadedAnnotator):
             == self.descriptor.parameters.person_class_name
             else ObjectHypothesis()
         )
-        hypothesis.source = self.name
+        hypothesis.source = self.get_class_name()
         hypothesis.roi.roi = region
 
         detection_mask = self._detection_mask(

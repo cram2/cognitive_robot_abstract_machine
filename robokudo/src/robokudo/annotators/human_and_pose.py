@@ -409,11 +409,11 @@ class HumanAndPoseAnnotator(ThreadedAnnotator):
 
         hypothesis = HumanHypothesis()
         hypothesis.id = index
-        hypothesis.source = self.name
+        hypothesis.source = self.get_class_name()
         hypothesis.roi.roi = box if keeps_full_box else shrunk_box
         hypothesis.annotations.append(
             Classification(
-                source=self.name,
+                source=self.get_class_name(),
                 classname=parameters.person_class_name,
                 confidence=float(result.boxes.conf[index]),
             )
@@ -425,7 +425,7 @@ class HumanAndPoseAnnotator(ThreadedAnnotator):
         ]
         hypothesis.annotations.append(
             KeypointAnnotation(
-                source=self.name,
+                source=self.get_class_name(),
                 keypoints=keypoints,
                 kind=KeypointKind.IMAGE_POSITION,
             )
@@ -439,7 +439,7 @@ class HumanAndPoseAnnotator(ThreadedAnnotator):
         if parameters.shrink_bounding_box is not None and keeps_full_box:
             hypothesis.annotations.append(
                 CloudAnnotation(
-                    source=self.name,
+                    source=self.get_class_name(),
                     points=depth_frame.box_cloud(
                         box=shrunk_box, depth_truncate=parameters.depth_truncate
                     ),
@@ -448,7 +448,7 @@ class HumanAndPoseAnnotator(ThreadedAnnotator):
         if parameters.generate_clouds_for_keypoints:
             hypothesis.annotations.append(
                 KeypointAnnotation(
-                    source=self.name,
+                    source=self.get_class_name(),
                     keypoints=self._keypoint_clouds(
                         keypoints=keypoints, depth_frame=depth_frame
                     ),

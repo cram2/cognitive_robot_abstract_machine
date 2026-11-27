@@ -304,7 +304,7 @@ class ICPPoseRefinementAnnotator(ThreadedAnnotator):
                 refined_pose_annotation.rotation = list(
                     get_quaternion_from_transform_matrix(refined_transformation)
                 )
-                refined_pose_annotation.source = type(self).__name__
+                refined_pose_annotation.source = self.get_class_name()
 
                 object_hypothesis.annotations.append(refined_pose_annotation)
 

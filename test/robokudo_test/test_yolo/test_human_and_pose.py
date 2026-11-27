@@ -304,7 +304,35 @@ def test_person_becomes_human_hypothesis_classified_as_person(
     (classification,) = _annotations_of_type(hypothesis, Classification)
     assert classification.classname == scene.person_class_name
     assert classification.confidence == pytest.approx(scene.person_confidence)
-    assert classification.source == annotator.name
+
+
+def test_renamed_annotator_hypothesis_and_annotations_name_its_class(
+    model_loader: MockModelLoader, scene: PersonScene, renamed_annotator_name: str
+):
+    """
+    The hypothesis and each annotation on it record the annotator class.
+    """
+    descriptor = scene.depth_descriptor()
+    descriptor.parameters.shrink_bounding_box = 0.5
+    descriptor.parameters.shrink_as_annotation = True
+    descriptor.parameters.generate_clouds_for_keypoints = True
+    annotator = HumanAndPoseAnnotator(
+        name=renamed_annotator_name, descriptor=descriptor
+    )
+    scene.place_in_pipeline(annotator=annotator)
+
+    annotator.compute()
+
+    hypothesis = _only_hypothesis(annotator)
+    class_name = HumanAndPoseAnnotator.get_class_name()
+    assert hypothesis.source == class_name
+    assert {
+        (type(annotation), annotation.source) for annotation in hypothesis.annotations
+    } == {
+        (Classification, class_name),
+        (KeypointAnnotation, class_name),
+        (CloudAnnotation, class_name),
+    }
 
 
 def test_hypothesis_region_is_person_bounding_box(

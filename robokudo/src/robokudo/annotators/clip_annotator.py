@@ -190,7 +190,7 @@ class CLIPAnnotator(ZeroShotClassificationAnnotator):
         return [
             [
                 Classification(
-                    source=self.name,
+                    source=self.get_class_name(),
                     classname=self.descriptor.parameters.vocabulary[index],
                     confidence=similarity,
                 )

@@ -442,7 +442,7 @@ class ImageClusterExtractor(BaseAnnotator):
 
             object_hypothesis = ObjectHypothesis()
             object_hypothesis.id = str(contour_index)
-            object_hypothesis.source = self.name
+            object_hypothesis.source = self.get_class_name()
             object_hypothesis.points = cloud
 
             left, top, width, height = cv2.boundingRect(contour)

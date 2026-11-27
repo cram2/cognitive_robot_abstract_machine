@@ -266,7 +266,7 @@ class ClusterPoseBBAnnotator(BaseAnnotator):
             pose_annotation.rotation = list(
                 get_quaternion_from_rotation_matrix(cluster_rotation_in_camera)
             )
-            pose_annotation.source = type(self).__name__
+            pose_annotation.source = self.get_class_name()
             object_hypothesis.annotations.append(pose_annotation)
 
             # Generate a BB from the cluster info for visualization
@@ -285,7 +285,7 @@ class ClusterPoseBBAnnotator(BaseAnnotator):
             rk_bb.z_length = bounding_box_extents[2]
             rk_bb.pose.translation = cluster_translation_in_camera
             rk_bb.pose.rotation = pose_annotation.rotation
-            rk_bb.source = type(self).__name__
+            rk_bb.source = self.get_class_name()
 
             object_hypothesis.annotations.append(rk_bb)
 
