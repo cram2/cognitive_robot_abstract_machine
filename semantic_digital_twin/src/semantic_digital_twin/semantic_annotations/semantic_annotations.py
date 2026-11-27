@@ -1489,7 +1489,7 @@ class ApplePeel(Peel):
 
     skin_thickness: SkinThickness | None = field(
         default_factory=lambda: SkinThickness(
-            value=Quality.closed_range(lower=33.3e-6, upper=78.3e-6)
+            value=Quality.closed_range(lower=33.3e-6, upper=73.1e-6)
         ),
         kw_only=True,
         hash=False,
@@ -1726,14 +1726,15 @@ class OrangePeel(Peel):
     material_elasticity: MaterialElasticity | None = field(
         default_factory=lambda: MaterialElasticity(
             youngs_modulus=Quality.closed_range(lower=1.985e4, upper=1.985e4),
-            poissons_ratio=Quality.closed_range(lower=-0.05, upper=-0.05),
+            poissons_ratio=Quality.closed_range(lower=-0.09, upper=-0.03),
         ),
         kw_only=True,
         hash=False,
         metadata=IsQualityRelationship().as_dict(),
     )
     """
-    Orange peel in quasi-static compression with digital image correlation
+    Orange peel in quasi-static compression with digital image correlation; the
+    Poisson's ratio is the median from 10 to 50 % axial strain
     :cite:`jentzsch2022citrus`.
     """
 
@@ -1964,37 +1965,11 @@ class Albumen(EggPart):
     The white of an egg, the liquid around its yolk.
     """
 
-    mass_density: MassDensity | None = field(
-        default_factory=lambda: MassDensity(
-            value=Quality.closed_range(lower=1027.5, upper=1030.9)
-        ),
-        kw_only=True,
-        hash=False,
-        metadata=IsQualityRelationship().as_dict(),
-    )
-    """
-    Egg white from 25 °C down to 8 °C; being liquid, it has no elasticity
-    :cite:`tsarenko2017egg`.
-    """
-
 
 @dataclass(eq=False, kw_only=True)
 class Yolk(EggPart):
     """
     The yellow centre of an egg.
-    """
-
-    mass_density: MassDensity | None = field(
-        default_factory=lambda: MassDensity(
-            value=Quality.closed_range(lower=1026.7, upper=1031.6)
-        ),
-        kw_only=True,
-        hash=False,
-        metadata=IsQualityRelationship().as_dict(),
-    )
-    """
-    Egg yolk from 25 °C down to 8 °C; being liquid, it has no elasticity
-    :cite:`tsarenko2017egg`.
     """
 
 
