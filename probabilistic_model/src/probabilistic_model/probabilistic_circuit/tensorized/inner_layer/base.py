@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 import numpy as np
 import numpy.typing as npt
 from krrood.patterns.dataclass_deep_copy import DataclassDeepcopyMixin
+from krrood.patterns.field_metadata import JSONMetadata
 from random_events.product_algebra import Event, SimpleEvent
 from sortedcontainers import SortedSet
 from typing_extensions import Any, Iterator, Self
@@ -66,6 +67,7 @@ from probabilistic_model.probabilistic_circuit.tensorized.structural_query impor
 )
 
 
+@dataclass(eq=False, repr=False, kw_only=True)
 class Layer(DataclassDeepcopyMixin, ABC):
     """
     Abstract base class for the layers of a layered probabilistic circuit.
@@ -950,12 +952,17 @@ class LeafLayer(Layer, ABC):
     distributions of a layered circuit.
     """
 
-    @property
-    def child_layers(self) -> list[Layer]:
-        """
-        :return: An empty list. A leaf layer has no child layers.
-        """
-        return []
+    child_layers: list[Layer] = field(
+        default_factory=list,
+        init=False,
+        repr=False,
+        metadata=JSONMetadata(serialize=False).as_dict(),
+    )
+    """
+    An empty list.
+
+    A leaf layer has no child layers.
+    """
 
     def copy_with_child_layers(self, child_layers: list[Layer]) -> Self:
         return self

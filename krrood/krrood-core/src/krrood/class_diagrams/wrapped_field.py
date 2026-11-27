@@ -17,13 +17,14 @@ from functools import cached_property, lru_cache
 from inspect import isclass
 from types import NoneType, UnionType
 
+from sortedcontainers import SortedSet
+
 # Only this class matches the aliases a ``type`` statement makes before Python 3.14.
 from typing import TypeAliasType  # noqa: TID251
 from typing_extensions import (
     Annotated,
     get_origin,
     get_args,
-    ClassVar,
     Type,
     TYPE_CHECKING,
     Optional,
@@ -42,6 +43,7 @@ from krrood.class_diagrams.utils import (
     is_union_annotation,
 )
 from krrood.class_diagrams.collection_kind import CollectionKind, DeclaredValueKind
+from krrood.patterns.classproperty import classproperty
 from krrood.utils import module_and_class_name, is_builtin_type
 
 if TYPE_CHECKING:
@@ -90,10 +92,12 @@ class WrappedField:
     The property descriptor instance that manages the field.
     """
 
-    container_types: ClassVar[list[type]] = [list, set, tuple, type, Sequence]
-    """
-    A list of container types that are supported by the parser.
-    """
+    @classproperty
+    def container_types(cls) -> tuple[type, ...]:
+        """
+        :return: The container types that are supported by the parser.
+        """
+        return list, set, tuple, type, Sequence, SortedSet
 
     def __post_init__(self):
         self.public_name = self.public_name or self.field.name

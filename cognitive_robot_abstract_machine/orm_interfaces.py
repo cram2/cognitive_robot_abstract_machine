@@ -548,6 +548,11 @@ class OrmPackage(StrEnum):
     The packages of this repository that generate an ORM interface.
     """
 
+    PROBABILISTIC_MODEL = "probabilistic_model"
+    """
+    Its interface builds on no other one.
+    """
+
     SEMANTIC_DIGITAL_TWIN = "semantic_digital_twin"
     """
     Its interface builds on no other one.
@@ -581,6 +586,7 @@ class OrmPackage(StrEnum):
 
 WORKSPACE_ORM_INTERFACES = WorkspaceOrmInterfaces(
     (
+        OrmInterface(OrmPackage.PROBABILISTIC_MODEL, REPOSITORY_ROOT),
         OrmInterface(OrmPackage.SEMANTIC_DIGITAL_TWIN, REPOSITORY_ROOT),
         OrmInterface(OrmPackage.CRAMPH, REPOSITORY_ROOT),
         OrmInterface(OrmPackage.SEGMIND, REPOSITORY_ROOT),

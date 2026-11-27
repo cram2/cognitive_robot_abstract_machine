@@ -26,6 +26,7 @@ from sqlalchemy.orm import (
     make_transient_to_detached,
     selectinload,
 )
+from sortedcontainers import SortedSet
 from typing_extensions import get_origin, Any, Callable, Sequence, TypeVar
 
 from krrood.entity_query_language.core.base_expressions import SymbolicExpression
@@ -53,6 +54,7 @@ from krrood.ormatic.exceptions import (
     StoredObjectTableNotUniqueError,
 )
 from krrood.patterns.called_positionally import called_positionally
+from krrood.patterns.classproperty import classproperty
 from krrood.patterns.exceptions import NoGenericError
 from krrood.patterns.has_generic import HasGeneric
 from krrood.ormatic.utils import is_data_column, _get_type_hints_cached
@@ -566,16 +568,17 @@ def _get_set_field_names(clazz: type) -> tuple[str, ...]:
 
 
 @lru_cache(maxsize=None)
-def _get_tuple_field_names(clazz: type) -> tuple[str, ...]:
+def _get_containers_of_list_held_fields(clazz: type) -> dict[str, type]:
     """
     :param clazz: The domain class to inspect.
-    :return: The names of all fields annotated as tuples.
+    :return: The container class of every field annotated with one of
+        :attr:`DataAccessObject.containers_held_as_lists`, by field name.
     """
-    return tuple(
-        attr_name
+    return {
+        attr_name: get_origin(hint) or hint
         for attr_name, hint in _get_type_hints_cached(clazz).items()
-        if get_origin(hint) is tuple or hint is tuple
-    )
+        if (get_origin(hint) or hint) in DataAccessObject.containers_held_as_lists
+    }
 
 
 class DataAccessObject(HasGeneric[T]):
@@ -645,6 +648,24 @@ class DataAccessObject(HasGeneric[T]):
         super().__init_subclass__(**kwargs)
         # New DAO classes invalidate previously failed (None) lookups.
         clear_dao_lookup_caches()
+
+    @classproperty
+    def containers_held_as_lists(cls) -> tuple[type, ...]:
+        """
+        :return: The domain containers that SQLAlchemy cannot instrument as the
+            collection of a relationship, so that a relationship holds them as a list
+            and loading an object rebuilds them from it.
+        """
+        return tuple, SortedSet
+
+    @classproperty
+    def containers_that_sort_their_elements(cls) -> tuple[type, ...]:
+        """
+        :return: The :attr:`containers_held_as_lists` that compare their elements, so that
+            loading an object rebuilds them only once every loaded object is
+            initialised.
+        """
+        return (SortedSet,)
 
     # %% conversion to dao routines
     @classmethod
@@ -982,11 +1003,12 @@ class DataAccessObject(HasGeneric[T]):
             ]
 
         # The instrumented DAO attribute expects an iterable duck-typed as its own
-        # collection class; an immutable domain container (tuple) is held as a
-        # list at the ORM layer (see WrappedTable.create_many_to_many_relationship),
-        # so it must be assigned as one here too.
+        # collection class, and the containers SQLAlchemy cannot instrument are held
+        # as lists at the ORM layer, so they must be assigned as one here too.
         assignable_container_type = (
-            list if type(source_collection) is tuple else type(source_collection)
+            list
+            if isinstance(source_collection, self.containers_held_as_lists)
+            else type(source_collection)
         )
         setattr(self, relationship.key, assignable_container_type(dao_collection))
 
@@ -1128,6 +1150,7 @@ class DataAccessObject(HasGeneric[T]):
         state.copy_attributes_inherited_from_alternative_mappings()
         self._finalize_containers(state=state, discovery_order=discovery_order)
         self._call_post_inits(state=state, discovery_order=discovery_order)
+        self._finalize_sorting_containers(state=state, discovery_order=discovery_order)
 
         for work_item in discovery_order:
             state.mark_initialized(dao_instance=work_item.dao_instance)
@@ -1193,28 +1216,74 @@ class DataAccessObject(HasGeneric[T]):
         """
         Convert temporary lists to their final container types.
         """
+        for domain_object in self._distinct_domain_objects(
+            state=state, discovery_order=discovery_order
+        ):
+            for attr_name in _get_set_field_names(type(domain_object)):
+                self._rebuild_container(
+                    domain_object=domain_object, attr_name=attr_name, container=set
+                )
+            for attr_name, container in _get_containers_of_list_held_fields(
+                type(domain_object)
+            ).items():
+                if container not in self.containers_that_sort_their_elements:
+                    self._rebuild_container(
+                        domain_object=domain_object,
+                        attr_name=attr_name,
+                        container=container,
+                    )
+
+    def _finalize_sorting_containers(
+        self,
+        *,
+        state: FromDataAccessObjectState,
+        discovery_order: list[FromDataAccessObjectWorkItem],
+    ) -> None:
+        """
+        Convert temporary lists to the :attr:`containers_that_sort_their_elements` their
+        type hints declare, once every loaded object is initialised.
+        """
+        for domain_object in self._distinct_domain_objects(
+            state=state, discovery_order=discovery_order
+        ):
+            for attr_name, container in _get_containers_of_list_held_fields(
+                type(domain_object)
+            ).items():
+                if container in self.containers_that_sort_their_elements:
+                    self._rebuild_container(
+                        domain_object=domain_object,
+                        attr_name=attr_name,
+                        container=container,
+                    )
+
+    @staticmethod
+    def _distinct_domain_objects(
+        *,
+        state: FromDataAccessObjectState,
+        discovery_order: list[FromDataAccessObjectWorkItem],
+    ) -> Iterable[Any]:
+        """
+        :return: Every domain object loaded, once each, in the order of discovery.
+        """
         processed_ids = set()
         for work_item in discovery_order:
             domain_object = state.get(source=work_item.dao_instance)
             if domain_object is not None and id(domain_object) not in processed_ids:
-                self._finalize_object_containers(domain_object=domain_object)
                 processed_ids.add(id(domain_object))
+                yield domain_object
 
     @staticmethod
-    def _finalize_object_containers(*, domain_object: Any) -> None:
+    def _rebuild_container(
+        *, domain_object: Any, attr_name: str, container: type
+    ) -> None:
         """
-        Convert lists to sets or tuples based on type hints.
+        Replace the list a relationship loaded into a field by the container its type hint
+        declares.
         """
-        for attr_name in _get_set_field_names(type(domain_object)):
-            value = getattr(domain_object, attr_name, None)
-            if isinstance(value, list):
-                # object.__setattr__ (not setattr) so this also works on frozen dataclasses.
-                object.__setattr__(domain_object, attr_name, set(value))
-        for attr_name in _get_tuple_field_names(type(domain_object)):
-            value = getattr(domain_object, attr_name, None)
-            if isinstance(value, list):
-                # object.__setattr__ (not setattr) so this also works on frozen dataclasses.
-                object.__setattr__(domain_object, attr_name, tuple(value))
+        value = getattr(domain_object, attr_name, None)
+        if isinstance(value, list):
+            # object.__setattr__ (not setattr) so this also works on frozen dataclasses.
+            object.__setattr__(domain_object, attr_name, container(value))
 
     def _call_post_inits(
         self,

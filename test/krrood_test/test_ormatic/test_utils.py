@@ -1,3 +1,4 @@
+import collections.abc
 import pytest
 from krrood.ormatic.exceptions import UnsupportedColumnType
 from krrood.ormatic.utils import get_python_type_from_sqlalchemy_column
@@ -109,3 +110,18 @@ def test_column_type_reporting_object_as_python_type_is_unsupported():
         get_python_type_from_sqlalchemy_column(
             Column(ColumnTypeWithoutSpecificPythonType)
         )
+
+
+# %% virtual subclasses
+
+
+def test_a_virtual_subclass_is_one_level_below_its_abstract_base_class():
+    """
+    A class an abstract base class claims through registration or a subclass hook, such
+    as :class:`list` for :class:`collections.abc.Sequence`, reaches it through none of
+    its bases and is one level below it.
+    """
+    assert (
+        inheritance_path_length(child_class=list, parent_class=collections.abc.Sequence)
+        == 1
+    )

@@ -17,6 +17,7 @@ from typing_extensions import List, TYPE_CHECKING, Optional, Set, get_origin
 from krrood.ormatic.field_storage import FieldStorage
 from krrood.ormatic.data_access_objects.alternative_mappings import AlternativeMapping
 from krrood.ormatic.data_access_objects.dao import (
+    DataAccessObject,
     RelationshipInformationKey,
 )
 from krrood.ormatic.stored_object import StoredObjectDAO
@@ -1082,14 +1083,11 @@ class WrappedTable(TableLike):
         # create a relationship
         relationship_name = wrapped_field.field.name
 
-        # SQLAlchemy instruments a collection class in place (it needs an appender
-        # method), which an immutable domain container such as tuple cannot provide.
-        # The relationship is therefore held as a list at the ORM layer; from_dao
-        # restores the domain field's own tuple type once its object is populated
-        # (see DataAccessObject._finalize_object_containers).
+        # from_dao rebuilds the domain field's own container from the list once its
+        # object is populated (see DataAccessObject._finalize_containers).
         collection_class_type = (
             list
-            if wrapped_field.container_type is tuple
+            if wrapped_field.container_type in DataAccessObject.containers_held_as_lists
             else wrapped_field.container_type
         )
         container_name = module_and_class_name(collection_class_type)

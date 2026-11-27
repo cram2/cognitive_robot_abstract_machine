@@ -8,17 +8,36 @@ parts that compute on numpy only, are numpy arrays on the host.
 
 from __future__ import annotations
 
+from abc import ABC
+from types import NotImplementedType
+
 import numpy as np
 import numpy.typing as npt
-from typing_extensions import Any, TypeAlias
+from typing_extensions import TypeAlias
 
 # %% values of any backend
 
-BackendArray: TypeAlias = Any
-"""
-An array of any backend that implements the Python Array API standard, which defines no
-type to annotate such an array with.
-"""
+
+class BackendArray(ABC):
+    """
+    An array of any backend that implements the Python Array API standard, such as a
+    :class:`numpy.ndarray`, a :class:`jax.Array` or a :class:`torch.Tensor`.
+
+    The standard defines no class such arrays derive from, so every class whose arrays
+    can be exchanged through DLPack is a virtual subclass.
+    """
+
+    @classmethod
+    def __subclasshook__(cls, subclass: type) -> bool | NotImplementedType:
+        """
+        :param subclass: The class to decide on.
+        :return: True if the class exchanges its arrays through DLPack, else the usual
+            subclass check decides.
+        """
+        if cls is BackendArray and hasattr(subclass, "__dlpack__"):
+            return True
+        return NotImplemented
+
 
 SampleArray: TypeAlias = BackendArray
 """
