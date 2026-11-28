@@ -39,10 +39,10 @@ dependencies = [
     "embreex",  # Hardware acceleration for trimesh raycasting
     "rtree",  # For spatial indexing in trimesh
     "xxhash",  # Fast hashing for trimesh, which hashes meshes to check its caches
-    "random_events>=26.10.0",
+    "random_events>=26.11.0",
     "plotly",
     "pathlib",
-    "probabilistic_model>=26.10.0",
+    "probabilistic_model>=26.11.0",
     "python-fcl",
     "manifold3d",
     "polytope",
@@ -61,16 +61,16 @@ dependencies = [
     "imageio-ffmpeg",
     "psutil~=5.9.0",
     "giskardpy_bullet_bindings==1.0.1",
-    "krrood-core>=26.10.0",
-    "krrood-eql>=26.10.0",
-    "krrood-ormatic>=26.10.0",
-    "krrood-probabilistic>=26.10.0",
-    "krrood-rdr>=26.10.0",
-    "krrood-serialization>=26.10.0",
-    "krrood-symbolic-math>=26.10.0",
-    "krrood_spatial_math[casadi]>=26.10.0",
-    "krrood_synchronization>=26.10.0",
-    "physics_simulators>=26.10.0",
+    "krrood-core>=26.11.0",
+    "krrood-eql>=26.11.0",
+    "krrood-ormatic>=26.11.0",
+    "krrood-probabilistic>=26.11.0",
+    "krrood-rdr>=26.11.0",
+    "krrood-serialization>=26.11.0",
+    "krrood-symbolic-math>=26.11.0",
+    "krrood_spatial_math[casadi]>=26.11.0",
+    "krrood_synchronization>=26.11.0",
+    "physics_simulators>=26.11.0",
 ]
 license = "LGPL-3.0-only"
 

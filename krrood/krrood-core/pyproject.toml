@@ -50,7 +50,7 @@ dependencies = [
 [project.optional-dependencies]
 # The descriptors ontomatic generates are recognized only once it is installed.
 ontomatic = [
-    "krrood-ontomatic==26.10.0",
+    "krrood-ontomatic==26.11.0",
 ]
 
 [project.urls]

@@ -14,20 +14,20 @@ authors = [{ name = "AICOR Institute", email = "you@example.com" }]
 # Add dependencies on all workspace members by their distribution names
 # uv will resolve these to editable installs via [tool.uv.sources]
 dependencies = [
-  "coraplex>=26.10.0",
-  "giskardpy>=26.10.0",
-  "cramph>=26.10.0",
-  "semantic_digital_twin>=26.10.0",
-  "krrood>=26.10.0",
-  "random-events>=26.10.0",
-  "probabilistic_model>=26.10.0",
-  "robokudo>=26.10.0",
-  "physics_simulators>=26.10.0",
-  "experiments>=26.10.0",
-  "segmind>=26.10.0",
-  "krrood_spatial_math>=26.10.0",
-  "krrood_compute_resources>=26.10.0",
-  "krrood_synchronization>=26.10.0",
+  "coraplex>=26.11.0",
+  "giskardpy>=26.11.0",
+  "cramph>=26.11.0",
+  "semantic_digital_twin>=26.11.0",
+  "krrood>=26.11.0",
+  "random-events>=26.11.0",
+  "probabilistic_model>=26.11.0",
+  "robokudo>=26.11.0",
+  "physics_simulators>=26.11.0",
+  "experiments>=26.11.0",
+  "segmind>=26.11.0",
+  "krrood_spatial_math>=26.11.0",
+  "krrood_compute_resources>=26.11.0",
+  "krrood_synchronization>=26.11.0",
   "ipykernel>=7.2.0",
   "lark-parser>=0.12.0",
   "tqdm"
@@ -45,7 +45,7 @@ dev = [
     "treon",
     "bokeh",
     "mypy>=1.8",
-    "krrood-development-tools>=26.10.0",
+    "krrood-development-tools>=26.11.0",
 ]
 
 doc = [

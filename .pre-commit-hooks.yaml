@@ -1,6 +1,6 @@
 # Hooks for krrood's development tools (krrood/krrood-development-tools/src/krrood/development_tools). They run the
 # installed `krrood` command, so the repository using them installs
-# `krrood[development-tools]` in its development environment; see
+# `krrood-development-tools` in its development environment; see
 # krrood/doc/development_tools.md.
 - id: krrood-format
   name: Format Python (ruff, then docformatter where it doesn't conflict with ruff)

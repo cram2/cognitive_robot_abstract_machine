@@ -8,6 +8,291 @@ that month. The format follows [Keep a Changelog](https://keepachangelog.com/en/
 Each package section lists the changes since that package's previous release on PyPI.
 Packages that are not published to PyPI are summarised since the 26.07.0 release.
 
+## [26.11.0] - 2026-11-28
+
+### Upgrade notes
+
+The changes below can break existing code. Each one is described in full in its pull
+request.
+
+#### krrood is split into `krrood-*` distributions
+
+`krrood` is now a namespace package spread over twelve distributions ([#1036](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1036)). The
+`krrood` distribution ships no module: it installs every `krrood-*` distribution at
+exactly its own version, so `pip install krrood` gives what it gave before, and imports
+do not change. A library depends only on the distributions it imports:
+
+| Distribution | Holds |
+|---|---|
+| `krrood-core` | patterns, class diagrams, the symbol graph and exceptions |
+| `krrood-serialization` | JSON serialization of krrood's dataclasses |
+| `krrood-code-generation` | generation of Python modules from Jinja templates |
+| `krrood-symbolic-math` | symbolic mathematics on CasADi expressions |
+| `krrood-rustworkx-utils` | trees and graph visualization on rustworkx graphs |
+| `krrood-eql` | the entity query language |
+| `krrood-planning` | planning over entity queries |
+| `krrood-ormatic` | SQLAlchemy interfaces generated from dataclasses, queried with EQL |
+| `krrood-probabilistic` | probabilistic queries and feature extraction over entity queries |
+| `krrood-rdr` | ripple down rules |
+| `krrood-ontomatic` | dataclasses generated from OWL ontologies |
+| `krrood-development-tools` | the `krrood` command |
+
+> **Warning:** upgrading an environment that holds krrood 26.10.0 or older with pip
+> deletes krrood's modules. pip installs the new distributions first and then uninstalls
+> the old `krrood`, which removes the files they now hold. Uninstall it first, or use a
+> fresh environment:
+>
+> ```bash
+> pip uninstall -y krrood && pip install krrood
+> ```
+>
+> An environment that is already broken is repaired with
+> `pip install --force-reinstall krrood`. uv is not affected.
+
+- The `development-tools` extra is gone: install `krrood-development-tools` instead of
+  `krrood[development-tools]`.
+- `krrood-ormatic` needs Python 3.12 or newer ([#1065](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1065)).
+- krrood's core imports nothing outside itself: SQLAlchemy, scipy, matplotlib,
+  random_events and probabilistic_model load only where they are used ([#904](https://github.com/cram2/cognitive_robot_abstract_machine/pull/904), [#959](https://github.com/cram2/cognitive_robot_abstract_machine/pull/959),
+  [#978](https://github.com/cram2/cognitive_robot_abstract_machine/pull/978), [#985](https://github.com/cram2/cognitive_robot_abstract_machine/pull/985), [#1003](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1003), [#1011](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1011)).
+
+#### Every package
+
+- Dataclass fields and method parameters are keyword-only in krrood ([#923](https://github.com/cram2/cognitive_robot_abstract_machine/pull/923)), cramph
+  ([#940](https://github.com/cram2/cognitive_robot_abstract_machine/pull/940)), giskardpy ([#967](https://github.com/cram2/cognitive_robot_abstract_machine/pull/967)), robokudo ([#1062](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1062)), coraplex ([#1076](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1076)) and random_events
+  ([#1082](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1082)). Pass every argument by keyword.
+- ORM schemas change across the workspace: association tables gain index columns
+  ([#1077](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1077)), exceptions get tables of their own ([#888](https://github.com/cram2/cognitive_robot_abstract_machine/pull/888)), fields typed with a parametrized
+  generic, a type alias, an unmapped dataclass or a `frozenset` are now stored ([#1002](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1002),
+  [#1032](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1032), [#1083](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1083)), and classes that bind a parametrization inherit its table ([#1065](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1065)).
+  Regenerate the ORM interfaces with `scripts/regenerate_all_orm.py` and create
+  databases written by 26.10.0 again.
+
+#### Per package
+
+- **krrood**: `Call` is abstract; build `CallWithValueArguments` or
+  `CallWithExpressionArguments`. A rule tree's alternative now yields its results after
+  the left branch ([#975](https://github.com/cram2/cognitive_robot_abstract_machine/pull/975)). `eql_to_sql` loads a result's relationships on access, so
+  read them while the session is open, or pass `result_loading=ResultLoading()` for the
+  previous eager loading ([#1065](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1065)). `eql_to_sql(..., as_common_table_expression=name)`
+  becomes `eql_to_sql(...).sql_query.cte(name)` ([#1023](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1023)). `InstantiatedVariable._type_`
+  is now the result type; the callable is `_factory_` ([#862](https://github.com/cram2/cognitive_robot_abstract_machine/pull/862)). `FloatEnum` moves to
+  `krrood.patterns.float_enumeration` ([#938](https://github.com/cram2/cognitive_robot_abstract_machine/pull/938)). In the development tools,
+  `CodeRulesCheck(staged=...)` becomes `CodeRulesCheck(changed_lines=...)` ([#1006](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1006)), and
+  `GeneratedInstructions` and `generate_instructions` become `GeneratedFile` and
+  `generate_files` ([#991](https://github.com/cram2/cognitive_robot_abstract_machine/pull/991)).
+- **probabilistic_model**: The modules of `probabilistic_model.learning` move into
+  `learning.structure` and `learning.parameters` under their old names ([#1050](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1050)).
+  `GradientDescent` is abstract; the jax trainer is `JaxGradientDescent` ([#980](https://github.com/cram2/cognitive_robot_abstract_machine/pull/980)), and
+  `LikelihoodMaximization` becomes `GradientDescent(root, AverageNegativeLogLikelihood(),
+  optimizer)` ([#961](https://github.com/cram2/cognitive_robot_abstract_machine/pull/961)). The jax package and `DifferentiableLayeredCircuit` are removed:
+  convert to a `LayeredProbabilisticCircuit` and call `to_namespace(jax.numpy)` ([#976](https://github.com/cram2/cognitive_robot_abstract_machine/pull/976)).
+  `RowGroupedSparseArray` is replaced by `SumLayer.from_entries` and `SparseEdgeMatrix`
+  ([#930](https://github.com/cram2/cognitive_robot_abstract_machine/pull/930), [#932](https://github.com/cram2/cognitive_robot_abstract_machine/pull/932), [#945](https://github.com/cram2/cognitive_robot_abstract_machine/pull/945)). Leaf layer constructors take one variable per node ([#1033](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1033)),
+  layer methods take keyword arguments ([#1040](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1040)), and `Region` of the region graphs is
+  renamed `VariableRegion` ([#1083](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1083)). `NygaInduction(min_likelihood_improvement=...)`
+  becomes `split_penalty_factor` ([#856](https://github.com/cram2/cognitive_robot_abstract_machine/pull/856)). The JSON of Nyga inductions ([#856](https://github.com/cram2/cognitive_robot_abstract_machine/pull/856)), sum
+  layers ([#932](https://github.com/cram2/cognitive_robot_abstract_machine/pull/932)) and layers ([#1046](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1046)) changes, so JSON written by 26.10.0 does not load.
+- **semantic_digital_twin**: `RevoluteConnection`, `PrismaticConnection` and
+  `ScrewConnection` become one `ScrewAxisConnection`, built from
+  `create_revolute_screw_axis`, `create_prismatic_screw_axis` or
+  `create_helical_screw_axis` ([#1059](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1059)), and `create_with_dofs` and `add_to_world` take keyword
+  arguments ([#1017](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1017)). `World.compute_inverse_kinematics` is removed;
+  solve inverse kinematics with a giskardpy Cartesian pose goal ([#1010](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1010)). The part
+  mixins move to `semantic_annotations.part_whole` ([#1072](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1072)). The grasp API is reworked
+  around grasp strategies and `GraspResult` patterns ([#792](https://github.com/cram2/cognitive_robot_abstract_machine/pull/792)). `join_shared_world(node)`
+  replaces `fetch_world_from_service` followed by a `WorldSynchronizer` ([#1022](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1022)), and
+  the message types come from `krrood_synchronization` ([#1000](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1000)). State change callbacks
+  fire once a modification block ends, without `force_republish` ([#1018](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1018)).
+  `ros2_interface` becomes `semantic_digital_twin.adapters.ros.ros_graph` ([#916](https://github.com/cram2/cognitive_robot_abstract_machine/pull/916)).
+  `InertiaTensor` and the other matrices and vectors require `data` ([#1032](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1032)). In
+  physically simulated worlds, an actuated joint's position is the measured one, not its
+  set point ([#881](https://github.com/cram2/cognitive_robot_abstract_machine/pull/881)).
+- **krrood_spatial_math**: the old `Twist` is renamed `Displacement`, and `Twist` is now a
+  velocity with `angular_velocity` and `linear_velocity` ([#1009](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1009)).
+- **coraplex**: `PlaceAction` takes `graspable` and `goal_pose`, and the other actions'
+  parameters are renamed alike ([#882](https://github.com/cram2/cognitive_robot_abstract_machine/pull/882)). `PlaceAction` requires `arm` ([#950](https://github.com/cram2/cognitive_robot_abstract_machine/pull/950)),
+  `CarryAction` requires `holding_arms` ([#879](https://github.com/cram2/cognitive_robot_abstract_machine/pull/879)), and `ActionTrial.succeeds` takes a
+  `SubtreeRebuild` ([#846](https://github.com/cram2/cognitive_robot_abstract_machine/pull/846)). `PerceptionInterface.for_source` is renamed `from_source`
+  ([#1076](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1076)).
+
+### Repository
+
+- CI runs only the tests a pull request can affect ([#1044](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1044)), skips draft pull requests
+  ([#1034](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1034)), builds every book and fails it when a cell raises ([#1041](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1041)), and runs every
+  example and demo in one job ([#1054](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1054)). Its runners free their disk and time out after an
+  hour ([#869](https://github.com/cram2/cognitive_robot_abstract_machine/pull/869), [#981](https://github.com/cram2/cognitive_robot_abstract_machine/pull/981)).
+- A test run builds only the ORM interfaces its packages need ([#926](https://github.com/cram2/cognitive_robot_abstract_machine/pull/926)), and modules import
+  an ORM interface only inside the functions that use it ([#1015](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1015)).
+- GitHub issue forms are generated from krrood declarations, and bug reports are
+  reproduced on main ([#991](https://github.com/cram2/cognitive_robot_abstract_machine/pull/991)).
+- A simulated robot can be driven cell by cell from a persistent IPython kernel ([#920](https://github.com/cram2/cognitive_robot_abstract_machine/pull/920),
+  [#955](https://github.com/cram2/cognitive_robot_abstract_machine/pull/955)).
+- Object meshes live in iai_maps ([#986](https://github.com/cram2/cognitive_robot_abstract_machine/pull/986)).
+- `scripts/sync_version.py` also bounds the optional dependencies between packages, so an
+  extra installs only siblings of its own release.
+
+### krrood
+
+#### Added
+
+- **Planning over EQL**: a `State` evaluates queries against fluents ([#866](https://github.com/cram2/cognitive_robot_abstract_machine/pull/866)), adds and
+  removes objects and supplies default domains ([#922](https://github.com/cram2/cognitive_robot_abstract_machine/pull/922)), and an
+  `AssertiveKnowledgeAction` applies an EQL precondition and effects to it ([#1060](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1060)).
+- **Ontomatic**: reads an ontology's classes and properties into an information model
+  ([#954](https://github.com/cram2/cognitive_robot_abstract_machine/pull/954)), carries property characteristics and chain axioms on property descriptors
+  ([#892](https://github.com/cram2/cognitive_robot_abstract_machine/pull/892)), and infers chained, symmetric and equivalent properties, storing facts with
+  their provenance ([#909](https://github.com/cram2/cognitive_robot_abstract_machine/pull/909)).
+- **Ripple down rules**: serialization as Python ([#974](https://github.com/cram2/cognitive_robot_abstract_machine/pull/974)), a provenance store for corner
+  cases ([#921](https://github.com/cram2/cognitive_robot_abstract_machine/pull/921)), and an adapter for underspecified matches ([#843](https://github.com/cram2/cognitive_robot_abstract_machine/pull/843)).
+- **ORMatic** stores collections of classes ([#863](https://github.com/cram2/cognitive_robot_abstract_machine/pull/863)), objects of classes with several
+  mapped base classes ([#1042](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1042)), ordered lists, nested collections and dictionaries
+  ([#1077](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1077)), and exceptions in tables of their own ([#888](https://github.com/cram2/cognitive_robot_abstract_machine/pull/888)). `eql_to_sql` translates a
+  `Match` ([#1023](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1023)) and loads the objects a query selects with few statements ([#1065](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1065)).
+- **Causal queries**: causal relations in the class diagram ([#870](https://github.com/cram2/cognitive_robot_abstract_machine/pull/870)), adjustment sets
+  learned for a class ([#878](https://github.com/cram2/cognitive_robot_abstract_machine/pull/878)), partially identified effects ([#884](https://github.com/cram2/cognitive_robot_abstract_machine/pull/884)), the repair of a
+  declared adjustment set ([#895](https://github.com/cram2/cognitive_robot_abstract_machine/pull/895)), hidden confounders ([#1055](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1055)), and trials that find out
+  what makes a behaviour succeed ([#1040](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1040)).
+- **Development tools**: rules carry deterministic checkers ([#848](https://github.com/cram2/cognitive_robot_abstract_machine/pull/848)), `krrood check` runs
+  ruff and checks the lines changed since any revision ([#1006](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1006)), and method names that
+  only the class name finishes are rejected ([#893](https://github.com/cram2/cognitive_robot_abstract_machine/pull/893)).
+
+#### Fixed
+
+- EQL: quantifiers range per outer binding ([#905](https://github.com/cram2/cognitive_robot_abstract_machine/pull/905), [#915](https://github.com/cram2/cognitive_robot_abstract_machine/pull/915)), a pattern keeps the
+  conditions evaluated before it is nested ([#925](https://github.com/cram2/cognitive_robot_abstract_machine/pull/925)), queries accept unhashable call
+  arguments ([#837](https://github.com/cram2/cognitive_robot_abstract_machine/pull/837)), and rule trees, calls, quantifiers and explanations are fixed
+  ([#975](https://github.com/cram2/cognitive_robot_abstract_machine/pull/975)).
+- ORMatic imports the modules of a specialized generic's type arguments ([#858](https://github.com/cram2/cognitive_robot_abstract_machine/pull/858)) and
+  loads a mapping that extends an abstract base mapping ([#864](https://github.com/cram2/cognitive_robot_abstract_machine/pull/864)).
+- Class diagrams resolve a field's string annotation through its declaring module
+  ([#876](https://github.com/cram2/cognitive_robot_abstract_machine/pull/876)) and an `Annotated` field to the annotated type ([#902](https://github.com/cram2/cognitive_robot_abstract_machine/pull/902)), and type-hint
+  resolution skips modules that are not installed ([#958](https://github.com/cram2/cognitive_robot_abstract_machine/pull/958)).
+- The symbol graph removes a wrapped instance by identity ([#875](https://github.com/cram2/cognitive_robot_abstract_machine/pull/875)), abstract bases stay
+  subclasses of themselves when a subclass binds a generic mixin ([#894](https://github.com/cram2/cognitive_robot_abstract_machine/pull/894)), and hashing a
+  symbolic expression that is not a scalar raises `TypeError` ([#914](https://github.com/cram2/cognitive_robot_abstract_machine/pull/914)).
+- The development tools import a project's rules without installing the repository root
+  ([#913](https://github.com/cram2/cognitive_robot_abstract_machine/pull/913)).
+
+### probabilistic_model
+
+#### Added
+
+- **Causal structure**: adjustment sets identified from a causal graph ([#845](https://github.com/cram2/cognitive_robot_abstract_machine/pull/845)), causal
+  graphs learned from data ([#860](https://github.com/cram2/cognitive_robot_abstract_machine/pull/860)) and with GES, with large equivalence classes answered
+  ([#918](https://github.com/cram2/cognitive_robot_abstract_machine/pull/918)), a check of the relational circuit's assumption ([#886](https://github.com/cram2/cognitive_robot_abstract_machine/pull/886)), and instance-to-part
+  edges in the learned graph ([#906](https://github.com/cram2/cognitive_robot_abstract_machine/pull/906)).
+- **Tensorized circuits**: training by gradient descent ([#953](https://github.com/cram2/cognitive_robot_abstract_machine/pull/953)) on torch ([#961](https://github.com/cram2/cognitive_robot_abstract_machine/pull/961)) and on
+  mini-batches until convergence ([#980](https://github.com/cram2/cognitive_robot_abstract_machine/pull/980)), numeric queries on any array backend ([#932](https://github.com/cram2/cognitive_robot_abstract_machine/pull/932),
+  [#939](https://github.com/cram2/cognitive_robot_abstract_machine/pull/939), [#945](https://github.com/cram2/cognitive_robot_abstract_machine/pull/945)), RAT-SPNs built from region graphs ([#976](https://github.com/cram2/cognitive_robot_abstract_machine/pull/976)), folded layers ([#1033](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1033)),
+  expectation maximization with jax and torch ([#1050](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1050)), hidden Chow-Liu tree circuits
+  ([#1069](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1069)), and dense probability tables trained through their normalization ([#1028](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1028)).
+- Layered probabilistic circuits are stored with ORMatic ([#1083](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1083)).
+- A benchmark of the circuit learning methods against RAT-SPN, JPT and EM ([#1002](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1002)).
+- The Nyga induction stops by a split penalty and fits data with up to 5000 unique values
+  optimally ([#856](https://github.com/cram2/cognitive_robot_abstract_machine/pull/856)).
+
+#### Fixed
+
+- The truncated Gaussian's cumulative distribution stays non-negative ([#1016](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1016)).
+- RAT-SPN circuits train the intended objective ([#927](https://github.com/cram2/cognitive_robot_abstract_machine/pull/927)).
+
+#### Performance
+
+- Block-edge circuits train up to 10x faster with jax and 4x with torch, and jax uses
+  every CPU core ([#1046](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1046)).
+- Tensorized sum layers scale with the number of rows ([#930](https://github.com/cram2/cognitive_robot_abstract_machine/pull/930)).
+
+### random_events
+
+- Dataclass fields and method parameters are keyword-only ([#1082](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1082)).
+
+### semantic_digital_twin
+
+#### Added
+
+- Fruits, their anatomy and ripeness, on a shared base for semantic relationships
+  ([#1072](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1072)), with tissue densities and elasticities ([#1081](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1081)).
+- `ScrewAxisConnection` for revolute, prismatic and helical joints ([#1059](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1059)).
+- Joining a shared world without losing or repeating updates ([#1022](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1022)), and rollbacks
+  that give back connections, degree of freedom state and history ([#969](https://github.com/cram2/cognitive_robot_abstract_machine/pull/969)).
+- USD scenes load as one body per object, and only meshes RViz can load are published
+  ([#977](https://github.com/cram2/cognitive_robot_abstract_machine/pull/977)).
+- MuJoCo 4.0.1, meshes placed by their MJCF reference frame ([#1061](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1061)), and torsional and
+  rolling friction of contacts ([#957](https://github.com/cram2/cognitive_robot_abstract_machine/pull/957)).
+- The nearest free point of a graph of convex sets ([#989](https://github.com/cram2/cognitive_robot_abstract_machine/pull/989)), a collision rule lookup
+  ([#994](https://github.com/cram2/cognitive_robot_abstract_machine/pull/994)), a closed-loop whole-body velocity interface for the dual-arm TIAGo ([#1053](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1053)),
+  and the position limits that block a stalled motion ([#1049](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1049)).
+
+#### Fixed
+
+- Every descendant of a kinematic structure entity is listed once ([#855](https://github.com/cram2/cognitive_robot_abstract_machine/pull/855)).
+- A connection keeps its name when re-parented ([#891](https://github.com/cram2/cognitive_robot_abstract_machine/pull/891)), a branch moved to a new world
+  keeps its joint state ([#956](https://github.com/cram2/cognitive_robot_abstract_machine/pull/956)), and copying and merging keep simulator properties and
+  actuated degrees of freedom ([#968](https://github.com/cram2/cognitive_robot_abstract_machine/pull/968)).
+- Writing joint states applies a joint's multiplier and offset ([#992](https://github.com/cram2/cognitive_robot_abstract_machine/pull/992)).
+- Changing an attribute checks for an open modification block ([#890](https://github.com/cram2/cognitive_robot_abstract_machine/pull/890)), blocks that modify
+  nothing are skipped ([#972](https://github.com/cram2/cognitive_robot_abstract_machine/pull/972)), and positions written in a modification are published
+  with its model change ([#1018](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1018)).
+- A receiver keeps receiving after an update it cannot apply and tells the owner
+  ([#973](https://github.com/cram2/cognitive_robot_abstract_machine/pull/973)), and the readers of a topic share one subscription ([#871](https://github.com/cram2/cognitive_robot_abstract_machine/pull/871)).
+- A flat mesh gets its convex hull when V-HACD finds no convex parts ([#965](https://github.com/cram2/cognitive_robot_abstract_machine/pull/965)).
+- A MuJoCo floor no longer drags a driven base ([#901](https://github.com/cram2/cognitive_robot_abstract_machine/pull/901)), and the kitchen environment's
+  floor no longer flickers and holds up against laser scans ([#861](https://github.com/cram2/cognitive_robot_abstract_machine/pull/861), [#900](https://github.com/cram2/cognitive_robot_abstract_machine/pull/900)).
+- Every frame of a MuJoCo video is rendered with one renderer ([#857](https://github.com/cram2/cognitive_robot_abstract_machine/pull/857)).
+
+### krrood_spatial_math
+
+- `Displacement`, a `Twist` that is a velocity ([#1009](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1009)), and `ScrewAxis`, sharing their
+  storage in `VectorPair` ([#1025](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1025)). Twists and screw axes integrate to displacements
+  ([#1035](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1035)).
+- The rotational distance of rotation matrices is measured the shorter way round ([#847](https://github.com/cram2/cognitive_robot_abstract_machine/pull/847)).
+- A book on frames, transformations and rates of motion ([#1043](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1043)).
+
+### krrood_synchronization
+
+New package: the bookkeeping of message streams, taken out of semantic_digital_twin and
+giskardpy ([#1000](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1000)). It is released on PyPI from this version on.
+
+### coraplex
+
+#### Added
+
+- A failure handling node recovers a plan while it runs ([#850](https://github.com/cram2/cognitive_robot_abstract_machine/pull/850)), and causal failure
+  handling finds the node that caused a failure ([#1047](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1047)), such as the one that wound a
+  joint up to a position limit ([#1085](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1085)).
+- A place follows an underspecified pick-up ([#950](https://github.com/cram2/cognitive_robot_abstract_machine/pull/950)), a carry reads what its arms hold
+  when it starts ([#879](https://github.com/cram2/cognitive_robot_abstract_machine/pull/879)), and the statements of a parallel are grounded as one choice
+  ([#846](https://github.com/cram2/cognitive_robot_abstract_machine/pull/846)).
+- Framework fixes and additions from the RoboCasa experiments ([#966](https://github.com/cram2/cognitive_robot_abstract_machine/pull/966)).
+
+#### Changed
+
+- Every action and node parameter comes from one mixin ([#882](https://github.com/cram2/cognitive_robot_abstract_machine/pull/882)).
+
+### Packages not published to PyPI
+
+- **giskardpy**: worlds are given as a `WorldSource` instead of a `WorldConfig` ([#851](https://github.com/cram2/cognitive_robot_abstract_machine/pull/851)).
+  A goal's cruise velocity is its executed speed ([#874](https://github.com/cram2/cognitive_robot_abstract_machine/pull/874)), goals merge into tasks
+  ([#924](https://github.com/cram2/cognitive_robot_abstract_machine/pull/924)), and each goal asks for its own trajectory plot and debug markers, published
+  off the control loop ([#931](https://github.com/cram2/cognitive_robot_abstract_machine/pull/931), [#983](https://github.com/cram2/cognitive_robot_abstract_machine/pull/983)). The Cartesian velocity limit tasks, the debug
+  expression plotter and `giskardpy.utils` are removed ([#999](https://github.com/cram2/cognitive_robot_abstract_machine/pull/999), [#1007](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1007), [#1020](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1020)).
+  Robotiq grippers are driven through their action servers ([#809](https://github.com/cram2/cognitive_robot_abstract_machine/pull/809), [#919](https://github.com/cram2/cognitive_robot_abstract_machine/pull/919)), and an
+  action server task cancels its goal whenever it stops running ([#1038](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1038)). External
+  collision buffer zones scale by the distance to a goal ([#1067](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1067)), and motions brake
+  onto a position limit ([#942](https://github.com/cram2/cognitive_robot_abstract_machine/pull/942), [#995](https://github.com/cram2/cognitive_robot_abstract_machine/pull/995)).
+- **cramph**: statecharts are stored with their nodes, conditions and state history
+  ([#885](https://github.com/cram2/cognitive_robot_abstract_machine/pull/885)). Changes to a statechart's structure are recorded and reported in blocks
+  ([#1004](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1004), [#1030](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1030)), a cancelled statechart interrupts its running nodes and keeps the
+  exception it ended with ([#907](https://github.com/cram2/cognitive_robot_abstract_machine/pull/907), [#911](https://github.com/cram2/cognitive_robot_abstract_machine/pull/911)), and `FunctionCall` observes unknown instead of
+  waiting for its function ([#1086](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1086)). The data types are tidied, and `LifeCycleValues`
+  and `ObservationStateValues` are renamed `LifeCycleValue` and `ObservationStateValue`
+  ([#938](https://github.com/cram2/cognitive_robot_abstract_machine/pull/938), [#946](https://github.com/cram2/cognitive_robot_abstract_machine/pull/946)). The ORM interface is generated without ROS ([#941](https://github.com/cram2/cognitive_robot_abstract_machine/pull/941)).
+- **robokudo**: the semantic digital twin is shared through a `WorldSynchronizer`
+  ([#795](https://github.com/cram2/cognitive_robot_abstract_machine/pull/795)), annotators log through module loggers instead of `rk_logger` ([#1051](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1051)), and a
+  stereo camera interface ([#963](https://github.com/cram2/cognitive_robot_abstract_machine/pull/963)) and the `FoundationPoseAnnotator` ([#868](https://github.com/cram2/cognitive_robot_abstract_machine/pull/868)) are added.
+- **segmind**: a watched body without collision geometry relates to nothing ([#960](https://github.com/cram2/cognitive_robot_abstract_machine/pull/960)).
+
 ## [26.10.0] - 2026-10-31
 
 ### Upgrade notes
@@ -414,4 +699,5 @@ These packages take the shared version but are not released on PyPI.
 - **experiments**: experiments for causal circuits, layered circuits, graphs of convex
   sets and shelf scenes ([#509](https://github.com/cram2/cognitive_robot_abstract_machine/pull/509), [#604](https://github.com/cram2/cognitive_robot_abstract_machine/pull/604), [#636](https://github.com/cram2/cognitive_robot_abstract_machine/pull/636), [#698](https://github.com/cram2/cognitive_robot_abstract_machine/pull/698), [#711](https://github.com/cram2/cognitive_robot_abstract_machine/pull/711)).
 
-[26.10.0]: https://github.com/cram2/cognitive_robot_abstract_machine/compare/52f4f745da...main
+[26.11.0]: https://github.com/cram2/cognitive_robot_abstract_machine/compare/5244715841...main
+[26.10.0]: https://github.com/cram2/cognitive_robot_abstract_machine/compare/52f4f745da...5244715841

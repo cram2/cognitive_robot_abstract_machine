@@ -27,16 +27,16 @@ authors = [
     {name = "David Prüser", email = "david@pruesernet.de"}
 ]
 dependencies = [
-    "krrood-core==26.10.0",
-    "krrood-eql==26.10.0",
-    "krrood-ormatic==26.10.0",
-    "krrood-symbolic-math==26.10.0",
-    "krrood_compute_resources>=26.10.0",
+    "krrood-core==26.11.0",
+    "krrood-eql==26.11.0",
+    "krrood-ormatic==26.11.0",
+    "krrood-symbolic-math==26.11.0",
+    "krrood_compute_resources>=26.11.0",
     "numpy",
     "pandas",
     "sqlalchemy",
-    "probabilistic_model>=26.10.0",
-    "random_events>=26.10.0",
+    "probabilistic_model>=26.11.0",
+    "random_events>=26.11.0",
 ]
 
 [project.urls]
