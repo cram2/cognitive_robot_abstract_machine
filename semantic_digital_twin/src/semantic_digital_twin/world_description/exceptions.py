@@ -12,6 +12,8 @@ import numpy as np
 from numpy.typing import NDArray
 
 from krrood.exceptions import DataclassException
+from semantic_digital_twin.datastructures.prefixed_name import PrefixedName
+from semantic_digital_twin.exceptions import UsageError
 
 # %% Color channels
 
@@ -92,6 +94,55 @@ class AsymmetricInertiaTensorError(DataclassException, ValueError):
 
     def suggest_correction(self) -> str:
         return "Give equal products of inertia above and below the diagonal."
+
+
+# %% Geometry
+
+
+@dataclass(kw_only=True)
+class TooFewRegionPointsError(UsageError):
+    """
+    Raised when a region is built from fewer unique points than span an area.
+    """
+
+    unique_point_count: int
+    """
+    How many unique points were given.
+    """
+
+    minimum_point_count: int
+    """
+    How many unique points a region needs at least.
+    """
+
+    def error_message(self) -> str:
+        return f"A region needs at least {self.minimum_point_count} unique points, got {self.unique_point_count}."
+
+    def suggest_correction(self) -> str:
+        return f"Give at least {self.minimum_point_count} distinct points."
+
+
+# %% Fill levels
+
+
+@dataclass(kw_only=True)
+class MissingFillLevelLimitsError(UsageError):
+    """
+    Raised when a fill-level connection's fill degree of freedom has no position limits,
+    so the integrated fill level cannot be clamped.
+    """
+
+    connection_name: PrefixedName
+    """
+    The name of the fill-level connection whose fill degree of freedom lacks position
+    limits.
+    """
+
+    def error_message(self) -> str:
+        return f"The fill degree of freedom of {self.connection_name} has no position limits to clamp the fill level to."
+
+    def suggest_correction(self) -> str:
+        return "create the connection via initialize_fill_level, or give its degree of freedom lower and upper position limits."
 
 
 # %% Mesh files
