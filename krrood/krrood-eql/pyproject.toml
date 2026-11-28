@@ -38,13 +38,13 @@ dependencies = [
 [project.optional-dependencies]
 # Queries for probabilities and distributions.
 probabilistic = [
-    "krrood-probabilistic",
-    "random_events",
-    "probabilistic_model",
+    "krrood-probabilistic==26.10.0",
+    "random_events>=26.10.0",
+    "probabilistic_model>=26.10.0",
 ]
 # Symbolic scalars in class diagrams.
 symbolic-math = [
-    "krrood-symbolic-math",
+    "krrood-symbolic-math==26.10.0",
 ]
 
 [project.urls]

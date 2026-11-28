@@ -63,7 +63,7 @@ dev = [
     "pyyaml",
 ]
 visualization = [
-    "krrood-rustworkx-utils[visualization]",
+    "krrood-rustworkx-utils[visualization]==26.10.0",
 ]
 
 [project.urls]

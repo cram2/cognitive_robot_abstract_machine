@@ -45,7 +45,7 @@ dev = [
     "treon",
     "bokeh",
     "mypy>=1.8",
-    "krrood-development-tools",
+    "krrood-development-tools>=26.10.0",
 ]
 
 doc = [
