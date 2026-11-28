@@ -14,9 +14,10 @@ from enum import StrEnum
 from types import MethodType, TracebackType
 
 import torch
+from krrood_compute_resources.devices import Device
 from krrood_compute_resources.memory import HostMemory, PeakTrackingMemory
 from krrood_compute_resources.torch_memory import TorchDeviceMemory
-from typing_extensions import Callable
+from typing_extensions import Callable, Self
 
 from probabilistic_model.learning.parameters.circuit_parameter_learning import (
     CircuitParameterLearning,
@@ -342,4 +343,15 @@ class TorchDeviceType(StrEnum):
     The types of torch devices that are told apart.
     """
 
+    CENTRAL_PROCESSOR = "cpu"
     COMPUTE_UNIFIED_DEVICE_ARCHITECTURE = "cuda"
+
+    @classmethod
+    def from_device(cls, *, device: Device) -> Self:
+        """
+        :param device: A kind of device.
+        :return: The torch device type of that kind of device.
+        """
+        if device is Device.GRAPHICS_PROCESSOR:
+            return cls.COMPUTE_UNIFIED_DEVICE_ARCHITECTURE
+        return cls.CENTRAL_PROCESSOR

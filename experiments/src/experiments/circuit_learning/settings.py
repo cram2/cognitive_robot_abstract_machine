@@ -22,6 +22,9 @@ from krrood.entity_query_language.factories import a, variable_from
 from krrood_compute_resources.devices import Device
 from typing_extensions import Any, Self
 
+from probabilistic_model.learning.parameters.torch_circuit_parameter_learning import (
+    TorchDeviceType,
+)
 from probabilistic_model.probabilistic_circuit.tensorized.inner_layer.edge_matrix import (
     BlockEdgeMatrix,
     DenseEdgeMatrix,
@@ -194,9 +197,7 @@ class ComputationSetting:
         if self.array_library is ArrayLibrary.JAX:
             return jax.devices(self.device)[0]
         if self.array_library is ArrayLibrary.TORCH:
-            return torch.device(
-                "cuda" if self.device is Device.GRAPHICS_PROCESSOR else "cpu"
-            )
+            return torch.device(TorchDeviceType.from_device(device=self.device))
         return None
 
     @property

@@ -51,6 +51,10 @@ from probabilistic_model.learning.structure.hidden_chow_liu_tree.hidden_chow_liu
     HiddenChowLiuTree,
 )
 from probabilistic_model.learning.structure.jpt.jpt import JointProbabilityTree
+from probabilistic_model.learning.structure.latent_variable_distillation.latent_variable_distillation import (
+    LatentVariableDistillation,
+    MaskedAutoencoderTraining,
+)
 from probabilistic_model.learning.structure.mutual_information import (
     BinnedMutualInformation,
     MutualInformationEstimator,
@@ -98,6 +102,7 @@ class LearningMethod(StrEnum):
     )
     JOINT_PROBABILITY_TREE = "joint probability tree"
     HIDDEN_CHOW_LIU_TREE = "hidden Chow-Liu tree"
+    LATENT_VARIABLE_DISTILLATION = "latent variable distillation"
 
 
 # %% learners
@@ -683,12 +688,7 @@ class HiddenChowLiuTreeByExpectationMaximization(BenchmarkMethod):
         context: TrainingContext,
     ) -> LearnedCircuit:
         rows = dataset.encoded(frame=dataset.train)
-        host = HiddenChowLiuTree(
-            variables=dataset.variables,
-            hidden_states=self.hidden_states,
-            mutual_information=self.mutual_information,
-            seed=self.seed,
-        ).build_circuit(data=rows)
+        host = self.initial_circuit(dataset=dataset, setting=setting)
         circuit = setting.placed(circuit=host)
         histories = []
         for phase in self.phases:
@@ -715,6 +715,83 @@ class HiddenChowLiuTreeByExpectationMaximization(BenchmarkMethod):
             history=ConvergenceHistory.from_consecutive(histories=histories),
         )
 
+    def structure(self, *, dataset: BenchmarkDataset) -> HiddenChowLiuTree:
+        """
+        :param dataset: The dataset.
+        :return: The hidden Chow-Liu tree over the variables of the dataset.
+        """
+        return HiddenChowLiuTree(
+            variables=dataset.variables,
+            hidden_states=self.hidden_states,
+            mutual_information=self.mutual_information,
+            seed=self.seed,
+        )
+
+    def initial_circuit(
+        self, *, dataset: BenchmarkDataset, setting: ComputationSetting
+    ) -> LayeredProbabilisticCircuit:
+        """
+        :param dataset: The dataset, of which only the training rows are read.
+        :param setting: The setting the circuit is trained in.
+        :return: The circuit the expectation maximization phases start from, with
+            random initial numpy parameters.
+        """
+        return self.structure(dataset=dataset).build_circuit(
+            data=dataset.encoded(frame=dataset.train)
+        )
+
+
+@dataclass(kw_only=True)
+class LatentVariableDistillationByExpectationMaximization(
+    HiddenChowLiuTreeByExpectationMaximization
+):
+    """
+    One hidden Chow-Liu tree circuit whose initial parameters are distilled from a
+    masked autoencoder :cite:`liu2023scaling`, then fine-tuned like
+    :class:`HiddenChowLiuTreeByExpectationMaximization`.
+    """
+
+    autoencoder: MaskedAutoencoderTraining = field(
+        default_factory=MaskedAutoencoderTraining
+    )
+    """
+    The autoencoder the latent states are distilled from, and its training.
+    """
+
+    @property
+    def name(self) -> LearningMethod:
+        """
+        :return: The name of latent variable distillation, see
+            :meth:`HiddenChowLiuTreeByExpectationMaximization.name`.
+        """
+        return LearningMethod.LATENT_VARIABLE_DISTILLATION
+
+    def distillation(
+        self, *, dataset: BenchmarkDataset, setting: ComputationSetting
+    ) -> LatentVariableDistillation:
+        """
+        :param dataset: The dataset.
+        :param setting: The setting the circuit is fine-tuned in.
+        :return: The distillation into the hidden Chow-Liu tree of the dataset, on the
+            device of the setting.
+        """
+        return LatentVariableDistillation(
+            structure=self.structure(dataset=dataset),
+            autoencoder=self.autoencoder,
+            device=setting.device,
+        )
+
+    def initial_circuit(
+        self, *, dataset: BenchmarkDataset, setting: ComputationSetting
+    ) -> LayeredProbabilisticCircuit:
+        """
+        :return: The circuit with initial numpy parameters counted from the distilled
+            latent states, see :meth:`HiddenChowLiuTreeByExpectationMaximization.initial_circuit`.
+        """
+        return self.distillation(dataset=dataset, setting=setting).build_circuit(
+            data=dataset.encoded(frame=dataset.train)
+        )
+
 
 # %% all methods
 
@@ -732,6 +809,7 @@ class BenchmarkMethods:
             RandomTensorizedSumProductNetworkByOnlineExpectationMaximization(),
             JointProbabilityTreeBaseline(),
             HiddenChowLiuTreeByExpectationMaximization(),
+            LatentVariableDistillationByExpectationMaximization(),
         ]
     )
     """

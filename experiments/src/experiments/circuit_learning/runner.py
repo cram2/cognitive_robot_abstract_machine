@@ -31,7 +31,10 @@ from krrood_compute_resources.machine import Machine, MachineDivision, MachineSh
 from krrood_compute_resources.torch_memory import TorchDeviceMemory
 from krrood.adapters.json_serializer import from_json, to_json
 
-from experiments.circuit_learning.database import BenchmarkDatabase
+from experiments.circuit_learning.database import (
+    BenchmarkDatabase,
+    TrainedCircuitFiles,
+)
 from experiments.circuit_learning.datasets import DatasetName, PreparedDatasets
 from experiments.circuit_learning.exceptions import NoShareForRunError
 from experiments.circuit_learning.measurements import (
@@ -48,7 +51,6 @@ from experiments.circuit_learning.records import (
     RunKind,
     RunRecord,
     RunStatus,
-    TrainedCircuit,
 )
 from experiments.circuit_learning.rows import BenchmarkConfiguration
 from experiments.circuit_learning.settings import (
@@ -75,6 +77,7 @@ class OutputFile(StrEnum):
 
     DATABASE = "results.sqlite"
     LOGS = "logs"
+    CIRCUITS = "circuits"
 
 
 # %% limits
@@ -144,6 +147,11 @@ class RunExecution:
     The database of the benchmark.
     """
 
+    circuits: TrainedCircuitFiles
+    """
+    The files of the circuits the training runs learned.
+    """
+
     cache_directory: Path
     """
     The directory of the downloaded and prepared datasets.
@@ -156,8 +164,8 @@ class RunExecution:
 
     def execute(self) -> None:
         """
-        Measure, and store the rows, and the learned circuit of a training run, in one
-        transaction.
+        Measure and store the rows; a training run also writes the circuit it learned to
+        its file.
         """
         jax.config.update("jax_enable_x64", True)
         dataset = PreparedDatasets(cache_directory=self.cache_directory).load(
@@ -175,7 +183,7 @@ class RunExecution:
                         seed=method.seed,
                     ),
                     setting=self.run.setting,
-                    circuit=self.database.trained_circuit(run=self.run.training_run()),
+                    circuit=self.circuits.read(training_run=self.run.training_run()),
                 ).run()
             )
             return
@@ -188,14 +196,10 @@ class RunExecution:
                 memory_budget_bytes=self.limits.memory_budget_bytes,
             ),
         ).run()
-        self.database.store(
-            records=[
-                measured.result,
-                TrainedCircuit(
-                    training_run=self.run, circuit=measured.circuit.to_namespace(np)
-                ),
-            ]
+        self.circuits.write(
+            training_run=self.run, circuit=measured.circuit.to_namespace(np)
         )
+        self.database.store(records=[measured.result])
 
 
 # %% scheduling
@@ -625,6 +629,9 @@ def main() -> None:
         RunExecution(
             run=from_json(json.loads(arguments.run)),
             database=BenchmarkDatabase(path=arguments.output / OutputFile.DATABASE),
+            circuits=TrainedCircuitFiles(
+                directory=arguments.output / OutputFile.CIRCUITS
+            ),
             cache_directory=arguments.cache_directory,
             limits=limits,
         ).execute()
