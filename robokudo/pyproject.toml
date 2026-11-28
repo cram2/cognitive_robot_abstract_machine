@@ -13,7 +13,7 @@ authors = [
 ]
 description = "Cognitive robot perception framework"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 license = "LGPL-3.0-only"
 classifiers = [
     "Programming Language :: Python :: 3",
@@ -33,10 +33,10 @@ dependencies = [
     "opencv-python>=4.11.0.86",
     "matplotlib>=3.0",
     "setuptools",
-    "krrood-core>=26.10.0",
-    "krrood-serialization>=26.10.0",
-    "semantic_digital_twin>=26.10.0",
-    "krrood_spatial_math[casadi]>=26.10.0",
+    "krrood-core>=26.11.0",
+    "krrood-serialization>=26.11.0",
+    "semantic_digital_twin>=26.11.0",
+    "krrood_spatial_math[casadi]>=26.11.0",
     "transformers",
     "faiss-cpu",
     "ultralytics",

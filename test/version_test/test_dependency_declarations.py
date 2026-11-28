@@ -7,6 +7,7 @@ imports.
 from __future__ import annotations
 
 import ast
+import itertools
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
@@ -14,7 +15,9 @@ from typing_extensions import Any
 
 import pytest
 from packaging.requirements import Requirement
+from packaging.specifiers import SpecifierSet
 from packaging.utils import canonicalize_name
+from packaging.version import Version
 
 # %% reading imports
 
@@ -123,6 +126,18 @@ class WorkspaceMember:
             for extra in self.project_table.get("optional-dependencies", {}).values()
             for specifier in extra
         }
+
+    @property
+    def oldest_python(self) -> Version:
+        """
+        The oldest Python 3 minor release the member's ``requires-python`` admits.
+        """
+        supported = SpecifierSet(self.project_table.get("requires-python", ""))
+        return next(
+            version
+            for version in (Version(f"3.{minor}") for minor in itertools.count())
+            if supported.contains(version)
+        )
 
     @property
     def provided_packages(self) -> set[str]:
@@ -246,6 +261,23 @@ def test_imported_workspace_members_are_declared(member: WorkspaceMember) -> Non
         if not member.declares_dependency_on(member_name=imported, members=MEMBERS)
     }
     assert undeclared_members == set()
+
+
+@pytest.mark.parametrize("member", MEMBERS, ids=[member.name for member in MEMBERS])
+def test_a_member_admits_no_python_older_than_its_dependencies_do(
+    member: WorkspaceMember,
+) -> None:
+    """
+    On a Python a dependency rejects, an installer would otherwise fall back to an older
+    release of the member instead of failing.
+    """
+    members_by_name = {other.name: other for other in MEMBERS}
+    dependencies_needing_a_newer_python = {
+        name
+        for name in member.members_depended_on(members=MEMBERS)
+        if members_by_name[name].oldest_python > member.oldest_python
+    }
+    assert dependencies_needing_a_newer_python == set()
 
 
 # %% layering

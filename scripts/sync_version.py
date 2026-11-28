@@ -1,6 +1,7 @@
-"""Synchronize the root VERSION file into every package of the workspace: the root and
-the members of its ``[tool.uv.workspace]``. Dependencies between them require at least
-that version, and exactly it between packages released together.
+"""
+Synchronize the root VERSION file into every package of the workspace: the root and the
+members of its ``[tool.uv.workspace]``. Dependencies between them require at least that
+version, and exactly it between packages released together.
 
 ``--check`` writes nothing and exits non-zero when a file would change.
 """
@@ -21,42 +22,95 @@ from krrood.development_tools.pyproject import Pyproject, PyprojectKey
 
 # %% names the script reads
 class RepositoryFile(StrEnum):
-    """The files this script reads, by name."""
+    """
+    The files this script reads, by name.
+    """
 
     VERSION = "VERSION"
-    """The repository's one version, at its root."""
+    """
+    The repository's one version, at its root.
+    """
 
     PYPROJECT = "pyproject.toml"
-    """A package's metadata, at the root of the package's directory."""
+    """
+    A package's metadata, at the root of the package's directory.
+    """
 
 
 class CommandFlag(StrEnum):
-    """The command-line flags of this script."""
+    """
+    The command-line flags of this script.
+    """
 
     CHECK = "--check"
 
 
 class VersionOperator(StrEnum):
-    """How a dependency on another package of the workspace is bounded."""
+    """
+    How a dependency on another package of the workspace is bounded.
+    """
 
     AT_LEAST = ">="
-    """A package released on its own accepts any later release of the other."""
+    """
+    A package released on its own accepts any later release of the other.
+    """
 
     EXACTLY = "=="
-    """Packages released together install only with each other's release."""
+    """
+    Packages released together install only with each other's release.
+    """
+
+
+class DependencyDeclaration(StrEnum):
+    """
+    The kinds of dependency a ``pyproject.toml`` declares, each by the pattern that
+    finds the part of the file declaring them.
+    """
+
+    REQUIRED = rf"^{PyprojectKey.DEPENDENCIES}\s*=\s*\[.*?^\]"
+    """
+    The ``[project]`` ``dependencies`` array, closed on a line of its own.
+    """
+
+    OPTIONAL = (
+        rf"^\[{PyprojectKey.PROJECT}\.{PyprojectKey.OPTIONAL_DEPENDENCIES}\][^\n]*\n"
+        r".*?(?=^\[|\Z)"
+    )
+    """
+    The ``[project.optional-dependencies]`` table, up to the next table.
+    """
+
+    def declared_specifiers(self, *, pyproject: Pyproject) -> list[str]:
+        """
+        :param pyproject: What this script reads of a ``pyproject.toml``.
+        :return: The dependencies of this kind it declares, as written.
+        """
+        if self is DependencyDeclaration.REQUIRED:
+            return pyproject.dependencies
+        return [
+            specifier
+            for specifiers in pyproject.optional_dependencies.values()
+            for specifier in specifiers
+        ]
 
 
 # %% a package
 @dataclass(frozen=True, kw_only=True)
 class VersionedPackage:
-    """A package whose version setuptools reads from a module of the package's
-    own, or one that declares the version of the packages its directory holds."""
+    """
+    A package whose version setuptools reads from a module of the package's own, or one
+    that declares the version of the packages its directory holds.
+    """
 
     directory: Path
-    """The directory the package's ``pyproject.toml`` is in."""
+    """
+    The directory the package's ``pyproject.toml`` is in.
+    """
 
     pyproject: Pyproject
-    """What this script reads of that file."""
+    """
+    What this script reads of that file.
+    """
 
     @classmethod
     def from_directory(
@@ -149,8 +203,8 @@ class VersionedPackage:
         :param released_together: The names of the siblings released together with this
             package.
         :param version: The version every sibling is released at.
-        :return: The content of the package's ``pyproject.toml`` with every ``[project]``
-            dependency on a sibling bounded to ``==version`` if it is released together
+        :return: The content of the package's ``pyproject.toml`` with every required and
+            optional dependency on a sibling bounded to ``==version`` if it is released together
             with this package and to ``>=version`` otherwise, and the declared version, if
             any, set to ``version``. A bound already there is replaced; extras and markers
             stay, and so does everything else in the file.
@@ -158,23 +212,24 @@ class VersionedPackage:
         text = self.pyproject_file.read_text()
         if self.pyproject.declared_version is not None:
             text = self.replace_declared_version(text=text, version=version)
-        for specifier in self.pyproject.dependencies:
-            requirement = Requirement(specifier)
-            name = canonicalize_name(requirement.name)
-            if name not in siblings or name == self.distribution_name:
-                continue
-            operator = (
-                VersionOperator.EXACTLY
-                if name in released_together
-                else VersionOperator.AT_LEAST
-            )
-            text = self.replace_dependency(
-                text=text,
-                old=specifier,
-                new=self.bounded(
-                    specifier=specifier, operator=operator, version=version
-                ),
-            )
+        for declaration in DependencyDeclaration:
+            for specifier in declaration.declared_specifiers(pyproject=self.pyproject):
+                name = canonicalize_name(Requirement(specifier).name)
+                if name not in siblings or name == self.distribution_name:
+                    continue
+                operator = (
+                    VersionOperator.EXACTLY
+                    if name in released_together
+                    else VersionOperator.AT_LEAST
+                )
+                text = self.replace_dependency(
+                    text=text,
+                    declaration=declaration,
+                    old=specifier,
+                    new=self.bounded(
+                        specifier=specifier, operator=operator, version=version
+                    ),
+                )
         return text
 
     @staticmethod
@@ -210,34 +265,40 @@ class VersionedPackage:
         return f"{requirement.name}{extras}{operator}{version}{marker}"
 
     @staticmethod
-    def replace_dependency(*, text: str, old: str, new: str) -> str:
+    def replace_dependency(
+        *, text: str, declaration: DependencyDeclaration, old: str, new: str
+    ) -> str:
         """
         :param text: The content of a ``pyproject.toml``.
-        :param old: A dependency as the ``[project]`` ``dependencies`` array lists it.
-        :param new: What to list instead.
-        :return: ``text`` with that array's ``old`` entry replaced by ``new``; nothing
-            else, such as a dependency group naming the same package, is touched.
+        :param declaration: The kind of dependency ``old`` is.
+        :param old: A dependency as the file declares it.
+        :param new: What to declare instead.
+        :return: ``text`` with every ``old`` entry of the part declaring ``declaration``
+            replaced by ``new``; nothing else, such as a dependency group naming the same
+            package, is touched.
         """
-        array = re.search(
-            rf"^{PyprojectKey.DEPENDENCIES}\s*=\s*\[.*?^\]",
-            text,
-            re.DOTALL | re.MULTILINE,
-        )
+        part = re.search(declaration, text, re.DOTALL | re.MULTILINE)
         entry = re.compile(rf"([\"']){re.escape(old)}\1")
-        replaced = entry.sub(lambda match: f"{match[1]}{new}{match[1]}", array[0])
-        return text[: array.start()] + replaced + text[array.end() :]
+        replaced = entry.sub(lambda match: f"{match[1]}{new}{match[1]}", part[0])
+        return text[: part.start()] + replaced + text[part.end() :]
 
 
 # %% the repository
 @dataclass(frozen=True)
 class ManagedFile:
-    """A file this script keeps in sync, with the content it is to have."""
+    """
+    A file this script keeps in sync, with the content it is to have.
+    """
 
     path: Path
-    """Where the file is."""
+    """
+    Where the file is.
+    """
 
     text: str
-    """The content the file is to have."""
+    """
+    The content the file is to have.
+    """
 
     @property
     def is_outdated(self) -> bool:
@@ -249,10 +310,14 @@ class ManagedFile:
 
 @dataclass(frozen=True, kw_only=True)
 class Repository:
-    """This repository, whose root holds the version every package carries."""
+    """
+    This repository, whose root holds the version every package carries.
+    """
 
     root: Path
-    """The repository's root directory."""
+    """
+    The repository's root directory.
+    """
 
     @classmethod
     def from_this_checkout(cls) -> Repository:
@@ -361,7 +426,8 @@ class Repository:
         return [file for file in self.expected_files() if file.is_outdated]
 
     def synchronize(self) -> list[ManagedFile]:
-        """Write every managed file whose content is outdated.
+        """
+        Write every managed file whose content is outdated.
 
         :return: The files written.
         """

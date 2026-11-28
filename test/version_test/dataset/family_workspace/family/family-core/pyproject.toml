@@ -5,8 +5,21 @@ dependencies = [
     "third-party>=2.0",
 ]
 
+[project.optional-dependencies]
+extended = [
+    "family-extra",
+    "loner[cli]>=1.0",
+    "third-party>=2.0",
+]
+inline = ["family-extra; sys_platform == 'linux'"]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.dynamic]
 version = {attr = "family._version.__version__"}
+
+[dependency-groups]
+workspace = [
+    "family-extra",
+]

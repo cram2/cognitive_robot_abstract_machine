@@ -21,6 +21,7 @@ class PyprojectKey(StrEnum):
     PROJECT = "project"
     NAME = "name"
     DEPENDENCIES = "dependencies"
+    OPTIONAL_DEPENDENCIES = "optional-dependencies"
     TOOL = "tool"
     UV = "uv"
     WORKSPACE = "workspace"
@@ -54,6 +55,10 @@ class Pyproject:
 
     dependencies: list[str]
     """The ``[project]`` dependencies as written."""
+
+    optional_dependencies: dict[str, list[str]]
+    """The ``[project.optional-dependencies]`` as written, by extra; empty without
+    any."""
 
     version_attribute: str
     """The dotted path of the attribute setuptools reads the version from;
@@ -105,6 +110,7 @@ class Pyproject:
             distribution_name=canonicalize_name(project[PyprojectKey.NAME]),
             declared_version=project.get(PyprojectKey.VERSION),
             dependencies=project.get(PyprojectKey.DEPENDENCIES, []),
+            optional_dependencies=project.get(PyprojectKey.OPTIONAL_DEPENDENCIES, {}),
             version_attribute=setuptools.get(PyprojectKey.DYNAMIC, {})
             .get(PyprojectKey.VERSION, {})
             .get(PyprojectKey.ATTRIBUTE, ""),

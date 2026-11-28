@@ -14,7 +14,7 @@ authors = [
 ]
 description = "Models for probabilistic reasoning"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
@@ -24,8 +24,8 @@ keywords=["probabilistic models", "probabilistic machine learning", "probability
 license = "LGPL-3.0-only"
 dynamic = ["version"]
 dependencies = [
-    "random-events>=26.10.0",
-    "krrood_compute_resources>=26.10.0",
+    "random-events>=26.11.0",
+    "krrood_compute_resources>=26.11.0",
     "networkx",
     "plotly",
     "scipy>=1.10",
@@ -49,11 +49,11 @@ dependencies = [
     "PySide6",
     "qt-material",
     "superqt",
-    "krrood-core>=26.10.0",
-    "krrood-serialization>=26.10.0",
-    "krrood-eql>=26.10.0",
-    "krrood-ormatic>=26.10.0",
-    "krrood-probabilistic>=26.10.0",
+    "krrood-core>=26.11.0",
+    "krrood-serialization>=26.11.0",
+    "krrood-eql>=26.11.0",
+    "krrood-ormatic>=26.11.0",
+    "krrood-probabilistic>=26.11.0",
     "causal-learn",
     "array-api-compat>=1.15",
     "array-api-extra>=0.11",
@@ -75,7 +75,7 @@ version = {attr = "probabilistic_model._version.__version__"}
 jax = [
     "jax>=0.6.0",
     "optax>=0.2.4",
-    "krrood_compute_resources[jax]>=26.10.0",
+    "krrood_compute_resources[jax]>=26.11.0",
 ]
 torch = [
     "torch>=2.4",
@@ -85,7 +85,7 @@ dev = [
     "pandas>=2.2.3",
     "graphviz",
     "matplotlib>=3.10.1",
-    "random_events>=5.0.1",
+    "random_events>=26.11.0",
     "typing_extensions>=4.13.2",
     "pytest-qt",
     "pytest-xvfb",

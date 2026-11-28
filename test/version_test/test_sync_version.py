@@ -73,6 +73,20 @@ def dependencies_of(pyproject_file: Path) -> dict[str, Requirement]:
     return {canonicalize_name(r.name): r for r in requirements}
 
 
+def optional_dependencies_of(pyproject_file: Path) -> dict[str, Requirement]:
+    """
+    :return: The ``[project.optional-dependencies]`` of a ``pyproject.toml`` across every
+        extra, by canonical name.
+    """
+    project = tomllib.loads(pyproject_file.read_text())["project"]
+    requirements = (
+        Requirement(text)
+        for specifiers in project.get("optional-dependencies", {}).values()
+        for text in specifiers
+    )
+    return {canonicalize_name(r.name): r for r in requirements}
+
+
 # %% finding the packages
 def test_every_version_module_in_the_repository_is_found():
     """
@@ -345,6 +359,75 @@ def test_a_static_version_of_a_package_holding_no_other_is_left_alone(
     assert unversioned.read_text() == before
 
 
+# %% bounding the optional dependencies on other packages
+@pytest.fixture
+def family_core_optional_dependencies(family_workspace) -> dict[str, Requirement]:
+    """
+    :return: The optional dependencies of ``family-core``, by canonical name, after
+        synchronizing.
+    """
+    family_workspace.synchronize()
+    return optional_dependencies_of(
+        family_workspace.root / "family" / "family-core" / "pyproject.toml"
+    )
+
+
+def test_an_optional_dependency_released_together_requires_exactly_its_version(
+    family_workspace, family_core_optional_dependencies
+):
+    """
+    Installing an extra never pulls in another release of the family.
+    """
+    expected = SpecifierSet(f"=={family_workspace.version}")
+
+    assert family_core_optional_dependencies["family-extra"].specifier == expected
+
+
+def test_an_optional_dependency_across_families_requires_at_least_the_version(
+    family_workspace, family_core_optional_dependencies
+):
+    loner = family_core_optional_dependencies["loner"]
+
+    assert loner.specifier == SpecifierSet(f">={family_workspace.version}")
+    assert loner.extras == {"cli"}
+
+
+def test_an_optional_dependency_on_a_third_party_package_is_left_alone(
+    family_core_optional_dependencies,
+):
+    third_party = family_core_optional_dependencies["third-party"]
+
+    assert third_party.specifier == SpecifierSet(">=2.0")
+
+
+def test_an_optional_dependency_in_an_inline_array_keeps_its_marker(
+    family_workspace,
+):
+    family_workspace.synchronize()
+
+    project = tomllib.loads(
+        (
+            family_workspace.root / "family" / "family-core" / "pyproject.toml"
+        ).read_text()
+    )["project"]
+    (inline,) = (
+        Requirement(text) for text in project["optional-dependencies"]["inline"]
+    )
+    assert inline.specifier == SpecifierSet(f"=={family_workspace.version}")
+    assert inline.marker == Requirement("family-extra ; sys_platform == 'linux'").marker
+
+
+def test_a_dependency_group_naming_a_sibling_is_left_alone(family_workspace):
+    family_workspace.synchronize()
+
+    document = tomllib.loads(
+        (
+            family_workspace.root / "family" / "family-core" / "pyproject.toml"
+        ).read_text()
+    )
+    assert document["dependency-groups"]["workspace"] == ["family-extra"]
+
+
 def test_synchronizing_a_family_twice_writes_nothing_the_second_time(
     family_workspace,
 ):
@@ -364,7 +447,12 @@ def test_this_repository_is_synchronized():
     assert repository.outdated_files() == []
 
 
-def test_every_dependency_on_another_package_of_this_repository_requires_its_version():
+@pytest.mark.parametrize(
+    "declared_dependencies", [dependencies_of, optional_dependencies_of]
+)
+def test_every_dependency_on_another_package_of_this_repository_requires_its_version(
+    declared_dependencies,
+):
     """
     Read back from the files with a TOML parser, independent of how the script writes
     them.
@@ -375,7 +463,7 @@ def test_every_dependency_on_another_package_of_this_repository_requires_its_ver
     }
 
     for package in packages.values():
-        for name, requirement in dependencies_of(package.pyproject_file).items():
+        for name, requirement in declared_dependencies(package.pyproject_file).items():
             if name not in packages or name == package.distribution_name:
                 continue
             released_together = repository.release_directory(

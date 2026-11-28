@@ -12,7 +12,7 @@ dependencies = [
     "sortedcontainers",
     "pybind11",
     "setuptools-scm",
-    "krrood-serialization>=26.10.0",
+    "krrood-serialization>=26.11.0",
 ]
 description = "Random random events for probabilistic reasoning"
 readme = "README.md"

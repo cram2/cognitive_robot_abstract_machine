@@ -109,11 +109,11 @@ exclude = ['(^|/)generated_module\.py$', '^test/dataset/']
 
 ## Installation
 
-The formatting tools are an optional dependency, pinned so every repository formats
-alike. The development tools need Python 3.11 or later:
+The development tools are the `krrood-development-tools` distribution, which pins the
+formatters so every repository formats alike. They need Python 3.11 or later:
 
 ```bash
-pip install "krrood[development-tools]"
+pip install krrood-development-tools
 ```
 
 ## Use with pre-commit
@@ -134,7 +134,7 @@ checks the lines it changes.
 
 To use rules that are not released yet, install krrood from a commit of
 cognitive_robot_abstract_machine:
-`pip install "krrood[development-tools] @ git+https://github.com/cram2/cognitive_robot_abstract_machine@<commit>#subdirectory=krrood"`.
+`pip install "krrood-development-tools @ git+https://github.com/cram2/cognitive_robot_abstract_machine@<commit>#subdirectory=krrood/krrood-development-tools"`.
 
 ## Project rules
 

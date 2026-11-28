@@ -5,29 +5,29 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "experiments"
 description = "Experiment scripts and actions for CRAM."
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 license = "LGPL-3.0-only"
 dynamic = ["version"]
 dependencies = [
     "line_profiler",
-    "coraplex>=26.10.0",
-    "cramph>=26.10.0",
-    "giskardpy>=26.10.0",
+    "coraplex>=26.11.0",
+    "cramph>=26.11.0",
+    "giskardpy>=26.11.0",
     "h5py",
-    "krrood-core>=26.10.0",
-    "krrood-eql>=26.10.0",
-    "krrood-ontomatic>=26.10.0",
-    "krrood-ormatic>=26.10.0",
-    "krrood-probabilistic>=26.10.0",
-    "krrood-serialization>=26.10.0",
-    "krrood-symbolic-math>=26.10.0",
-    "krrood_compute_resources[jax,torch]>=26.10.0",
-    "probabilistic_model[jax,torch]>=26.10.0",
+    "krrood-core>=26.11.0",
+    "krrood-eql>=26.11.0",
+    "krrood-ontomatic>=26.11.0",
+    "krrood-ormatic>=26.11.0",
+    "krrood-probabilistic>=26.11.0",
+    "krrood-serialization>=26.11.0",
+    "krrood-symbolic-math>=26.11.0",
+    "krrood_compute_resources[jax,torch]>=26.11.0",
+    "probabilistic_model[jax,torch]>=26.11.0",
     "psutil~=5.9.0",
     "pymysql",
-    "random_events>=26.10.0",
-    "semantic_digital_twin>=26.10.0",
-    "krrood_spatial_math[casadi]>=26.10.0",
+    "random_events>=26.11.0",
+    "semantic_digital_twin>=26.11.0",
+    "krrood_spatial_math[casadi]>=26.11.0",
 ]
 
 [tool.setuptools]

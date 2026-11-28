@@ -15,8 +15,6 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Scientific/Engineering",
@@ -25,10 +23,10 @@ authors = [
     {name = "Tom Schierenbeck", email = "tom_sch@uni-bremen.de"}
 ]
 dependencies = [
-    "krrood-core==26.10.0",
-    "krrood-serialization==26.10.0",
-    "krrood-code-generation==26.10.0",
-    "krrood-eql==26.10.0",
+    "krrood-core==26.11.0",
+    "krrood-serialization==26.11.0",
+    "krrood-code-generation==26.11.0",
+    "krrood-eql==26.11.0",
     "sqlalchemy",
     "numpy",
     "rustworkx>=0.14.0",

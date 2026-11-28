@@ -7,7 +7,7 @@ name = "krrood-probabilistic"
 dynamic = ["version"]
 description = "Probabilistic queries and feature extraction over entity queries."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 license = "LGPL-3.0-only"
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -15,8 +15,6 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Scientific/Engineering",
@@ -27,16 +25,16 @@ authors = [
     {name = "David Prüser", email = "david@pruesernet.de"}
 ]
 dependencies = [
-    "krrood-core==26.10.0",
-    "krrood-eql==26.10.0",
-    "krrood-ormatic==26.10.0",
-    "krrood-symbolic-math==26.10.0",
-    "krrood_compute_resources>=26.10.0",
+    "krrood-core==26.11.0",
+    "krrood-eql==26.11.0",
+    "krrood-ormatic==26.11.0",
+    "krrood-symbolic-math==26.11.0",
+    "krrood_compute_resources>=26.11.0",
     "numpy",
     "pandas",
     "sqlalchemy",
-    "probabilistic_model>=26.10.0",
-    "random_events>=26.10.0",
+    "probabilistic_model>=26.11.0",
+    "random_events>=26.11.0",
 ]
 
 [project.urls]

@@ -25,8 +25,8 @@ authors = [
     {name = "Abdelrhman Bassiouny", email = "abassiou@uni-bremen.de"}
 ]
 dependencies = [
-    "krrood-core==26.10.0",
-    "krrood-code-generation==26.10.0",
+    "krrood-core==26.11.0",
+    "krrood-code-generation==26.11.0",
     "sqlalchemy",
     "ipython",
     "anytree>=2.8.0",
