@@ -85,14 +85,16 @@ jobs:
       fail-fast: false
       matrix:
         distribution: *distributions
+        exclude:
+          - distribution: krrood
     # PyPI keeps a single pending trusted publisher per workflow and environment, so
     # each distribution publishes from an environment of its own.
-    environment:
+    environment: &publish_environment
       name: pypi-${{ matrix.distribution }}
       url: https://pypi.org/p/${{ matrix.distribution }}
     permissions:
       id-token: write  # required for trusted publishing
-    steps:
+    steps: &publish_steps
       - name: Download the dist of ${{ matrix.distribution }}
         uses: actions/download-artifact@v4
         with:
@@ -106,3 +108,18 @@ jobs:
         with:
           packages-dir: dist/
           verbose: 'true'
+
+  # The krrood distribution pins every krrood-* distribution, so it is published only
+  # once all of them are on PyPI; otherwise an installer falls back to an older krrood.
+  publish-krrood:
+    name: Publish ${{ matrix.distribution }} to PyPI
+    runs-on: ubuntu-latest
+    needs: [check-version, publish]
+    strategy:
+      matrix:
+        distribution:
+          - krrood
+    environment: *publish_environment
+    permissions:
+      id-token: write  # required for trusted publishing
+    steps: *publish_steps
