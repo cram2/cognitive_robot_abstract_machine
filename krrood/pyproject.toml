@@ -34,7 +34,7 @@ dependencies = [
 ]
 description = "A python package for Knowledge Representation and Reasoning systems based on Object Oriented Design: every krrood-* distribution."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 license = "LGPL-3.0-only"
 authors = [
     {name = "Abdelrhman Bassiouny", email = "abassiou@uni-bremen.de"},
@@ -47,8 +47,6 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Scientific/Engineering",

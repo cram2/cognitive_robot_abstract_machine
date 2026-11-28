@@ -9,7 +9,7 @@ authors = [
 ]
 description = "A generic statechart engine with node life cycles, transition conditions, ticking and composite nodes."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",

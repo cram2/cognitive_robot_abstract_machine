@@ -51,7 +51,10 @@ do not change. A library depends only on the distributions it imports:
 
 - The `development-tools` extra is gone: install `krrood-development-tools` instead of
   `krrood[development-tools]`.
-- `krrood-ormatic` needs Python 3.12 or newer ([#1065](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1065)).
+- `krrood-ormatic` needs Python 3.12 or newer ([#1065](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1065)), and so does every package that
+  depends on it or on random_events: krrood, krrood-probabilistic, probabilistic_model,
+  semantic_digital_twin and coraplex declare it now, so pip on an older Python fails
+  instead of installing their 26.10.0 release.
 - krrood's core imports nothing outside itself: SQLAlchemy, scipy, matplotlib,
   random_events and probabilistic_model load only where they are used ([#904](https://github.com/cram2/cognitive_robot_abstract_machine/pull/904), [#959](https://github.com/cram2/cognitive_robot_abstract_machine/pull/959),
   [#978](https://github.com/cram2/cognitive_robot_abstract_machine/pull/978), [#985](https://github.com/cram2/cognitive_robot_abstract_machine/pull/985), [#1003](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1003), [#1011](https://github.com/cram2/cognitive_robot_abstract_machine/pull/1011)).

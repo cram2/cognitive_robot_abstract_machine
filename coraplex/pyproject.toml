@@ -14,7 +14,7 @@ authors = [
 ]
 description = "A Python library for cognitive robot control."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",

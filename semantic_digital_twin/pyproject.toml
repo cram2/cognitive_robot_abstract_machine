@@ -14,7 +14,7 @@ authors = [
 ]
 description = "A world model that unifies kinematic information and semantic meaning for robotic world representations."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
